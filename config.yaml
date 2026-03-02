@@ -1,0 +1,35 @@
+# RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) - Phase 1
+# Update watchdog and artifact values per Sparrow/FDA limits and validation.
+
+paths:
+  scaler: models/artifacts/scaler.pkl
+  checkpoint: models/checkpoints/best_model.pth
+
+# LSL live stream (FR-1.1)
+lsl:
+  expected_hz: 250
+
+# HRV windows in seconds (FR-2.2): 30 s and 5 min
+hrv:
+  window_sec: [30, 300]
+
+# CWT for wavelet_filter.py
+wavelet:
+  family: "cmor"
+  scale_range: [1, 64]  # adjust per signal; baseline <0.5 Hz removal
+
+# artifact_scrubber.py - placeholder; update per validation
+artifact:
+  amplitude_mad_multiple: 5
+  rr_deviation_percent: 25
+
+# watchdog.py - Sparrow/FDA placeholders; update with real limits (FR-4.2)
+watchdog:
+  max_duration_minutes: 5
+  max_intensity: 1.0
+
+# train.py
+training:
+  learning_rate: 1.0e-3
+  batch_size: 32
+  max_epochs: 100  # N for AUROC contingency

@@ -1,0 +1,37 @@
+# Data and artifacts
+*.edf
+*.csv
+data/raw/*
+!data/raw/.gitkeep
+data/**/*.npy
+
+# Trained artifacts
+models/artifacts/*.pkl
+models/checkpoints/*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg
+
+# IDE / OS
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+
+# Optional: logs and experiment tracking
+*.log
+wandb/
