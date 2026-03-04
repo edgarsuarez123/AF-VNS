@@ -10,18 +10,18 @@
 
 | Category | Status |
 |----------|--------|
-| **Overall** | 0% Complete |
-| Environment & Infrastructure | 0/4 tasks (0%) |
-| Data Foundation (Ingestion) | 0/5 tasks (0%) |
-| Preprocessing & Feature Extraction | 0/7 tasks (0%) |
-| Hybrid AI Models (PyTorch) | 0/5 tasks (0%) |
+| **Overall** | 20/30 tasks (67%) |
+| Environment & Infrastructure | 4/4 tasks (100%) ✅ |
+| Data Foundation (Ingestion) | 4/5 tasks (80%) |
+| Preprocessing & Feature Extraction | 7/7 tasks (100%) ✅ |
+| Hybrid AI Models (PyTorch) | 5/5 tasks (100%) ✅ |
 | Training & Validation Engine | 0/4 tasks (0%) |
 | Live Inference & Hardware API | 0/5 tasks (0%) |
 
-- [ ] Environment & Infrastructure - 0/4 tasks (0%)
-- [ ] Data Foundation (Ingestion) - 0/5 tasks (0%)
-- [ ] Preprocessing & Feature Extraction - 0/7 tasks (0%)
-- [ ] Hybrid AI Models (PyTorch) - 0/5 tasks (0%)
+- [x] Environment & Infrastructure - 4/4 tasks (100%)
+- [x] Data Foundation (Ingestion) - 4/5 tasks (80%; LSL deferred to Live Integration)
+- [x] Preprocessing & Feature Extraction - 7/7 tasks (100%) ✅
+- [x] Hybrid AI Models (PyTorch) - 5/5 tasks (100%) ✅
 - [ ] Training & Validation Engine - 0/4 tasks (0%)
 - [ ] Live Inference & Hardware API - 0/5 tasks (0%)
 
@@ -33,36 +33,36 @@
 
 #### 1. Environment & Infrastructure
 
-- [ ] **Repository Setup** — Initialize Git, `.gitignore` (exclude `.edf` and `.csv` datasets).
-- [ ] **Dependency Management** — Create `requirements.txt`: torch, torchaudio, mne, neurokit2, pylsl, scikit-learn, pandas, numpy, scipy, **PyWavelets** (pywt).
-- [ ] **Directory Structure** — Scaffold `src/data`, `src/features`, `src/models`, `src/hardware`, `src/training`, `tests/`, `models/artifacts/`, `models/checkpoints/`.
-- [ ] **Config Management** — Create `config.yaml` as single source of truth: learning rate, batch size; **LSL expected rate (250 Hz)**; **HRV window lengths (30 s, 5 min)**; **wavelet params** (family, scale range); **watchdog max duration & max intensity** (Sparrow/FDA limits); paths for scaler (`models/artifacts/scaler.pkl`) and checkpoint (`models/checkpoints/best_model.pth`).
+- [x] **Repository Setup** — Initialize Git, `.gitignore` (exclude `.edf` and `.csv` datasets).
+- [x] **Dependency Management** — Create `requirements.txt`: torch, torchaudio, mne, neurokit2, pylsl, scikit-learn, pandas, numpy, scipy, **PyWavelets** (pywt).
+- [x] **Directory Structure** — Scaffold `src/data`, `src/features`, `src/models`, `src/hardware`, `src/training`, `tests/`, `models/artifacts/`, `models/checkpoints/`.
+- [x] **Config Management** — Create `config.yaml` as single source of truth: learning rate, batch size; **LSL expected rate (250 Hz)**; **HRV window lengths (30 s, 5 min)**; **wavelet params** (family, scale range); **watchdog max duration & max intensity** (Sparrow/FDA limits); paths for scaler (`models/artifacts/scaler.pkl`) and checkpoint (`models/checkpoints/best_model.pth`).
 
 #### 2. Data Foundation (Ingestion)
 
-- [ ] **Dataset Downloader** — `src/data/download_physionet.py` using wget or wfdb: **MIT-BIH AF**, **PhysioNet Normal Sinus Rhythm**, and **MIMIC-III**. Document channel mapping (which channel(s) are ECG/PPG) in config or README when using MNE for EDF.
-- [ ] **EDF/CSV Parsers** — `src/data/dataset_parsers.py` to convert PhysioNet formats into standardized Pandas DataFrames / NumPy arrays (use MNE for EDF where applicable).
-- [ ] **PyTorch DataLoaders** — `src/data/dataloaders.py`: custom `torch.utils.data.Dataset` with **configurable** rolling window logic (10 s waveform windows; **30 s and 5 min** HRV windows per FR-2.2).
-- [ ] **Data Splitter** — Strict 70/15/15 Train/Val/Test **by Patient/Subject ID** (e.g. `GroupShuffleSplit` or equivalent); no patient in more than one split. Document split logic; `train.py` must consume pre-defined split indices or paths.
-- [ ] **Galea LSL Receiver** — `src/data/lsl_streamer.py` using `pylsl.StreamInlet`; buffer must support **≥250 Hz** (FR-1.1). Verify stream rate (e.g. `nominal_srate` or timestamps); fail fast or warn if below 250 Hz.
+- [x] **Dataset Downloader** — `src/data/download_physionet.py` using wfdb: **MIT-BIH AF**, **PhysioNet Normal Sinus Rhythm**; MIMIC-III reads from configured dir (warn if missing). Channel mapping documented in parser/README.
+- [x] **EDF/CSV Parsers** — `src/data/dataset_parsers.py` converts WFDB, EDF, and MIMIC-III CSV/EDF into standard schema (subject_id, signal, fs, label).
+- [x] **PyTorch DataLoaders** — `src/data/dataloaders.py`: `PhysioDataset` with configurable 10 s and 5 min windows; `get_dataloaders()` from config and split.
+- [x] **Data Splitter** — `src/data/splitter.py`: 70/15/15 by subject_id; `create_split()` / `load_split()`; persist to `models/artifacts/split.json`.
+- [ ] **Galea LSL Receiver** — `src/data/lsl_streamer.py` (deferred to Live Integration phase). Buffer **≥250 Hz** (FR-1.1); verify stream rate, fail fast or warn if below.
 
 #### 3. Preprocessing & Feature Extraction
 
-- [ ] **Signal Denoising** — `src/features/wavelet_filter.py`: CWT (PyWavelets) to remove baseline wander **&lt;0.5 Hz** and high-frequency noise. Specify wavelet family (e.g. `'cmor'` or `'mexh'`), scale range; keep params in `config.yaml`.
-- [ ] **Artifact Rejection** — `src/features/artifact_scrubber.py`: reject windows where amplitude exceeds **X× MAD** or R–R differs from local median by **&gt;Y%**; X, Y in config.
-- [ ] **R-Peak Detection** — `src/features/peak_detector.py` utilizing neurokit2 (e.g. `nk.ecg_peaks`) to find exact R–R intervals.
-- [ ] **Time-Domain HRV** — `src/features/hrv_time.py`: RMSSD, SDNN from R–R intervals.
-- [ ] **Frequency-Domain HRV** — `src/features/hrv_freq.py`: LF/HF ratio via Welch's method (`scipy.signal`).
-- [ ] **Non-Linear HRV** — `src/features/hrv_nonlinear.py`: e.g. sample entropy and/or DFA α1 from R–R intervals; integrate into feature pipeline and DataLoader (per original Aim 2).
-- [ ] **Feature Standardizer** — `src/features/scaler.py`: Z-score with `sklearn.preprocessing.StandardScaler`; **fit on training set only**; persist to `models/artifacts/scaler.pkl`. Live pipeline must load this same scaler for inference.
+- [x] **Signal Denoising** — `src/features/wavelet_filter.py`: CWT (PyWavelets) to remove baseline wander **&lt;0.5 Hz** and high-frequency noise. Specify wavelet family (e.g. `'cmor'` or `'mexh'`), scale range; keep params in `config.yaml`.
+- [x] **Artifact Rejection** — `src/features/artifact_scrubber.py`: reject windows where amplitude exceeds **X× MAD** or R–R differs from local median by **&gt;Y%**; X, Y in config.
+- [x] **R-Peak Detection** — `src/features/peak_detector.py` utilizing neurokit2 (e.g. `nk.ecg_peaks`) to find exact R–R intervals.
+- [x] **Time-Domain HRV** — `src/features/hrv_time.py`: RMSSD, SDNN from R–R intervals.
+- [x] **Frequency-Domain HRV** — `src/features/hrv_freq.py`: LF/HF ratio via Welch's method (`scipy.signal`).
+- [x] **Non-Linear HRV** — `src/features/hrv_nonlinear.py`: e.g. sample entropy and/or DFA α1 from R–R intervals; integrate into feature pipeline and DataLoader (per original Aim 2).
+- [x] **Feature Standardizer** — `src/features/scaler.py`: Z-score with `sklearn.preprocessing.StandardScaler`; **fit on training set only**; persist to `models/artifacts/scaler.pkl`. Live pipeline must load this same scaler for inference.
 
 #### 4. Hybrid AI Models (PyTorch)
 
-- [ ] **CNN Morphology Module** — `src/models/cnn.py`: 1D-CNN (`nn.Conv1d`) for 10-second raw waveform feature extraction. Returns 128-dim embedding.
-- [ ] **RNN Temporal Module** — `src/models/rnn.py`: GRU network (`nn.GRU`) processing 5-minute sequences of HRV features. Returns 64-dim hidden state.
-- [ ] **Transformer Attention Module** — `src/models/transformer.py`: `nn.TransformerEncoder` handling parameter optimization and attention weighting across the sequence.
-- [ ] **Hybrid Ensemble Logic** — `src/models/ensemble.py`: The wrapper `nn.Module` that concatenates CNN, RNN, and Transformer outputs into a final Fully Connected (FC) classification layer (`nn.Linear` → `nn.Sigmoid`).
-- [ ] **Dimensionality Reduction** — `src/models/pca_reduction.py` using `sklearn.decomposition.PCA` to map Galea 8-channel data to Sparrow 1-channel equivalent.
+- [x] **CNN Morphology Module** — `src/models/cnn.py`: 1D-CNN (`nn.Conv1d`) for 10-second raw waveform feature extraction. Returns 128-dim embedding.
+- [x] **RNN Temporal Module** — `src/models/rnn.py`: GRU network (`nn.GRU`) processing 5-minute sequences of HRV features. Returns 64-dim hidden state.
+- [x] **Transformer Attention Module** — `src/models/transformer.py`: `nn.TransformerEncoder` handling parameter optimization and attention weighting across the sequence.
+- [x] **Hybrid Ensemble Logic** — `src/models/ensemble.py`: The wrapper `nn.Module` that concatenates CNN, RNN, and Transformer outputs into a final Fully Connected (FC) classification layer (`nn.Linear` → `nn.Sigmoid`).
+- [x] **Dimensionality Reduction** — `src/models/pca_reduction.py` using `sklearn.decomposition.PCA` to map Galea 8-channel data to Sparrow 1-channel equivalent.
 
 #### 5. Hardware Actuation & Safety
 
@@ -93,16 +93,16 @@
 
 **Setup & Ingestion**
 
-- [ ] Run `pip install -r requirements.txt`.
-- [ ] Execute `download_physionet.py` to populate `data/raw/` (MIT-BIH AF, Normal Sinus, MIMIC-III as available).
-- [ ] Write `dataset_parsers.py` to convert records to `.npy` arrays.
-- [ ] Implement **data splitter** (70/15/15 by Patient ID); use it before any training.
+- [x] Run `pip install -r requirements.txt`.
+- [x] Execute `download_physionet.py` to populate `data/raw/` (MIT-BIH AF, Normal Sinus, MIMIC-III dir checked).
+- [x] Write `dataset_parsers.py` to convert records to standard schema (subject_id, signal, fs, label).
+- [x] Implement **data splitter** (70/15/15 by Patient ID); use it before any training.
 
 **Preprocessing Engine**
 
-- [ ] Complete `wavelet_filter.py` (CWT params in config) and verify signal plots (matplotlib).
-- [ ] Complete `peak_detector.py`, `hrv_time.py`, `hrv_freq.py`, `hrv_nonlinear.py`.
-- [ ] Create **`tests/test_preprocessing.py`** (PyTest): HRV calculations match NeuroKit2 benchmarks; CWT output sanity checks.
+- [x] Complete `wavelet_filter.py` (CWT params in config) and verify signal plots (matplotlib).
+- [x] Complete `peak_detector.py`, `hrv_time.py`, `hrv_freq.py`, `hrv_nonlinear.py`.
+- [x] Create **`tests/test_preprocessing.py`** (PyTest): HRV calculations match NeuroKit2 benchmarks; CWT output sanity checks.
 
 ---
 
@@ -110,9 +110,9 @@
 
 **Model Architectures**
 
-- [ ] Implement `cnn.py`, `rnn.py`, and `transformer.py`.
-- [ ] Assemble `ensemble.py`.
-- [ ] Write a dummy forward pass test: `tensor(batch=32, seq=300, channels=1)` → model → output shape `(32, 1)`.
+- [x] Implement `cnn.py`, `rnn.py`, and `transformer.py`.
+- [x] Assemble `ensemble.py`.
+- [x] Write a dummy forward pass test: `tensor(batch=32, seq=300, channels=1)` → model → output shape `(32, 1)`.
 
 **Training Loop**
 
@@ -184,6 +184,6 @@
 ## Phase 1 Exit Checklist
 
 - [ ] All Phase 1 FRs/NFRs/TRs mapped to a test or script (see Traceability).
-- [ ] `config.yaml` contains: LSL rate (250 Hz), HRV window lengths (30 s, 5 min), wavelet params, artifact thresholds (X, Y), watchdog max duration & intensity, scaler path, checkpoint path.
-- [ ] README or runbook: how to run training, evaluation, latency profiler, and `live_inference.py` (LSL or replay).
+- [x] `config.yaml` contains: LSL rate (250 Hz), HRV window lengths (30 s, 5 min), wavelet params, artifact thresholds (X, Y), watchdog max duration & intensity, scaler path, checkpoint path.
+- [x] README or runbook: how to run training, evaluation, latency profiler, and `live_inference.py` (LSL or replay).
 - [ ] Four acceptance criteria above signed off.

@@ -1,0 +1,191 @@
+"""
+Convert WFDB, EDF, and MIMIC-III raw files into a single in-memory schema.
+
+Standard schema per record: subject_id (str), signal (1D ndarray), fs (float), label (int | None).
+ECG/PPG channel mapping: WFDB first channel; EDF/MIMIC per config/comment.
+"""
+
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import yaml
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+RecordDict = Dict[str, Any]  # subject_id, signal, fs, label
+
+
+def load_config(config_path: str = "config.yaml") -> dict:
+    """Load config from project root if needed."""
+    import os
+    if not os.path.isabs(config_path) and not os.path.isfile(config_path):
+        root = Path(__file__).resolve().parents[2]
+        config_path = root / config_path
+    with open(config_path) as f:
+        return yaml.safe_load(f)
+
+
+def _ensure_1d(signal: np.ndarray) -> np.ndarray:
+    """Take first channel if 2D, else return 1D."""
+    if signal.ndim == 2:
+        return signal[0] if signal.shape[0] < signal.shape[1] else signal[:, 0]
+    return signal
+
+
+def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optional[RecordDict]:
+    """Parse one WFDB record; return standard dict or None on failure."""
+    try:
+        import wfdb
+    except ImportError:
+        raise ImportError("wfdb is required")
+
+    if not (record_dir / f"{record_name}.hea").exists():
+        return None
+    try:
+        record = wfdb.rdrecord(record_name, pn_dir=None, pb_dir=str(record_dir))
+    except Exception:
+        return None
+    if record is None:
+        return None
+
+    signal = record.p_signal if record.p_signal is not None else record.d_signal
+    if signal is None:
+        return None
+    signal = _ensure_1d(np.asarray(signal, dtype=np.float64))
+
+    fs = float(record.fs)
+    label: Optional[int] = None
+    if db_name == "afdb":
+        try:
+            ann = wfdb.rdann(record_name, "atr", pn_dir=None, pb_dir=str(record_dir))
+        except Exception:
+            ann = None
+        if ann is not None and hasattr(ann, "symbol"):
+            # AF in MIT-BIH AF db: '(AF' or similar; treat any non-normal as AF=1
+            symbols = "".join(ann.symbol) if isinstance(ann.symbol, (list, np.ndarray)) else str(ann.symbol)
+            label = 1 if "AF" in symbols or "(AF" in symbols else 0
+        else:
+            label = 1  # afdb is AF cohort
+    elif db_name == "nsrdb":
+        label = 0  # Normal sinus rhythm
+
+    return {
+        "subject_id": record_name,
+        "signal": signal,
+        "fs": fs,
+        "label": label,
+    }
+
+
+def parse_wfdb_dir(record_dir: Path, db_name: str) -> List[RecordDict]:
+    """Parse all WFDB records in a directory."""
+    records = []
+    if not record_dir.is_dir():
+        return records
+    hea_files = list(record_dir.glob("*.hea"))
+    seen = set()
+    for hea in hea_files:
+        name = hea.stem
+        if name in seen:
+            continue
+        seen.add(name)
+        rec = parse_wfdb_record(record_dir, name, db_name)
+        if rec is not None:
+            records.append(rec)
+    return records
+
+
+def parse_edf_file(edf_path: Path, channel_idx: int = 0) -> Optional[RecordDict]:
+    """Parse one EDF file with MNE; primary channel at channel_idx (default ECG/PPG)."""
+    try:
+        import mne
+    except ImportError:
+        raise ImportError("mne is required for EDF")
+
+    raw = mne.io.read_raw_edf(str(edf_path), verbose=False)
+    data, times = raw.get_data(return_times=True)
+    signal = _ensure_1d(data)
+    fs = raw.info["sfreq"]
+    subject_id = edf_path.stem
+    return {
+        "subject_id": subject_id,
+        "signal": signal.astype(np.float64),
+        "fs": float(fs),
+        "label": None,
+    }
+
+
+def parse_mimic3_csv(csv_path: Path, subject_id_col: str = "subject_id", time_col: str = "time", signal_col: str = "ecg", label_col: Optional[str] = "label", fs: float = 250.0) -> Optional[RecordDict]:
+    """Parse one MIMIC-III CSV; columns: subject_id, time, ecg (or ppg), optional label."""
+    import pandas as pd
+    df = pd.read_csv(csv_path)
+    for col in (signal_col,):
+        if col not in df.columns and col == "ecg" and "ppg" in df.columns:
+            signal_col = "ppg"
+            break
+    if signal_col not in df.columns:
+        logger.warning("CSV %s missing signal column (tried ecg/ppg).", csv_path)
+        return None
+    signal = np.asarray(df[signal_col], dtype=np.float64)
+    if subject_id_col in df.columns:
+        sid = str(df[subject_id_col].iloc[0])
+    else:
+        sid = csv_path.stem
+    label = None
+    if label_col and label_col in df.columns:
+        # Majority vote or last value for segment
+        label = int(df[label_col].mode().iloc[0]) if len(df[label_col].dropna()) else None
+    return {
+        "subject_id": sid,
+        "signal": signal,
+        "fs": fs,
+        "label": label,
+    }
+
+
+def parse_mimic3_dir(mimic3_dir: Path, fs_default: float = 250.0) -> List[RecordDict]:
+    """Parse MIMIC-III directory: CSV(s) with subject_id, time, ecg/ppg, optional label; or EDF."""
+    records = []
+    if not mimic3_dir.is_dir():
+        return records
+    for f in mimic3_dir.iterdir():
+        if f.suffix.lower() == ".csv":
+            rec = parse_mimic3_csv(f, fs=fs_default)
+            if rec is not None:
+                records.append(rec)
+        elif f.suffix.lower() == ".edf":
+            rec = parse_edf_file(f)
+            if rec is not None:
+                records.append(rec)
+    return records
+
+
+def parse_all(config_path: str = "config.yaml") -> List[RecordDict]:
+    """Parse all configured sources (WFDB afdb/nsrdb, MIMIC-III) into standard list."""
+    config = load_config(config_path)
+    data_cfg = config.get("data", {})
+    raw_dir = Path(data_cfg.get("raw_dir", "data/raw"))
+    mimic3_subdir = Path(data_cfg.get("mimic3_subdir", "data/raw/mimic3"))
+
+    all_records: List[RecordDict] = []
+
+    afdb_path = raw_dir / "afdb"
+    if afdb_path.is_dir():
+        afdb_recs = parse_wfdb_dir(afdb_path, "afdb")
+        all_records.extend(afdb_recs)
+        logger.info("Parsed %d records from afdb", len(afdb_recs))
+    nsrdb_path = raw_dir / "nsrdb"
+    if nsrdb_path.is_dir():
+        nsr_recs = parse_wfdb_dir(nsrdb_path, "nsrdb")
+        all_records.extend(nsr_recs)
+        logger.info("Parsed %d records from nsrdb", len(nsr_recs))
+
+    if mimic3_subdir.is_dir() and any(mimic3_subdir.iterdir()):
+        mimic_recs = parse_mimic3_dir(mimic3_subdir)
+        all_records.extend(mimic_recs)
+        logger.info("Parsed %d records from MIMIC-III", len(mimic_recs))
+
+    return all_records
