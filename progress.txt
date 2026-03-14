@@ -465,6 +465,69 @@ FIXES APPLIED:
 
 Tests: 33/33 passing after all fixes.
 
+--- 2.12 MIMIC-III Cross-Dataset Validation Setup (2026-03-14) ---
+
+PURPOSE: The training val_auroc=0.9999 is suspiciously high. With only
+41 PhysioNet records (23 afdb + 18 nsrdb), the model likely exploits
+non-physiological dataset artifacts (record length patterns, noise
+profiles, equipment differences) rather than learning pure AF physiology.
+MIMIC-III cross-dataset validation (NFR-3.1: <5% F1 degradation) is the
+real test of whether the model generalizes.
+
+MIMIC-III DATA STRUCTURE:
+  The user downloaded the clinical MIMIC-III database (relational tables:
+  admissions, labs, diagnoses, etc.) — NOT raw ECG waveforms. The clinical
+  tables contain ICD diagnosis codes but no signal data. Separately,
+  PhysioNet hosts the MIMIC-III Waveform Database Matched Subset which
+  links ICU waveform recordings to clinical records.
+
+  - Clinical MIMIC-III: DIAGNOSES_ICD.csv has 46,520 patients, 10,271
+    with AF diagnosis (ICD-9 code 42731).
+  - Waveform Matched Subset: 10,282 patients have waveform recordings.
+  - Overlap: 3,035 AF patients and 7,247 non-AF patients have both
+    clinical diagnoses and waveform recordings.
+
+DOWNLOAD APPROACH:
+  Created src/data/download_mimic3_waveforms.py that:
+  1. Reads DIAGNOSES_ICD.csv to identify AF (42731) vs non-AF patients
+  2. Cross-references with MIMIC-III Waveform Matched Subset RECORDS list
+  3. For each selected patient, checks all available waveform records:
+     - Skips "numerics" records (fs=1 Hz — these are vital sign trends,
+       not ECG waveforms)
+     - Requires fs>1 Hz (actual waveforms are typically 125 Hz)
+     - Requires at least one ECG channel (II, I, V, MCL, etc.)
+     - Minimum 30 seconds duration (was 300s, reduced because many MIMIC
+       records are short segments; our CNN only needs 10s, and partial
+       HRV is acceptable for validation)
+     - Picks the longest qualifying record per patient
+  4. Downloads .hea + .dat files to data/raw/mimic3/
+  5. Renames files to p{subject_id}_{record} to avoid collisions
+  6. Writes .label files (1=AF, 0=non-AF) from ICD diagnosis
+
+  Target: 30 AF + 30 non-AF patients. Oversamples 3x to account for
+  patients without qualifying waveform records.
+
+WHY 30 SECONDS MINIMUM (not 5 minutes):
+  The 5-minute window is the gold standard for HRV analysis (ESC/NASPE
+  1996 guidelines). However, for model validation:
+  - The CNN branch only needs 10 seconds of raw ECG
+  - Records shorter than 5 minutes will have partial/zero HRV features
+    (NaN→0), but the CNN still produces valid predictions
+  - The model was trained to handle NaN HRV (7% of training rows were NaN)
+  - Getting real cross-dataset validation on 60 patients is more valuable
+    than getting perfect-length records on 10 patients
+  - Records with >=5 minutes will get full HRV; shorter ones test whether
+    the model degrades gracefully with partial features
+
+STATUS: Download script running. Downloading 30 AF + 30 non-AF patients
+  from MIMIC-III Waveform Matched Subset via PhysioNet authenticated API.
+
+NEXT AFTER DOWNLOAD:
+  1. Update dataset_parsers.py to read MIMIC-III WFDB records with .label files
+  2. Run evaluate.py on MIMIC-III holdout
+  3. Report AUROC, F1, sensitivity, specificity vs training performance
+  4. If F1 degradation >5%, investigate what the model is actually learning
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------
