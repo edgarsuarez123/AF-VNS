@@ -208,12 +208,22 @@ src/features/ and later src/hardware/).
 - Tests: test_watchdog.py, test_state_machine.py; latency profiler (10k
   heartbeats, p99 < 200 ms); 24 h HIL test.
 
---- 2.8 In progress ---
+--- 2.8 First Training Run (2026-03-14) ---
 
-- Fast-training cache and parallel precompute (--workers) are implemented;
-  see 2.5 and Section 5.
-- First training run launched 2026-03-13 using --use-cache on RTX 3080.
-  157,337 train / 43,062 val / 40,237 test samples.
+- Precompute cache completed: 157,337 train / 43,062 val / 40,237 test.
+  HRV NaN rate: ~7% per feature (down from ~89% before Round 2 fixes).
+- Training run: --use-cache on RTX 3080 (CUDA), batch_size=32.
+  ~220 batches/sec, ~22 sec/epoch. Early stopping at epoch 29 (patience=15).
+- Best checkpoint: epoch 14, val_auroc=0.999999.
+  Saved to models/checkpoints/best_model.pth.
+- LR scheduler triggered LR reduction; gradient clipping active.
+
+  WARNING: val_auroc=0.9999 is suspiciously high for 41 records. Likely
+  the model exploits non-physiological differences between afdb/nsrdb
+  (record lengths, noise profiles, residual resampling artifacts) rather
+  than learning pure AF physiology. MIMIC-III cross-dataset validation
+  (NFR-3.1) is critical to determine real generalization performance.
+  Patient-level split is verified correct (no leakage).
 
 --- 2.9 FIXED: Training Pipeline Bugs (identified 2026-03-13, fixed 2026-03-13) ---
 

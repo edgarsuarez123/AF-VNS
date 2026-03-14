@@ -135,8 +135,8 @@ After all tests pass:
 | 9    | Done        | 2026-03-13   |
 | 10   | Done        | 2026-03-13   |
 | 11   | Done        | 2026-03-13   |
-| 12   | In progress |              |
-| 13   | Pending     |              |
+| 12   | Done        | 2026-03-14   |
+| 13   | Done        | 2026-03-14   |
 | 14   | Done        | 2026-03-14   |
 
 ---
