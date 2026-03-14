@@ -19,8 +19,8 @@ Rounds 1–4 complete. Current state:
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
 | 19 | NaN fix + clean baseline metrics | Done | 2026-03-14 |
-| 20 | Download PhysioNet 2017 AF Challenge + parser | In Progress | |
-| 21 | Update split + rebuild cache | Not Started | |
+| 20 | Download PhysioNet 2017 AF Challenge + parser | Done | 2026-03-14 |
+| 21 | Update split + rebuild cache | In Progress | |
 | 22 | Retrain + cross-dataset eval | Not Started | |
 
 ---
