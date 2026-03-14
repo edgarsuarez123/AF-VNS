@@ -45,12 +45,13 @@ def test_window_shapes():
         long_window_sec=300.0,
     )
     assert len(dataset) > 0
-    short_t, long_t, label_t = dataset[0]
+    short_t, long_t, label_t, fs_out = dataset[0]
     assert short_t.shape == (1, int(10 * fs)), f"Expected (1, {10*fs}), got {short_t.shape}"
     assert long_t.shape == (1, int(300 * fs)), f"Expected (1, {300*fs}), got {long_t.shape}"
     assert label_t.shape == ()
     assert short_t.dtype == torch.float32
     assert long_t.dtype == torch.float32
+    assert isinstance(fs_out, (int, float)) and fs_out == fs
 
 
 def test_no_patient_leakage():
@@ -84,3 +85,37 @@ def test_load_split_roundtrip():
         t, v, te = create_split(records, str(split_path))
         t2, v2, te2 = load_split(str(split_path))
         assert t == t2 and v == v2 and te == te2
+
+
+def test_resampling_uniform_fs():
+    """After parse_all with target_fs=250, all records should have fs=250.0."""
+    import yaml as _yaml
+    from src.data.dataset_parsers import parse_all
+
+    # Create a minimal config with target_fs
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        cfg = {
+            "data": {
+                "raw_dir": "data/raw",
+                "mimic3_subdir": "data/raw/mimic3",
+                "target_fs": 250,
+            },
+        }
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump(cfg, f)
+        records = parse_all(cfg_path)
+        if len(records) == 0:
+            pytest.skip("No data available for resampling test")
+        for rec in records:
+            assert abs(rec["fs"] - 250.0) < 0.1, f"Record {rec['subject_id']} has fs={rec['fs']}, expected 250"
+
+
+def test_stride_increases_samples():
+    """PhysioDataset with stride_sec=5 produces more samples than stride_sec=10."""
+    fs = 250.0
+    records = _synthetic_records(fs=fs, num_subjects=3, duration_sec=400.0)
+    subject_ids = [r["subject_id"] for r in records]
+    ds_10 = PhysioDataset(records, subject_ids, waveform_sec=10.0, long_window_sec=300.0, stride_sec=10.0)
+    ds_5 = PhysioDataset(records, subject_ids, waveform_sec=10.0, long_window_sec=300.0, stride_sec=5.0)
+    assert len(ds_5) > len(ds_10), f"stride=5 ({len(ds_5)}) should yield more than stride=10 ({len(ds_10)})"

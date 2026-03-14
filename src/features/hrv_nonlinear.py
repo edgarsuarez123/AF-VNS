@@ -10,7 +10,7 @@ import numpy as np
 def compute_hrv_nonlinear(rr_intervals: np.ndarray) -> Dict[str, float]:
     """
     Compute sampen and dfa_alpha1 from R-R intervals (seconds).
-    Uses NeuroKit2 nk.entropy_sample and nk.dfa. Returns NaNs for short sequences.
+    Uses NeuroKit2 nk.entropy_sample and nk.hrv_nonlinear. Returns NaNs for short sequences.
     """
     rr = np.asarray(rr_intervals, dtype=np.float64).ravel()
     out: Dict[str, float] = {"sampen": np.nan, "dfa_alpha1": np.nan}
@@ -22,26 +22,27 @@ def compute_hrv_nonlinear(rr_intervals: np.ndarray) -> Dict[str, float]:
         return out
     # R-R in ms for neurokit2 (common convention)
     rr_ms = rr * 1000.0
+
+    # SampEn via entropy_sample (works on raw RR series)
     try:
-        out["sampen"] = float(nk.entropy_sample(rr_ms))
+        se = nk.entropy_sample(rr_ms)
+        # neurokit2 may return (value, info_dict) tuple or a scalar
+        if isinstance(se, tuple):
+            se = se[0]
+        out["sampen"] = float(se)
     except Exception:
         pass
+
+    # DFA via hrv_nonlinear (needs peaks as cumulative sample indices, not raw RR)
     try:
-        dfa_indices = nk.hrv_nonlinear(rr_ms, silent=True)
-        if dfa_indices is not None and hasattr(dfa_indices, "columns"):
-            for col in ("DFA_Alpha1", "HRV_DFA_alpha1", "DFA_alpha1"):
-                if col in dfa_indices.columns:
-                    out["dfa_alpha1"] = float(dfa_indices[col].iloc[0])
-                    break
-        if hasattr(dfa_indices, "iloc") and np.isnan(out["dfa_alpha1"]):
-            row = dfa_indices.iloc[0]
-            for k in ("DFA_Alpha1", "HRV_DFA_alpha1", "DFA_alpha1"):
-                if k in row:
-                    out["dfa_alpha1"] = float(row[k])
-                    break
+        peaks = np.cumsum(rr_ms).astype(int)
+        dfa_result = nk.hrv_nonlinear(peaks, sampling_rate=1000, silent=True)
+        if dfa_result is not None and hasattr(dfa_result, "columns"):
+            if "HRV_DFA_alpha1" in dfa_result.columns:
+                val = dfa_result["HRV_DFA_alpha1"].iloc[0]
+                if not np.isnan(val):
+                    out["dfa_alpha1"] = float(val)
     except Exception:
-        try:
-            out["dfa_alpha1"] = float(nk.dfa(rr_ms)[0])
-        except Exception:
-            pass
+        pass
+
     return out

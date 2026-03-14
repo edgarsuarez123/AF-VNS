@@ -5,14 +5,18 @@ paths:
   scaler: models/artifacts/scaler.pkl
   checkpoint: models/checkpoints/best_model.pth
   split: models/artifacts/split.json
+  cache_dir: models/artifacts/cache
 
 # Data paths and windows (Step 2; FR-1.2, FR-2.2)
 data:
   raw_dir: data/raw
   mimic3_subdir: data/raw/mimic3
   split_path: models/artifacts/split.json
+  splits_dir: data/splits  # optional: materialize_split.py creates train/val/test symlinks here
   waveform_sec: 10
   hrv_window_sec: 300  # 5 min for RNN; also use hrv.window_sec [30, 300] for short HRV
+  target_fs: 250  # resample all records to uniform rate (afdb=250Hz, nsrdb=128Hz)
+  stride_sec: 5   # 50% overlap for training windows; val/test stay non-overlapping
 
 # LSL live stream (FR-1.1)
 lsl:
@@ -21,7 +25,7 @@ lsl:
 # HRV windows in seconds (FR-2.2): 30 s and 5 min; subwindow for RNN sequence (Step 3)
 hrv:
   window_sec: [30, 300]
-  subwindow_sec: 30  # one HRV vector per 30 s -> 10 time steps over 5 min
+  subwindow_sec: 60  # one HRV vector per 60 s -> 5 time steps over 5 min
 
 # CWT for wavelet_filter.py
 wavelet:
@@ -30,8 +34,9 @@ wavelet:
 
 # artifact_scrubber.py - placeholder; update per validation
 artifact:
-  amplitude_mad_multiple: 5
-  rr_deviation_percent: 25
+  amplitude_mad_multiple: 30  # raised from 5: normal ECG QRS spikes are 5-25x MAD; only catch true lead-off/saturation
+  rr_deviation_percent: 60  # raised from 25: AF has irregular RR (40-60% deviation is normal in AF)
+  rr_fraction_threshold: 0.30  # reject only if >30% of beats are outliers (was np.any = 0%)
 
 # watchdog.py - Sparrow/FDA placeholders; update with real limits (FR-4.2)
 watchdog:
@@ -54,5 +59,5 @@ model:
   transformer_nhead: 4
   transformer_num_encoder_layers: 1
   transformer_dim_feedforward: 128
-  hrv_seq_len: 10
+  hrv_seq_len: 5
   hrv_n_features: 7

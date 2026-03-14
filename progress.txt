@@ -25,10 +25,10 @@ latency < 200 ms) in a controlled environment.
 2. WHAT HAS BEEN DONE (Implementation Summary)
 --------------------------------------------------------------------------------
 
-Overall status: 20/30 tasks (67%). Environment, Data Ingestion (except LSL),
-Preprocessing & Feature Extraction, and Hybrid AI Models are complete.
-Training & Validation Engine and Live Inference & Hardware API are not yet
-implemented.
+Overall status: 23/30 tasks (77%). Environment, Data Ingestion (except LSL),
+Preprocessing & Feature Extraction, Hybrid AI Models, and Training & Validation
+Engine are implemented (including fast-training cache and parallel precompute).
+Live Inference & Hardware API are not yet implemented.
 
 --- 2.1 Environment & Infrastructure (100%) ---
 
@@ -163,7 +163,27 @@ place for safety and traceability (FR-4.2, NFR-2.1).
     TR-2.3 (strip 80% channels, verify ≥75% baseline accuracy) and future
     Galea→Sparrow integration.
 
---- 2.5 Tests ---
+--- 2.5 Training & Validation (implemented) ---
+
+- src/training/train.py
+  - On-the-fly path: fit scaler on train only; per-batch HRV and denoised 10s
+    from long/short waveforms; BCEWithLogitsLoss, AdamW; save best checkpoint by
+    val AUROC; progress bars for scaler fit and per-epoch batches; CUDA when
+    available.
+  - Fast path: --use-cache loads precomputed HRV and denoised 10s from
+    models/artifacts/cache/ (build once via python -m src.training.precompute_cache);
+    target ≤1 h per epoch (GPU-bound).
+- src/training/precompute_cache.py: Optional parallel precompute via --workers N
+  (0 = all CPU cores); precompute_worker.py runs chunked HRV+denoised 10s in a
+  process pool to reduce cache build time (e.g. multi-core speedup). Config path
+  is resolved to absolute in the main process and passed to workers so that
+  precompute with --workers > 1 produces valid HRV (avoids all-NaN scaler-fit
+  failure when worker cwd differs from main).
+- src/training/evaluate.py: AUROC, F1, sensitivity, specificity; ROC and
+  confusion matrix plots to models/artifacts/.
+- src/training/visualize.py: training curves from training_log.csv.
+
+--- 2.6 Tests ---
 
 - tests/test_preprocessing.py: denoise length/power, HRV time vs NeuroKit2
   benchmark, HRV freq keys, pipeline output shape, scaler fit/load/transform,
@@ -177,19 +197,209 @@ place for safety and traceability (FR-4.2, NFR-2.1).
 These support Phase 1 acceptance (e.g. pytest suite, coverage for
 src/features/ and later src/hardware/).
 
---- 2.6 Not Yet Implemented ---
+--- 2.7 Not Yet Implemented ---
 
-- Training: src/training/train.py (BCEWithLogitsLoss, AdamW; fit scaler on
-  train only; persist scaler and best checkpoint).
-- Evaluation: src/training/evaluate.py (AUROC, F1, Sensitivity, Specificity;
-  MIMIC-III holdout; 5-fold CV; noise injection test).
 - LSL: src/data/lsl_streamer.py (and replay mode).
 - Hardware & safety: src/hardware/sparrow_api.py (mockable), watchdog.py
   (max duration/intensity from config; SafetyViolationException), state_machine.py.
 - Live: live_inference.py (LSL/replay → preprocess → model → state machine →
   MockSparrow via watchdog only).
+- Evaluation extensions: MIMIC-III holdout; 5-fold CV; noise injection test.
 - Tests: test_watchdog.py, test_state_machine.py; latency profiler (10k
   heartbeats, p99 < 200 ms); 24 h HIL test.
+
+--- 2.8 In progress ---
+
+- Fast-training cache and parallel precompute (--workers) are implemented;
+  see 2.5 and Section 5.
+- First training run launched 2026-03-13 using --use-cache on RTX 3080.
+  157,337 train / 43,062 val / 40,237 test samples.
+
+--- 2.9 FIXED: Training Pipeline Bugs (identified 2026-03-13, fixed 2026-03-13) ---
+
+PLAN.md updated with full fix plan (7 bugs across 7 files). All fixes applied:
+
+  1. scaler.py transform(): replaced row-level NaN mask with per-column loop
+     so valid features are scaled even when other columns in the same row are NaN.
+  2. precompute_cache.py: removed row-level pre-filter mask; fit_scaler handles
+     per-column NaN internally.
+  3. train.py: same pre-filter mask removal in _fit_scaler_from_train_dataset().
+  4. pipeline.py: changed subwindow_sec default from 30.0 to None; fixed config
+     read logic (was short-circuiting due to truthy default).
+  5. config.yaml: subwindow_sec 30→60 (more R-R intervals per window),
+     hrv_seq_len 10→5 (300/60=5 time steps).
+  6. hrv_freq.py: MIN_SAMPLES 64→32 (with 60s window, ~70 RR intervals is
+     comfortably above 32).
+  7. precompute_cache.py/train.py: HRV_STEPS constants updated (derived from
+     config in precompute_cache, set to 5 in train.py).
+
+  Tests: 25/25 passed (17 existing + 8 new regression tests for these bugs).
+
+--- 2.9 Background: HRV Feature Sparsity (identified 2026-03-13) ---
+
+Precomputed cache analysis (157,337 train samples × 10 timesteps = 1,573,370
+HRV rows) reveals severe feature sparsity:
+
+  Feature 0-1 (RMSSD, SDNN):       173,647 valid rows (~11%)
+  Feature 2-4 (LF, HF, LF/HF):        545 valid rows (~0.03%)
+  Feature 5-6 (SampEn, DFA α1):          0 valid rows (0%)
+
+The model is currently training with features 5-6 zeroed out entirely
+(NaN → 0 after scaling) and features 2-4 effectively zeroed out. The
+CNN branch (raw 10s waveform) is carrying nearly all classification signal.
+The RNN and Transformer branches receive mostly zeros.
+
+ROOT CAUSES (three independent issues):
+
+  1. Artifact scrubber R-R deviation threshold rejects AF windows.
+     artifact_scrubber.py rejects any window where an R-R interval deviates
+     >25% from the local median (config artifact.rr_deviation_percent: 25).
+     AF is defined by irregularly irregular R-R intervals — RR variability
+     of 40-60% is typical in AF. This means the scrubber systematically
+     rejects AF windows, which are exactly the positive class we need to
+     classify. This is the primary cause of the ~89% NaN rate in time-domain
+     features (RMSSD/SDNN). Normal sinus rhythm windows also get rejected
+     when respiratory sinus arrhythmia causes transient RR variation > 25%.
+
+  2. 30-second subwindow is too short for frequency-domain HRV.
+     hrv_freq.py requires MIN_SAMPLES = 64 R-R intervals for Welch PSD.
+     At a normal heart rate of 60-100 bpm, a 30s window produces only
+     ~30-50 beats → ~29-49 R-R intervals, well below 64. LF power
+     (0.04-0.15 Hz) also has a fundamental resolution problem: one full
+     LF cycle takes 7-25 seconds, so a 30s window captures at most 1-4
+     cycles — not enough for reliable spectral estimation. This is why
+     only 545 out of 1.57M rows have valid frequency features (those 545
+     are from subjects with very high heart rates).
+
+  3. Nonlinear features need longer time series.
+     SampEn and DFA α1 (via neurokit2) require sufficient embedding
+     dimensions and data length to converge. With ~30 R-R intervals per
+     30s window, neurokit2 silently returns NaN or fails. SampEn typically
+     needs ≥200 data points for stable estimates; DFA needs ≥100.
+
+RECOMMENDED FIXES (in order of priority):
+
+  A. Fix the artifact scrubber for AF data (highest priority).
+     The current R-R deviation threshold defeats the purpose of the
+     classifier. Options:
+       (a) Increase rr_deviation_percent to 60-80% (allows AF-typical
+           variability while still catching gross artifacts like lead-off).
+       (b) Disable R-R rejection entirely and rely on amplitude-MAD only.
+           R-R irregularity is a feature for the model, not an artifact.
+       (c) Use a two-stage approach: compute HRV with relaxed thresholds
+           for the AI pipeline; apply strict R-R checks only for the
+           safety/watchdog layer (FR-4.2) before stimulation.
+     This fix alone should raise time-domain feature coverage from ~11%
+     to 60-80%+.
+
+  B. Increase subwindow_sec from 30s to 60s (recommended compromise).
+     60s at 70 bpm → ~70 R-R intervals, just above MIN_SAMPLES = 64.
+     This gives 5 time steps per 5-min window (vs current 10), which is
+     still reasonable for RNN/Transformer temporal modeling. Trade-off:
+     coarser temporal resolution, but far more valid frequency features.
+
+     Alternative: 120s subwindow → ~140 R-R intervals (solidly above 64),
+     but only 2-3 time steps — too few for the RNN to learn sequences.
+     60s is the best balance.
+
+     If 60s is used, update config:
+       hrv.subwindow_sec: 60
+       model.hrv_seq_len: 5
+     And rebuild the cache (python -m src.training.precompute_cache).
+
+  C. Lower MIN_SAMPLES in hrv_freq.py from 64 to 32 (quick win).
+     Combined with fix B (60s window), this gives comfortable margin.
+     Welch's method with nperseg=min(256, len//2) still works at 32
+     samples; spectral estimates will be noisier but the model can learn
+     to weight them appropriately.
+
+  D. Tiered feature windows (future enhancement, not urgent).
+     Use 30s subwindows for time-domain HRV (RMSSD/SDNN need only ~10 RR
+     intervals) and compute frequency/nonlinear features once over the
+     full 5-min window as static features appended to each timestep. This
+     maximizes temporal resolution for time-domain while giving
+     frequency/nonlinear features enough data. Requires pipeline refactor.
+
+  E. Accept CNN-dominant training for now (pragmatic short-term).
+     The current training run will produce a model where the CNN branch
+     dominates (it sees raw waveform morphology — P-wave absence, f-waves,
+     irregular R-R — which are strong AF signals). The RNN/Transformer
+     branches contribute little with zeroed HRV. This is acceptable as a
+     Phase 1 baseline: if CNN-only AUROC meets NFR-2.1 (≥0.75), then
+     fixing HRV coverage is an enhancement, not a blocker.
+
+--- 2.10 Deep Pipeline Audit (2026-03-13) ---
+
+Cache rebuild was in progress (~67%, ~3.5 hrs) when deep audit revealed 5 additional
+issues that would invalidate the cache. Process killed to avoid wasting time. All
+fixes to be applied before a single rebuild.
+
+ISSUES FOUND:
+
+  1. CRITICAL: Mixed sampling rates create model bias.
+     AF records (afdb) are 250 Hz; NSR records (nsrdb) are 128 Hz. The CNN
+     receives raw waveform — AF always produces 2500 samples (250×10s), NSR
+     always produces 1280 samples (128×10s). After padding to uniform length,
+     the model can trivially learn the padding pattern as a proxy for the label.
+     This also biases HRV: peak detection at 128 Hz has coarser temporal
+     precision than at 250 Hz, introducing systematic feature-scale differences
+     between the two classes independent of physiology.
+     FIX: Resample all signals to uniform 250 Hz in dataset_parsers.py using
+     scipy.signal.resample. Added target_fs: 250 to config.yaml.
+
+  2. CRITICAL: Artifact rejection rejects valid AF windows (np.any logic).
+     artifact_scrubber.py line 55: np.any(dev_pct > rr_deviation_percent)
+     rejects a window if ANY single beat deviates >60% from median RR. AF is
+     defined by irregularly irregular RR — this systematically rejects the
+     positive class. Aim 2 methodology explicitly says "artifact detection and
+     correction" not rejection.
+     FIX: (a) New correct_rr_intervals() function that interpolates outlier
+     beats instead of discarding the window. (b) Change should_reject_window()
+     from np.any to fraction-based: reject only if >30% of beats deviate.
+     Added rr_fraction_threshold: 0.30 to config.yaml.
+
+  3. HIGH: SampEn and DFA always NaN (0% valid across 1.57M rows).
+     compute_hrv_nonlinear() calls neurokit2's entropy_sample (needs ~200 RR
+     intervals) and hrv_nonlinear/dfa (needs ~100). With 60s subwindow at
+     ~70 bpm = ~70 RR intervals — well below both thresholds.
+     FIX: Compute nonlinear features once over the full 5-min RR pool (~350
+     intervals at 70 bpm) and broadcast to all timesteps. Trades temporal
+     resolution for valid features. Time/freq features remain per-subwindow.
+
+  4. HIGH: NaN→0 masks data loss with no logging.
+     precompute_cache.py line 161: np.nan_to_num(hrv, nan=0.0) converts all
+     remaining NaN to zero. Model can't distinguish true zero variability from
+     missing data. After fixes 1-3, NaN count should drop from ~89% to <10%.
+     FIX: Add logging of NaN % before imputation so we can track improvement.
+
+  5. MAJOR: Non-overlapping windows waste ~50% of small dataset.
+     With only 41 records, non-overlapping 10s stride wastes potential training
+     data. PhysioDataset already accepts stride_sec (line 28-32) but
+     get_dataloaders() doesn't expose it.
+     FIX: Add stride_sec: 5 to config.yaml, wire through get_dataloaders()
+     for training set only (val/test stay non-overlapping for unbiased eval).
+
+DECISION: Kill cache rebuild, fix all 5 issues, then rebuild once.
+See PLAN.md Steps 6-13 for implementation order and details.
+
+TRAINING STRATEGY AFTER FIXES:
+
+  1. Apply fix A (relax artifact scrubber) + fix B (60s subwindow) + fix C
+     (lower MIN_SAMPLES) → rebuild cache → retrain. Compare AUROC to
+     CNN-only baseline.
+  2. If AUROC improves, the RNN/Transformer branches are contributing.
+     If not, investigate whether the HRV features add information beyond
+     what the CNN already captures from raw waveform.
+  3. Scaler was updated to fit per-column (not requiring all 7 features
+     valid per row) on 2026-03-13. This is in src/features/scaler.py.
+
+ADDITIONAL NOTE — Scaler fix applied 2026-03-13:
+
+  The original fit_scaler() required all 7 features to be non-NaN in a row
+  to include it in the scaler fit. With 0 fully-valid rows, this caused a
+  hard failure. Fixed to fit per-column: each feature's mean/variance is
+  computed from its own valid entries. This allows training to proceed even
+  with sparse features.
 
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
@@ -217,6 +427,9 @@ src/features/ and later src/hardware/).
 
 - Artifact rejection (MAD + R–R %): Simple, interpretable rules; thresholds in
   config to be updated after validation so we don’t over-reject or under-reject.
+  WARNING (2026-03-13): The 25% R-R deviation threshold systematically rejects
+  AF windows because AF is characterized by irregular R-R. See Section 2.9 for
+  diagnosis and recommended fixes.
 
 - Scaler fit on train only + persist: Prevents leakage; inference uses same
   scaling as training (NFR-3.1, generalizability).
@@ -233,6 +446,12 @@ src/features/ and later src/hardware/).
 - MockSparrow in Phase 1: All stimulation requests will go through the
   watchdog (no direct trigger_stim from AI). Phase 1 uses a mock to log
   commands and validate the control path without physical device.
+
+- Precompute workers and config path: Worker processes may have a different
+  current working directory than the main process, so passing a relative
+  config_path (e.g. "config.yaml") could lead to missing or wrong config and
+  all-NaN HRV; resolving to an absolute path in the main process and passing
+  that to workers ensures consistent config and valid HRV when using --workers > 1.
 
 --------------------------------------------------------------------------------
 4. TRACEABILITY (Selected FR/NFR/TR → Implementation)
@@ -262,9 +481,11 @@ TR-2.3  PCA / channel strip → pca_reduction.py, tests
 
 - For onboarding: Read Section 1–2 to see goal and what exists.
 - For “why” questions: See Section 3 (rationale) and Section 4 (traceability).
-- For next steps: See “Not Yet Implemented” in Section 2.6 and Phase 1
-  Implementation Plan (Weeks 3–4: training/eval; Week 5: CV & PCA tests;
+- For next steps: See “Not Yet Implemented” in Section 2.7 and "In progress" in Section 2.8; Phase 1
+  Implementation Plan (Week 5: CV & PCA tests;
   Weeks 6–8: LSL, hardware, live_inference, latency and HIL tests).
+- For fast training: Run precompute_cache once (use --workers 0 or --workers 4 for
+  parallel speedup), then train --use-cache.
 
 Update this file as new components are implemented and when key design
 decisions (e.g. artifact thresholds, watchdog limits) are finalized after

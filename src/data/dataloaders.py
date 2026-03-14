@@ -54,11 +54,11 @@ class PhysioDataset(Dataset):
     def __len__(self) -> int:
         return len(self._samples)
 
-    def __getitem__(self, i: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, i: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, float]:
         rec_idx, start = self._samples[i]
         rec = self._records[rec_idx]
         sig = np.asarray(rec["signal"], dtype=np.float64)
-        fs = rec["fs"]
+        fs = float(rec["fs"])
         n_short = int(fs * self.waveform_sec)
         n_long = int(fs * self.long_window_sec)
 
@@ -69,11 +69,11 @@ class PhysioDataset(Dataset):
             label = -1  # sentinel for unlabeled
         label_val = float(label) if label >= 0 else 0.0
 
-        # Channel-first: (1, T)
+        # Channel-first: (1, T); return fs for pipeline (waveform_to_hrv_sequence, waveform_10s_denoised)
         short_t = torch.from_numpy(short).float().unsqueeze(0)
         long_t = torch.from_numpy(long_).float().unsqueeze(0)
         label_t = torch.tensor(label_val, dtype=torch.float32)
-        return short_t, long_t, label_t
+        return short_t, long_t, label_t, fs
 
 
 def get_dataloaders(
@@ -96,6 +96,7 @@ def get_dataloaders(
     split_path = split_path or data_cfg.get("split_path", "models/artifacts/split.json")
     waveform_sec = data_cfg.get("waveform_sec", 10)
     long_sec = data_cfg.get("hrv_window_sec", 300)
+    stride_sec = data_cfg.get("stride_sec", None)  # None = non-overlapping
     batch_size = batch_size or train_cfg.get("batch_size", 32)
 
     if parsed_records is None:
@@ -108,7 +109,7 @@ def get_dataloaders(
     train_ids, val_ids, test_ids = load_split(split_path)
 
     train_ds = PhysioDataset(
-        parsed_records, train_ids, waveform_sec=waveform_sec, long_window_sec=long_sec
+        parsed_records, train_ids, waveform_sec=waveform_sec, long_window_sec=long_sec, stride_sec=stride_sec
     )
     val_ds = PhysioDataset(
         parsed_records, val_ids, waveform_sec=waveform_sec, long_window_sec=long_sec

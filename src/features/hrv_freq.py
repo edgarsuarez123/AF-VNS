@@ -9,7 +9,7 @@ from scipy import integrate, signal as scipy_signal
 
 LF_LO, LF_HI = 0.04, 0.15   # Hz
 HF_LO, HF_HI = 0.15, 0.4   # Hz
-MIN_SAMPLES = 64  # minimum for meaningful PSD
+MIN_SAMPLES = 32  # minimum for meaningful PSD
 
 
 def compute_hrv_freq(

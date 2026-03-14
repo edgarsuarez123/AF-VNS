@@ -44,12 +44,32 @@ def fit_scaler(
         path = config.get("paths", {}).get("scaler", "models/artifacts/scaler.pkl")
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     X = np.asarray(hrv_features_train, dtype=np.float64)
-    # Handle NaNs: fit on non-NaN rows only, or use nan-friendly strategy
-    mask = ~np.any(np.isnan(X), axis=1)
-    if np.sum(mask) == 0:
-        raise ValueError("No valid (non-NaN) rows in hrv_features_train")
+    # Per-column fit: compute mean/var from non-NaN entries per feature
+    # so partial rows (e.g. time-domain only) still contribute
+    n_features = X.shape[1]
+    means = np.zeros(n_features)
+    vars_ = np.ones(n_features)
+    n_samples_seen = 0
+    any_valid = False
+    for col in range(n_features):
+        col_vals = X[:, col]
+        valid = col_vals[~np.isnan(col_vals)]
+        if len(valid) > 0:
+            means[col] = valid.mean()
+            vars_[col] = valid.var() if len(valid) > 1 else 1.0
+            any_valid = True
+            n_samples_seen = max(n_samples_seen, len(valid))
+        else:
+            means[col] = 0.0
+            vars_[col] = 1.0
+    if not any_valid:
+        raise ValueError("No valid (non-NaN) values in any feature column of hrv_features_train")
     scaler = StandardScaler()
-    scaler.fit(X[mask])
+    scaler.mean_ = means
+    scaler.var_ = vars_
+    scaler.scale_ = np.sqrt(vars_)
+    scaler.n_samples_seen_ = n_samples_seen
+    scaler.n_features_in_ = n_features
     if joblib is not None:
         joblib.dump(scaler, path)
     else:
@@ -72,12 +92,15 @@ def load_scaler(path: Optional[str] = None, config_path: str = "config.yaml") ->
 
 
 def transform(features: np.ndarray, scaler: "StandardScaler") -> np.ndarray:
-    """Transform features (any shape with last dim n_features); NaNs passed through."""
+    """Transform features (any shape with last dim n_features); NaNs passed through per-column."""
     X = np.asarray(features, dtype=np.float64)
     orig_shape = X.shape
     X_flat = X.reshape(-1, orig_shape[-1])
-    nan_mask = np.any(np.isnan(X_flat), axis=1)
     out = np.full_like(X_flat, np.nan)
-    if np.any(~nan_mask):
-        out[~nan_mask] = scaler.transform(X_flat[~nan_mask])
+    n_features = X_flat.shape[1]
+    for col in range(n_features):
+        col_vals = X_flat[:, col]
+        valid = ~np.isnan(col_vals)
+        if np.any(valid):
+            out[valid, col] = (col_vals[valid] - scaler.mean_[col]) / scaler.scale_[col]
     return out.reshape(orig_shape).astype(np.float32)

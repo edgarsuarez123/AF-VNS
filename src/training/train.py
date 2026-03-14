@@ -1,0 +1,364 @@
+"""
+Training script for Hybrid Ensemble (Phase 1).
+Fit scaler on train only; on-the-fly HRV from 5-min window; save best checkpoint by val AUROC.
+"""
+
+import csv
+import logging
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from tqdm import tqdm
+
+# Project root for config and imports when run as script
+if __name__ == "__main__":
+    _root = Path(__file__).resolve().parents[2]
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
+
+from src.data.dataloaders import get_dataloaders
+from src.features.pipeline import waveform_10s_denoised, waveform_to_hrv_sequence
+from src.features.scaler import fit_scaler, load_scaler, transform
+
+from .build_model import build_model, load_config
+
+
+class _EmptyCacheDataset(torch.utils.data.Dataset):
+    """Placeholder dataset with 0 samples when val cache files are missing."""
+
+    def __init__(self, max_short_len: int):
+        self._max_short_len = max_short_len
+
+    def __len__(self):
+        return 0
+
+    def __getitem__(self, i):
+        raise IndexError("Empty dataset")
+
+
+class PrecomputedDataset(torch.utils.data.Dataset):
+    """Dataset that loads precomputed short (denoised 10s), scaled HRV, and labels from cache."""
+
+    def __init__(self, cache_dir: Path, split: str):
+        self.cache_dir = Path(cache_dir)
+        self.split = split
+        self._short = np.load(self.cache_dir / f"{split}_short.npy")
+        self._hrv = np.load(self.cache_dir / f"{split}_hrv_scaled.npy")
+        self._labels = np.load(self.cache_dir / f"{split}_labels.npy")
+
+    def __len__(self):
+        return len(self._labels)
+
+    def __getitem__(self, i):
+        short_i = torch.from_numpy(self._short[i : i + 1].astype(np.float32))  # (1, max_T)
+        hrv_i = torch.from_numpy(self._hrv[i].astype(np.float32))  # (seq_len, 7)
+        label_i = torch.tensor(self._labels[i], dtype=torch.float32)
+        return short_i, hrv_i, label_i
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+# Default config path when run as script
+CONFIG_PATH = "config.yaml"
+N_FEATURES = 7
+HRV_STEPS = 5
+
+
+def _pad_collate(batch):
+    """Collate 4-tuples (short, long, label, fs); pad short and long to max length in batch."""
+    shorts = [b[0] for b in batch]  # each (1, T_i)
+    longs = [b[1] for b in batch]
+    labels = torch.stack([b[2] for b in batch])
+    fs_list = [b[3] for b in batch]
+
+    max_short = max(s.shape[1] for s in shorts)
+    max_long = max(s.shape[1] for s in longs)
+    short_padded = torch.stack(
+        [F.pad(s, (0, max_short - s.shape[1]), value=0.0) for s in shorts]
+    )
+    long_padded = torch.stack(
+        [F.pad(s, (0, max_long - s.shape[1]), value=0.0) for s in longs]
+    )
+    return short_padded, long_padded, labels, fs_list
+
+
+def _fit_scaler_from_train_dataset(train_dataset, config_path: str, scaler_path: str):
+    """One pass over train dataset: compute HRV per sample, collect rows, fit scaler."""
+    all_rows = []
+    n = len(train_dataset)
+    for i in tqdm(range(n), desc="Fitting scaler", unit="sample"):
+        _, long_t, _, fs = train_dataset[i]
+        long_np = long_t.squeeze(0).numpy()
+        hrv = waveform_to_hrv_sequence(long_np, float(fs), config_path=config_path)
+        all_rows.append(hrv)
+    if not all_rows:
+        raise ValueError("No training samples for scaler fit")
+    X = np.vstack(all_rows)
+    fit_scaler(X, path=scaler_path, config_path=config_path)
+    logger.info("Fitted scaler on %d HRV rows (per-column NaN handled internally), saved to %s", X.shape[0], scaler_path)
+
+
+def _batch_to_device_and_model(
+    short_padded, long_padded, labels, fs_list, scaler, device, config_path: str
+):
+    """
+    Compute HRV and denoised 10s for batch; scale HRV; impute NaN with 0; return tensors on device.
+    """
+    B = short_padded.shape[0]
+    hrv_list = []
+    short_denoised_list = []
+    for b in range(B):
+        long_np = long_padded[b].squeeze(0).numpy()
+        short_np = short_padded[b].squeeze(0).numpy()
+        fs = float(fs_list[b])
+        hrv_b = waveform_to_hrv_sequence(long_np, fs, config_path=config_path)
+        short_d = waveform_10s_denoised(short_np, fs, config_path=config_path)
+        hrv_list.append(hrv_b)
+        short_denoised_list.append(short_d)
+
+    hrv_batch = np.stack(hrv_list, axis=0).astype(np.float32)
+    hrv_batch = transform(hrv_batch, scaler)
+    np.nan_to_num(hrv_batch, nan=0.0, copy=False)
+    hrv_t = torch.from_numpy(hrv_batch).float().to(device)
+
+    # Pad denoised 10s to same length in batch (may vary if fs varies)
+    lens = [s.size for s in short_denoised_list]
+    max_len = max(lens)
+    short_tensors = []
+    for s in short_denoised_list:
+        t = torch.from_numpy(np.asarray(s, dtype=np.float32))
+        short_tensors.append(F.pad(t.unsqueeze(0).unsqueeze(0), (0, max_len - t.size), value=0.0))
+    short_t = torch.cat(short_tensors, dim=0).to(device)
+
+    labels_t = labels.to(device)
+    return short_t, hrv_t, labels_t
+
+
+def run_validation(model, val_loader, scaler, device, config_path: str):
+    """Run validation set; return val_loss and val_auroc."""
+    model.eval()
+    all_logits = []
+    all_labels = []
+    total_loss = 0.0
+    n = 0
+    with torch.no_grad():
+        for batch in val_loader:
+            short_pad, long_pad, labels, fs_list = batch
+            short_t, hrv_t, labels_t = _batch_to_device_and_model(
+                short_pad, long_pad, labels, fs_list, scaler, device, config_path
+            )
+            logits = model(short_t, hrv_t).squeeze(-1)
+            loss = F.binary_cross_entropy_with_logits(logits, labels_t)
+            total_loss += loss.item() * short_t.shape[0]
+            n += short_t.shape[0]
+            all_logits.append(logits.cpu().numpy())
+            all_labels.append(labels_t.cpu().numpy())
+    if n == 0:
+        return 0.0, 0.0
+    val_loss = total_loss / n
+    logits_np = np.concatenate(all_logits, axis=0)
+    labels_np = np.concatenate(all_labels, axis=0)
+    probs = 1.0 / (1.0 + np.exp(-np.clip(logits_np, -50, 50)))
+    try:
+        from sklearn.metrics import roc_auc_score
+        val_auroc = float(roc_auc_score(labels_np, probs))
+    except Exception:
+        val_auroc = 0.0
+    return val_loss, val_auroc
+
+
+def run_validation_from_cache(model, val_loader, device):
+    """Run validation from precomputed cache batches (short, hrv, labels)."""
+    model.eval()
+    all_logits = []
+    all_labels = []
+    total_loss = 0.0
+    n = 0
+    with torch.no_grad():
+        for short_t, hrv_t, labels_t in val_loader:
+            short_t = short_t.to(device)
+            hrv_t = hrv_t.to(device)
+            labels_t = labels_t.to(device)
+            logits = model(short_t, hrv_t).squeeze(-1)
+            loss = F.binary_cross_entropy_with_logits(logits, labels_t)
+            total_loss += loss.item() * short_t.shape[0]
+            n += short_t.shape[0]
+            all_logits.append(logits.cpu().numpy())
+            all_labels.append(labels_t.cpu().numpy())
+    if n == 0:
+        return 0.0, 0.0
+    val_loss = total_loss / n
+    logits_np = np.concatenate(all_logits, axis=0)
+    labels_np = np.concatenate(all_labels, axis=0)
+    probs = 1.0 / (1.0 + np.exp(-np.clip(logits_np, -50, 50)))
+    try:
+        from sklearn.metrics import roc_auc_score
+        val_auroc = float(roc_auc_score(labels_np, probs))
+    except Exception:
+        val_auroc = 0.0
+    return val_loss, val_auroc
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Train Hybrid Ensemble (Phase 1).")
+    parser.add_argument("--config", default=CONFIG_PATH, help="Config YAML path")
+    parser.add_argument("--max-epochs", type=int, default=None, help="Override max epochs (e.g. 1 for smoke run)")
+    parser.add_argument(
+        "--use-cache",
+        action="store_true",
+        help="Train from precomputed cache (run python -m src.training.precompute_cache first)",
+    )
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    paths_cfg = config.get("paths", {})
+    data_cfg = config.get("data", {})
+    train_cfg = config.get("training", {})
+
+    checkpoint_path = paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth")
+    scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
+    cache_dir = Path(paths_cfg.get("cache_dir", "models/artifacts/cache"))
+    split_path = data_cfg.get("split_path", "models/artifacts/split.json")
+    lr = float(train_cfg.get("learning_rate", 1e-3))
+    batch_size = int(train_cfg.get("batch_size", 32))
+    max_epochs = args.max_epochs if args.max_epochs is not None else int(train_cfg.get("max_epochs", 100))
+
+    Path(checkpoint_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(scaler_path).parent.mkdir(parents=True, exist_ok=True)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info("Using device: %s", device)
+
+    use_cache = args.use_cache
+    if use_cache:
+        required = ["train_short.npy", "train_hrv_scaled.npy", "train_labels.npy", "cache_meta.json"]
+        missing = [f for f in required if not (cache_dir / f).exists()]
+        if missing:
+            logger.error(
+                "Cache missing or incomplete. Required: %s. Missing: %s. Run: python -m src.training.precompute_cache",
+                required,
+                missing,
+            )
+            sys.exit(1)
+        train_ds = PrecomputedDataset(cache_dir, "train")
+        try:
+            val_ds = PrecomputedDataset(cache_dir, "val")
+        except FileNotFoundError:
+            # Legacy cache without val files (precompute_cache now writes empty splits)
+            import json
+            with open(cache_dir / "cache_meta.json") as f:
+                meta = json.load(f)
+            max_t = meta.get("max_short_len", 3000)
+            val_ds = _EmptyCacheDataset(max_t)
+        train_loader = torch.utils.data.DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0,
+        )
+        val_loader = torch.utils.data.DataLoader(
+            val_ds,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+        )
+        scaler = None
+    else:
+        train_loader, val_loader, test_loader = get_dataloaders(
+            config_path=args.config,
+            split_path=split_path,
+            batch_size=batch_size,
+            create_split_if_missing=True,
+        )
+        train_loader = torch.utils.data.DataLoader(
+            train_loader.dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0,
+            collate_fn=_pad_collate,
+        )
+        val_loader = torch.utils.data.DataLoader(
+            val_loader.dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+            collate_fn=_pad_collate,
+        )
+        logger.info("Fitting scaler on training set...")
+        _fit_scaler_from_train_dataset(train_loader.dataset, args.config, scaler_path)
+        scaler = load_scaler(path=scaler_path, config_path=args.config)
+
+    model = build_model(config_path=args.config, checkpoint_path=None, device=device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    best_auroc = 0.0
+
+    log_path = Path(scaler_path).parent / "training_log.csv"
+    with open(log_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["epoch", "train_loss", "val_loss", "val_auroc"])
+
+    for epoch in range(max_epochs):
+        model.train()
+        train_loss_sum = 0.0
+        train_n = 0
+        pbar = tqdm(
+            train_loader,
+            desc=f"Epoch {epoch + 1}/{max_epochs}",
+            unit="batch",
+            leave=False,
+        )
+        if use_cache:
+            for short_t, hrv_t, labels_t in pbar:
+                short_t = short_t.to(device)
+                hrv_t = hrv_t.to(device)
+                labels_t = labels_t.to(device)
+                optimizer.zero_grad()
+                logits = model(short_t, hrv_t).squeeze(-1)
+                loss = F.binary_cross_entropy_with_logits(logits, labels_t)
+                loss.backward()
+                optimizer.step()
+                train_loss_sum += loss.item() * short_t.shape[0]
+                train_n += short_t.shape[0]
+                pbar.set_postfix(loss=f"{loss.item():.4f}")
+        else:
+            for batch in pbar:
+                short_pad, long_pad, labels, fs_list = batch
+                short_t, hrv_t, labels_t = _batch_to_device_and_model(
+                    short_pad, long_pad, labels, fs_list, scaler, device, args.config
+                )
+                optimizer.zero_grad()
+                logits = model(short_t, hrv_t).squeeze(-1)
+                loss = F.binary_cross_entropy_with_logits(logits, labels_t)
+                loss.backward()
+                optimizer.step()
+                train_loss_sum += loss.item() * short_t.shape[0]
+                train_n += short_t.shape[0]
+                pbar.set_postfix(loss=f"{loss.item():.4f}")
+
+        train_loss = train_loss_sum / train_n if train_n else 0.0
+        if use_cache:
+            val_loss, val_auroc = run_validation_from_cache(model, val_loader, device)
+        else:
+            val_loss, val_auroc = run_validation(model, val_loader, scaler, device, args.config)
+        logger.info(
+            "Epoch %d  train_loss=%.4f  val_loss=%.4f  val_auroc=%.4f",
+            epoch + 1, train_loss, val_loss, val_auroc,
+        )
+        with open(log_path, "a", newline="") as f:
+            csv.writer(f).writerow([epoch + 1, f"{train_loss:.6f}", f"{val_loss:.6f}", f"{val_auroc:.6f}"])
+
+        if val_auroc > best_auroc:
+            best_auroc = val_auroc
+            torch.save({"state_dict": model.state_dict(), "epoch": epoch + 1, "val_auroc": val_auroc}, checkpoint_path)
+            logger.info("Saved best checkpoint (val_auroc=%.4f) to %s", val_auroc, checkpoint_path)
+
+    logger.info("Training finished. Best val_auroc=%.4f", best_auroc)
+
+
+if __name__ == "__main__":
+    main()

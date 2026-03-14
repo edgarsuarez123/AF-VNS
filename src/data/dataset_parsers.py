@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import yaml
+from scipy.signal import resample as _scipy_resample
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,6 +36,14 @@ def _ensure_1d(signal: np.ndarray) -> np.ndarray:
     return signal
 
 
+def _resample_to_target_fs(signal: np.ndarray, fs_orig: float, fs_target: float) -> np.ndarray:
+    """Resample signal from fs_orig to fs_target using FFT-based resampling."""
+    if abs(fs_orig - fs_target) < 0.1:
+        return signal
+    n_target = int(len(signal) * fs_target / fs_orig)
+    return _scipy_resample(signal, n_target).astype(np.float64)
+
+
 def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optional[RecordDict]:
     """Parse one WFDB record; return standard dict or None on failure."""
     try:
@@ -42,10 +51,12 @@ def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optio
     except ImportError:
         raise ImportError("wfdb is required")
 
-    if not (record_dir / f"{record_name}.hea").exists():
+    record_path = record_dir / record_name
+    if not (record_path.with_suffix(".hea")).exists():
         return None
     try:
-        record = wfdb.rdrecord(record_name, pn_dir=None, pb_dir=str(record_dir))
+        # Pass full path for local files (wfdb accepts path/to/record without extension)
+        record = wfdb.rdrecord(str(record_path))
     except Exception:
         return None
     if record is None:
@@ -60,13 +71,14 @@ def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optio
     label: Optional[int] = None
     if db_name == "afdb":
         try:
-            ann = wfdb.rdann(record_name, "atr", pn_dir=None, pb_dir=str(record_dir))
+            ann = wfdb.rdann(str(record_path), "atr")
         except Exception:
             ann = None
-        if ann is not None and hasattr(ann, "symbol"):
-            # AF in MIT-BIH AF db: '(AF' or similar; treat any non-normal as AF=1
-            symbols = "".join(ann.symbol) if isinstance(ann.symbol, (list, np.ndarray)) else str(ann.symbol)
-            label = 1 if "AF" in symbols or "(AF" in symbols else 0
+        if ann is not None and hasattr(ann, "aux_note"):
+            # AF rhythm labels in MIT-BIH AF db are in aux_note (e.g. '(AFIB', '(AFL')
+            # symbol contains beat codes (N, V, Q) which never include 'AF'
+            notes = "".join(ann.aux_note) if isinstance(ann.aux_note, (list, np.ndarray)) else str(ann.aux_note)
+            label = 1 if "AFIB" in notes or "AFL" in notes or "(AF" in notes else 0
         else:
             label = 1  # afdb is AF cohort
     elif db_name == "nsrdb":
@@ -80,10 +92,23 @@ def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optio
     }
 
 
+def _wfdb_dir_with_hea(base: Path) -> Optional[Path]:
+    """Return base if it contains .hea files, else first subdir that does (e.g. afdb/files or nsrdb/versioned)."""
+    if not base.is_dir():
+        return None
+    if list(base.glob("*.hea")):
+        return base
+    for sub in sorted(base.iterdir()):
+        if sub.is_dir() and list(sub.glob("*.hea")):
+            return sub
+    return None
+
+
 def parse_wfdb_dir(record_dir: Path, db_name: str) -> List[RecordDict]:
-    """Parse all WFDB records in a directory."""
+    """Parse all WFDB records in a directory (or its first subdir that contains .hea)."""
     records = []
-    if not record_dir.is_dir():
+    record_dir = _wfdb_dir_with_hea(record_dir)
+    if record_dir is None:
         return records
     hea_files = list(record_dir.glob("*.hea"))
     seen = set()
@@ -187,5 +212,14 @@ def parse_all(config_path: str = "config.yaml") -> List[RecordDict]:
         mimic_recs = parse_mimic3_dir(mimic3_subdir)
         all_records.extend(mimic_recs)
         logger.info("Parsed %d records from MIMIC-III", len(mimic_recs))
+
+    # Resample to uniform rate if target_fs is set (avoids sampling-rate bias in CNN)
+    target_fs = float(data_cfg.get("target_fs", 0))
+    if target_fs > 0:
+        for rec in all_records:
+            if abs(rec["fs"] - target_fs) >= 0.1:
+                logger.info("Resampling %s from %.0f Hz to %.0f Hz", rec["subject_id"], rec["fs"], target_fs)
+                rec["signal"] = _resample_to_target_fs(rec["signal"], rec["fs"], target_fs)
+                rec["fs"] = target_fs
 
     return all_records

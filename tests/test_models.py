@@ -27,16 +27,16 @@ def test_cnn_shape():
 
 def test_rnn_shape():
     model = GRUEncoder(RNNConfig(input_size=7, hidden_size=64, num_layers=1))
-    x = torch.randn(32, 10, 7)
+    x = torch.randn(32, 5, 7)
     y = model(x)
     assert y.shape == (32, 64)
 
 
 def test_transformer_shape():
     model = TransformerEncoder(
-        TransformerConfig(n_features=7, d_model=64, nhead=4, num_encoder_layers=1, seq_len=10)
+        TransformerConfig(n_features=7, d_model=64, nhead=4, num_encoder_layers=1, seq_len=5)
     )
-    x = torch.randn(32, 10, 7)
+    x = torch.randn(32, 5, 7)
     y = model(x)
     assert y.shape == (32, 64)
 
@@ -44,7 +44,7 @@ def test_transformer_shape():
 def test_ensemble_dummy_forward():
     model = HybridEnsemble(EnsembleConfig())
     waveform = torch.randn(32, 1, 2500)
-    hrv_seq = torch.randn(32, 10, 7)
+    hrv_seq = torch.randn(32, 5, 7)
     logits = model(waveform, hrv_seq)
     assert logits.shape == (32, 1)
 

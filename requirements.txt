@@ -2,6 +2,7 @@
 #   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 # Use cu118, cu121, or cu124 to match your driver. See https://pytorch.org/get-started/locally/
 
+tqdm>=4.65.0
 mne>=1.6.0
 neurokit2>=0.2.7
 pylsl>=1.16.0
