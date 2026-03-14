@@ -83,7 +83,22 @@ Commit: `feat: regenerate split with Challenge 2017, rebuild cache`
 - Rounds 1-4 complete. 37/37 tests passing.
 - Step 19 done: NaN fix committed, clean MIMIC baseline AUROC=0.6656
 - Step 20 done: Challenge 2017 downloaded (738 AF + 5,050 Normal)
-- Step 20b: ltafdb downloading in background (~84 records, ~3GB)
+- Step 20b: ltafdb downloading in background — 183 segments from 9/84 records complete
+  - Check: `Get-Content "C:\Users\Edgar\AF VNS\ltafdb_download_err.log" -Tail 3`
+  - Count: `cd data/raw/ltafdb && ls *.label | wc -l`
 - Step 20c done: pos_weight added to training loop
-- After ltafdb: ~3,415 AF vs ~5,068 Normal (1:1.5 ratio, pos_weight handles rest)
-- **Next:** Wait for ltafdb download → delete split.json → rebuild cache → train
+- Expected final: ~3,415 AF vs ~5,068 Normal (1:1.5 ratio)
+
+**Next (Step 21) — after ltafdb download completes:**
+1. Verify segment count: `cd data/raw/ltafdb && ls *.label | wc -l` (expect ~2,600+)
+2. split.json already deleted. Cache already cleared.
+3. Rebuild cache (background):
+   ```powershell
+   Start-Process -WindowStyle Hidden ".venv\Scripts\python.exe" `
+     -ArgumentList "-m src.training.precompute_cache --config config.yaml --workers 4" `
+     -WorkingDirectory "C:\Users\Edgar\AF VNS" `
+     -RedirectStandardOutput "precompute.log" `
+     -RedirectStandardError "precompute_err.log"
+   ```
+4. Monitor: `Get-Content precompute_err.log -Tail 5`
+5. After cache done → commit → train → eval MIMIC holdout
