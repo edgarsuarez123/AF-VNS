@@ -47,7 +47,7 @@ class HybridEnsemble(nn.Module):
     def forward(self, waveform_10s: torch.Tensor, hrv_sequence: torch.Tensor) -> torch.Tensor:
         """
         waveform_10s: (B, 1, T)
-        hrv_sequence: (B, 10, 7) (scaled)
+        hrv_sequence: (B, seq_len, 7) (scaled)
         returns: (B, 1) logits
         """
         cnn_emb = self.cnn(waveform_10s)

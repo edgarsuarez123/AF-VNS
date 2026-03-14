@@ -1,7 +1,7 @@
 """
 RNN/GRU Temporal Module (FR-3.2).
 
-Input:  (B, seq_len=10, n_features=7) HRV feature sequence
+Input:  (B, seq_len, n_features=7) HRV feature sequence
 Output: (B, hidden_size) temporal embedding
 """
 

@@ -46,9 +46,9 @@ class PrecomputedDataset(torch.utils.data.Dataset):
     def __init__(self, cache_dir: Path, split: str):
         self.cache_dir = Path(cache_dir)
         self.split = split
-        self._short = np.load(self.cache_dir / f"{split}_short.npy")
-        self._hrv = np.load(self.cache_dir / f"{split}_hrv_scaled.npy")
-        self._labels = np.load(self.cache_dir / f"{split}_labels.npy")
+        self._short = np.load(self.cache_dir / f"{split}_short.npy", mmap_mode="r")
+        self._hrv = np.load(self.cache_dir / f"{split}_hrv_scaled.npy", mmap_mode="r")
+        self._labels = np.load(self.cache_dir / f"{split}_labels.npy", mmap_mode="r")
 
     def __len__(self):
         return len(self._labels)
@@ -131,7 +131,7 @@ def _batch_to_device_and_model(
     short_tensors = []
     for s in short_denoised_list:
         t = torch.from_numpy(np.asarray(s, dtype=np.float32))
-        short_tensors.append(F.pad(t.unsqueeze(0).unsqueeze(0), (0, max_len - t.size), value=0.0))
+        short_tensors.append(F.pad(t.unsqueeze(0).unsqueeze(0), (0, max_len - t.numel()), value=0.0))
     short_t = torch.cat(short_tensors, dim=0).to(device)
 
     labels_t = labels.to(device)
@@ -295,7 +295,12 @@ def main():
 
     model = build_model(config_path=args.config, checkpoint_path=None, device=device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="max", patience=5, factor=0.5, min_lr=1e-6
+    )
     best_auroc = 0.0
+    patience = 15
+    epochs_without_improvement = 0
 
     log_path = Path(scaler_path).parent / "training_log.csv"
     with open(log_path, "w", newline="") as f:
@@ -321,6 +326,7 @@ def main():
                 logits = model(short_t, hrv_t).squeeze(-1)
                 loss = F.binary_cross_entropy_with_logits(logits, labels_t)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
                 train_loss_sum += loss.item() * short_t.shape[0]
                 train_n += short_t.shape[0]
@@ -335,6 +341,7 @@ def main():
                 logits = model(short_t, hrv_t).squeeze(-1)
                 loss = F.binary_cross_entropy_with_logits(logits, labels_t)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
                 train_loss_sum += loss.item() * short_t.shape[0]
                 train_n += short_t.shape[0]
@@ -345,17 +352,26 @@ def main():
             val_loss, val_auroc = run_validation_from_cache(model, val_loader, device)
         else:
             val_loss, val_auroc = run_validation(model, val_loader, scaler, device, args.config)
+        current_lr = optimizer.param_groups[0]["lr"]
         logger.info(
-            "Epoch %d  train_loss=%.4f  val_loss=%.4f  val_auroc=%.4f",
-            epoch + 1, train_loss, val_loss, val_auroc,
+            "Epoch %d  train_loss=%.4f  val_loss=%.4f  val_auroc=%.4f  lr=%.2e",
+            epoch + 1, train_loss, val_loss, val_auroc, current_lr,
         )
         with open(log_path, "a", newline="") as f:
             csv.writer(f).writerow([epoch + 1, f"{train_loss:.6f}", f"{val_loss:.6f}", f"{val_auroc:.6f}"])
 
+        scheduler.step(val_auroc)
+
         if val_auroc > best_auroc:
             best_auroc = val_auroc
+            epochs_without_improvement = 0
             torch.save({"state_dict": model.state_dict(), "epoch": epoch + 1, "val_auroc": val_auroc}, checkpoint_path)
             logger.info("Saved best checkpoint (val_auroc=%.4f) to %s", val_auroc, checkpoint_path)
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= patience:
+                logger.info("Early stopping at epoch %d (no improvement for %d epochs)", epoch + 1, patience)
+                break
 
     logger.info("Training finished. Best val_auroc=%.4f", best_auroc)
 

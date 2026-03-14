@@ -1,7 +1,7 @@
 """
 Transformer Attention Module (FR-3.3, Step 4 Option B).
 
-Input:  (B, seq_len=10, n_features=7) HRV feature sequence
+Input:  (B, seq_len, n_features=7) HRV feature sequence
 Output: (B, d_model) temporal-attention embedding (default 64)
 """
 
@@ -22,7 +22,7 @@ class TransformerConfig:
     num_encoder_layers: int = 1
     dim_feedforward: int = 128
     dropout: float = 0.1
-    seq_len: int = 10
+    seq_len: int = 5
     pooling: str = "mean"  # "mean" or "last"
 
 

@@ -137,6 +137,28 @@ After all tests pass:
 | 11   | Done        | 2026-03-13   |
 | 12   | In progress |              |
 | 13   | Pending     |              |
+| 14   | Done        | 2026-03-14   |
+
+---
+
+## Round 3: Training Loop Quality Fixes (Post-Audit, 2026-03-14)
+
+Senior ML engineer audit found 7 issues in the training loop and model code.
+**None affect the precompute cache.** All changes are in training code, model defaults, and docstrings.
+
+### Step 14: Training loop + code quality fixes
+
+| # | Fix | File | Why |
+|---|-----|------|-----|
+| 1 | LR scheduler (ReduceLROnPlateau, patience=5, factor=0.5) | `train.py` | Without decay, training plateaus ~epoch 20 and wastes remaining epochs |
+| 2 | Early stopping (patience=15) | `train.py` | Stops training if no AUROC improvement for 15 epochs — saves hours |
+| 3 | Gradient clipping (max_norm=1.0) | `train.py` | Prevents weight explosion from noisy batches |
+| 4 | Memory-mapped cache loading (mmap_mode="r") | `train.py` | Loads data on demand instead of 1.5+ GB into RAM at once |
+| 5 | Fix `t.size` → `t.numel()` in on-the-fly path | `train.py` | `t.size` is a method on torch tensors, not an int — would crash |
+| 6 | TransformerConfig default seq_len 10→5 | `transformer.py` | Matches actual config (was overridden at runtime but default was wrong) |
+| 7 | Fix stale docstrings (seq_len=10→seq_len) | `ensemble.py`, `rnn.py`, `transformer.py` | Documentation accuracy |
+
+All 33 tests passing after fixes.
 
 **Step 5 note:** Cache rebuild killed at 67% — deep audit found 5 more issues (Steps 6-11) that would invalidate the cache. Fix all before single rebuild.
 

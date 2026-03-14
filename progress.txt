@@ -2,7 +2,7 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: March 2025
+Last updated: 2026-03-14
 
 --------------------------------------------------------------------------------
 1. PROJECT GOAL & CONTEXT
@@ -400,6 +400,60 @@ ADDITIONAL NOTE — Scaler fix applied 2026-03-13:
   hard failure. Fixed to fit per-column: each feature's mean/variance is
   computed from its own valid entries. This allows training to proceed even
   with sparse features.
+
+--- 2.11 Training Loop Quality Fixes (2026-03-14, post-audit) ---
+
+Senior ML engineer audit of the full codebase identified 7 issues in the
+training loop and model code. None of these affect the precompute cache —
+all changes are in training code, model defaults, and docstrings.
+
+FIXES APPLIED:
+
+  1. LR scheduler — ReduceLROnPlateau (patience=5, factor=0.5, min_lr=1e-6).
+     Why: A flat learning rate at 1e-3 for 100 epochs means the model makes
+     the same size adjustments even when it's close to optimal. This causes
+     the model to plateau around epoch 20-30 and never converge to the best
+     solution. The scheduler watches val_auroc; if it doesn't improve for 5
+     epochs, it halves the learning rate, allowing finer convergence.
+
+  2. Early stopping — patience=15 epochs.
+     Why: Without early stopping, training runs all 100 epochs even if the
+     model peaked at epoch 25 and is now overfitting (memorizing training
+     data instead of learning patterns). This wastes 75 epochs of compute
+     time and risks degrading the final saved model. The best checkpoint is
+     always preserved since we save on improvement.
+
+  3. Gradient clipping — max_norm=1.0 before optimizer.step().
+     Why: Medical signal data is noisy. A batch with bad windows can produce
+     an extremely large gradient that blows up model weights, causing NaN
+     loss or unstable training. Clipping caps the gradient magnitude at 1.0.
+     Standard practice in every production medical ML pipeline.
+
+  4. Memory-mapped cache loading — np.load(..., mmap_mode="r").
+     Why: PrecomputedDataset was loading entire numpy arrays into RAM on init
+     (train_short.npy alone is ~1.5 GB at 157K×2500 float32). With train +
+     val + HRV + labels, peak RAM was ~4+ GB before training even started.
+     Memory-mapping reads data from disk on demand; the OS page cache handles
+     the rest. Reduces peak RAM usage significantly.
+
+  5. Fixed t.size bug in on-the-fly training path (train.py line 134).
+     Why: torch.Tensor.size is a method (returns torch.Size object), not an
+     int like numpy's ndarray.size property. The expression max_len - t.size
+     would crash with a TypeError. Changed to t.numel() which returns the
+     total element count as an int. Only affects the on-the-fly path (not
+     --use-cache), but should still be correct.
+
+  6. TransformerConfig default seq_len 10 → 5 (transformer.py).
+     Why: The dataclass default was 10 from before the subwindow_sec change
+     (300/30=10 → 300/60=5). build_model.py overrides from config so runtime
+     was correct, but anyone constructing TransformerConfig() without
+     arguments would get the wrong default.
+
+  7. Fixed stale docstrings in ensemble.py, rnn.py, transformer.py.
+     Why: Documentation said seq_len=10 in multiple places. Updated to
+     generic "seq_len" since the actual value comes from config.
+
+Tests: 33/33 passing after all fixes.
 
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
