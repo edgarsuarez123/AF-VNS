@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 CONFIG_PATH = "config.yaml"
 MAX_SHORT_LEN_CAP = 3600  # 12 s at 300 Hz for variable fs
 N_FEATURES = 7
-CHUNK_SIZE = 32
+CHUNK_SIZE = 8  # reduced from 32: each chunk pickles short+long waveforms (~5MB at 250Hz)
 
 
 def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHUNK_SIZE):

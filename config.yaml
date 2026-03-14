@@ -16,7 +16,7 @@ data:
   waveform_sec: 10
   hrv_window_sec: 300  # 5 min for RNN; also use hrv.window_sec [30, 300] for short HRV
   target_fs: 250  # resample all records to uniform rate (afdb=250Hz, nsrdb=128Hz)
-  stride_sec: 5   # 50% overlap for training windows; val/test stay non-overlapping
+  # stride_sec: 5   # disabled: doubles cache time for marginal benefit; revisit after baseline training
 
 # LSL live stream (FR-1.1)
 lsl:

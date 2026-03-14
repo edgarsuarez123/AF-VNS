@@ -37,11 +37,22 @@ def _ensure_1d(signal: np.ndarray) -> np.ndarray:
 
 
 def _resample_to_target_fs(signal: np.ndarray, fs_orig: float, fs_target: float) -> np.ndarray:
-    """Resample signal from fs_orig to fs_target using FFT-based resampling."""
+    """Resample signal from fs_orig to fs_target. Chunks long signals to avoid OOM."""
     if abs(fs_orig - fs_target) < 0.1:
         return signal
-    n_target = int(len(signal) * fs_target / fs_orig)
-    return _scipy_resample(signal, n_target).astype(np.float64)
+    ratio = fs_target / fs_orig
+    # Chunk at ~60s to keep memory bounded (~15K samples per chunk at 250 Hz)
+    chunk_samples = int(fs_orig * 60)
+    if len(signal) <= chunk_samples * 2:
+        n_target = int(len(signal) * ratio)
+        return _scipy_resample(signal, n_target).astype(np.float64)
+    # Resample in chunks and concatenate
+    chunks = []
+    for start in range(0, len(signal), chunk_samples):
+        seg = signal[start : start + chunk_samples]
+        n_out = int(len(seg) * ratio)
+        chunks.append(_scipy_resample(seg, n_out).astype(np.float64))
+    return np.concatenate(chunks)
 
 
 def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optional[RecordDict]:
