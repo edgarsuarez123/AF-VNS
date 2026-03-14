@@ -617,9 +617,30 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
   After expansion: ~800 AF + ~5,200 NSR training records (from 3 sources).
   All 60 MIMIC records remain as pure holdout for cross-dataset eval.
 
-  This addresses the core generalization failure: with 3+ recording sources
-  in training (afdb 250Hz + nsrdb 128Hz + challenge2017 300Hz), the model
-  cannot shortcut on equipment-specific artifacts.
+  This addresses the core generalization failure: with 4+ recording sources
+  in training (afdb 250Hz + nsrdb 128Hz + challenge2017 300Hz + ltafdb 128Hz),
+  the model cannot shortcut on equipment-specific artifacts.
+
+--- 2.16 Class Imbalance Fix (2026-03-14) ---
+
+  PROBLEM: After Challenge 2017 download, class distribution was 761 AF vs
+  5,068 Normal (~1:6.7 ratio). Model would be biased toward predicting Normal.
+
+  SOLUTION (two-pronged):
+  1. More real AF data: Long-Term AF Database (ltafdb) — 84 multi-hour Holter
+     recordings with rhythm annotations. Parser extracts only (AFIB segments
+     as separate records (2,654 segments >= 30s). Total AF after: ~3,415.
+  2. Dynamic pos_weight: Computed from training labels before each training
+     run. pos_weight = n_neg / n_pos, capped at 10. Applied to
+     BCEWithLogitsLoss. Handles residual ~1:1.5 imbalance.
+
+  DECISION: Real data > artificial weighting. ltafdb first, pos_weight second
+  as safety net. User explicitly preferred this approach over pure pos_weight.
+
+  EXPECTED CLASS BALANCE AFTER ALL DOWNLOADS:
+    AF:     ~3,415 records (23 afdb + 738 challenge2017 + 2,654 ltafdb)
+    Normal: ~5,068 records (18 nsrdb + 5,050 challenge2017)
+    Ratio:  ~1:1.5 (acceptable, pos_weight ~1.5 handles remainder)
 
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES

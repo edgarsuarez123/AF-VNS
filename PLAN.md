@@ -10,7 +10,7 @@ Rounds 1–4 complete. Current state:
 
 **Root problem:** Model cannot generalize because it only saw 2 recording sources (afdb + nsrdb). Any new ECG equipment looks foreign. Need diverse training data.
 
-**Strategy:** Keep all 60 MIMIC as holdout. Download PhysioNet 2017 AF Challenge (8,528 labeled records) as primary training expansion.
+**Strategy:** Keep all 60 MIMIC as holdout. Download PhysioNet 2017 AF Challenge (5,788 labeled) + Long-Term AF Database (2,654 AF segments from 84 records) for balanced training. Dynamic pos_weight handles residual imbalance.
 
 ---
 
@@ -20,7 +20,9 @@ Rounds 1–4 complete. Current state:
 |------|-------------|--------|--------------|
 | 19 | NaN fix + clean baseline metrics | Done | 2026-03-14 |
 | 20 | Download PhysioNet 2017 AF Challenge + parser | Done | 2026-03-14 |
-| 21 | Update split + rebuild cache | In Progress | |
+| 20b | Download ltafdb + AF segment parser | In Progress | |
+| 20c | Add pos_weight for class imbalance | Done | 2026-03-14 |
+| 21 | Update split + rebuild cache | Not Started | |
 | 22 | Retrain + cross-dataset eval | Not Started | |
 
 ---
@@ -79,6 +81,9 @@ Commit: `feat: regenerate split with Challenge 2017, rebuild cache`
 
 **Current state (2026-03-14):**
 - Rounds 1-4 complete. 37/37 tests passing.
-- Training: val_auroc=0.9999 (epoch 14, early stop at 29)
-- MIMIC-III cross-dataset: AUROC=0.6667, F1=0.6667, NFR-3.1 FAIL
-- NaN fix applied (uncommitted), starting Round 5 execution
+- Step 19 done: NaN fix committed, clean MIMIC baseline AUROC=0.6656
+- Step 20 done: Challenge 2017 downloaded (738 AF + 5,050 Normal)
+- Step 20b: ltafdb downloading in background (~84 records, ~3GB)
+- Step 20c done: pos_weight added to training loop
+- After ltafdb: ~3,415 AF vs ~5,068 Normal (1:1.5 ratio, pos_weight handles rest)
+- **Next:** Wait for ltafdb download → delete split.json → rebuild cache → train
