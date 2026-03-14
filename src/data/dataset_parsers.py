@@ -221,11 +221,10 @@ def parse_edf_file(edf_path: Path, channel_idx: int = 0) -> Optional[RecordDict]
 
 
 def parse_ltafdb_dir(ltafdb_dir: Path) -> List[RecordDict]:
-    """Parse Long-Term AF Database: extract only AFIB rhythm segments as separate records.
+    """Parse Long-Term AF Database segments (pre-extracted by download_ltafdb.py).
 
-    Each AFIB episode becomes a separate record with label=1. Non-AF segments
-    are discarded (we only need AF data from this source).
-    Minimum segment duration: 30s (enough for CNN + partial HRV).
+    Each file is an individual AF segment with .label=1, saved as WFDB format.
+    Only parses records that have .label files (AF segments only).
     """
     try:
         import wfdb
@@ -236,15 +235,16 @@ def parse_ltafdb_dir(ltafdb_dir: Path) -> List[RecordDict]:
     if not ltafdb_dir.is_dir():
         return records
 
-    hea_files = sorted(ltafdb_dir.glob("*.hea"))
-    min_samples_30s = 30 * 128  # 30s at native 128 Hz
-
-    for hea in hea_files:
-        record_name = hea.stem
+    label_files = sorted(ltafdb_dir.glob("*.label"))
+    for label_path in label_files:
+        record_name = label_path.stem
+        hea_path = ltafdb_dir / f"{record_name}.hea"
+        if not hea_path.exists():
+            continue
         try:
             record = wfdb.rdrecord(str(ltafdb_dir / record_name))
         except Exception as e:
-            logger.warning("Failed to read ltafdb %s: %s", record_name, e)
+            logger.warning("Failed to read ltafdb segment %s: %s", record_name, e)
             continue
 
         signal = record.p_signal if record.p_signal is not None else record.d_signal
@@ -253,49 +253,14 @@ def parse_ltafdb_dir(ltafdb_dir: Path) -> List[RecordDict]:
         signal = _ensure_1d(np.asarray(signal, dtype=np.float64))
         signal = np.nan_to_num(signal, nan=0.0)
         fs = float(record.fs)
+        label = int(label_path.read_text().strip())
 
-        # Read rhythm annotations to find AFIB segments
-        try:
-            ann = wfdb.rdann(str(ltafdb_dir / record_name), "atr")
-        except Exception:
-            continue
-
-        # Build list of (start_sample, end_sample) for AFIB rhythm
-        afib_segments = []
-        current_rhythm = None
-        afib_start = None
-
-        for idx in range(len(ann.aux_note)):
-            note = ann.aux_note[idx]
-            if not note or not note.startswith("("):
-                continue
-            sample = ann.sample[idx]
-
-            if note == "(AFIB" or note == "(AFL":
-                if current_rhythm != "AF":
-                    afib_start = sample
-                    current_rhythm = "AF"
-            else:
-                if current_rhythm == "AF" and afib_start is not None:
-                    afib_segments.append((afib_start, sample))
-                current_rhythm = "other"
-                afib_start = None
-
-        # Close final segment if record ends in AF
-        if current_rhythm == "AF" and afib_start is not None:
-            afib_segments.append((afib_start, len(signal)))
-
-        # Extract each AF segment as a separate record
-        for seg_idx, (start, end) in enumerate(afib_segments):
-            seg_signal = signal[start:end]
-            if len(seg_signal) < min_samples_30s:
-                continue
-            records.append({
-                "subject_id": f"ltaf_{record_name}_s{seg_idx}",
-                "signal": seg_signal,
-                "fs": fs,
-                "label": 1,
-            })
+        records.append({
+            "subject_id": f"ltaf_{record_name}",
+            "signal": signal,
+            "fs": fs,
+            "label": label,
+        })
 
     return records
 
