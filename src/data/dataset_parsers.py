@@ -220,6 +220,65 @@ def parse_edf_file(edf_path: Path, channel_idx: int = 0) -> Optional[RecordDict]
     }
 
 
+def parse_challenge2017_record(record_dir: Path, record_name: str) -> Optional[RecordDict]:
+    """Parse one PhysioNet 2017 AF Challenge WFDB record (.hea + .mat) with .label file."""
+    try:
+        import wfdb
+    except ImportError:
+        raise ImportError("wfdb is required")
+
+    record_path = record_dir / record_name
+    if not record_path.with_suffix(".hea").exists():
+        return None
+    try:
+        record = wfdb.rdrecord(str(record_path))
+    except Exception as e:
+        logger.warning("Failed to read Challenge 2017 record %s: %s", record_name, e)
+        return None
+    if record is None:
+        return None
+
+    signal = record.p_signal if record.p_signal is not None else record.d_signal
+    if signal is None:
+        return None
+    signal = _ensure_1d(np.asarray(signal, dtype=np.float64))
+
+    # Sanitize NaN (shouldn't be common but be safe)
+    signal = np.nan_to_num(signal, nan=0.0)
+
+    fs = float(record.fs)
+
+    # Read label from .label file
+    label: Optional[int] = None
+    label_path = record_dir / f"{record_name}.label"
+    if label_path.exists():
+        label = int(label_path.read_text().strip())
+
+    return {
+        "subject_id": f"c17_{record_name}",  # prefix to avoid ID collision with afdb/nsrdb
+        "signal": signal,
+        "fs": fs,
+        "label": label,
+    }
+
+
+def parse_challenge2017_dir(challenge_dir: Path) -> List[RecordDict]:
+    """Parse all PhysioNet 2017 AF Challenge records that have .label files (AF or Normal only)."""
+    records = []
+    if not challenge_dir.is_dir():
+        return records
+
+    # Only parse records that have .label files (AF=1 or Normal=0; Other/Noisy excluded)
+    label_files = sorted(challenge_dir.glob("*.label"))
+    for label_path in label_files:
+        record_name = label_path.stem
+        rec = parse_challenge2017_record(challenge_dir, record_name)
+        if rec is not None:
+            records.append(rec)
+
+    return records
+
+
 def parse_mimic3_csv(csv_path: Path, subject_id_col: str = "subject_id", time_col: str = "time", signal_col: str = "ecg", label_col: Optional[str] = "label", fs: float = 250.0) -> Optional[RecordDict]:
     """Parse one MIMIC-III CSV; columns: subject_id, time, ecg (or ppg), optional label."""
     import pandas as pd
@@ -297,10 +356,17 @@ def parse_all(config_path: str = "config.yaml") -> List[RecordDict]:
         all_records.extend(nsr_recs)
         logger.info("Parsed %d records from nsrdb", len(nsr_recs))
 
+    challenge2017_path = raw_dir / "challenge2017"
+    if challenge2017_path.is_dir():
+        c17_recs = parse_challenge2017_dir(challenge2017_path)
+        all_records.extend(c17_recs)
+        logger.info("Parsed %d records from Challenge 2017", len(c17_recs))
+
+    # NOTE: MIMIC-III is excluded from parse_all() — it is reserved as pure holdout
+    # for cross-dataset evaluation (NFR-3.1). evaluate_mimic3() parses it separately.
     if mimic3_subdir.is_dir() and any(mimic3_subdir.iterdir()):
-        mimic_recs = parse_mimic3_dir(mimic3_subdir)
-        all_records.extend(mimic_recs)
-        logger.info("Parsed %d records from MIMIC-III", len(mimic_recs))
+        logger.info("MIMIC-III dir found (%s) — skipped (holdout only, use evaluate --mimic3)",
+                     mimic3_subdir)
 
     # Resample to uniform rate if target_fs is set (avoids sampling-rate bias in CNN)
     target_fs = float(data_cfg.get("target_fs", 0))

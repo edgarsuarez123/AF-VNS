@@ -71,10 +71,13 @@ def waveform_to_hrv_sequence(
 
     denoised = denoise(signal_5min, fs, config_path=config_path)
     n_per_sub = int(fs * subwindow_sec)
-    if denoised.size < n_steps * n_per_sub:
+
+    # Compute HRV for however many complete subwindows fit (supports short records)
+    n_available = min(n_steps, denoised.size // n_per_sub) if n_per_sub > 0 else 0
+    if n_available == 0:
         return out
 
-    # Compute nonlinear features from FULL 5-min RR pool (~350 intervals at 70 bpm)
+    # Compute nonlinear features from full available RR pool
     full_rr = get_rr_intervals(denoised, fs)
     if len(full_rr) >= 5:
         full_rr_corrected, _ = correct_rr_intervals(full_rr, config_path=config_path)
@@ -83,7 +86,7 @@ def waveform_to_hrv_sequence(
         d_nl_full = {"sampen": np.nan, "dfa_alpha1": np.nan}
 
     # Per-subwindow: time and frequency features with corrected RR
-    for i in range(n_steps):
+    for i in range(n_available):
         start = i * n_per_sub
         seg = denoised[start : start + n_per_sub]
         rr = get_rr_intervals(seg, fs)

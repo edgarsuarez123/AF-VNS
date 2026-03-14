@@ -43,13 +43,19 @@ class PhysioDataset(Dataset):
             fs = rec["fs"]
             n_short = int(fs * waveform_sec)
             n_long = int(fs * long_window_sec)
-            if sig.size < n_long:
-                continue
+            if sig.size < n_short:
+                continue  # need at least 10s for CNN
             self._records.append(rec)
             rec_idx = len(self._records) - 1
-            stride = int(fs * self.stride_sec)
-            for start in range(0, sig.size - n_long + 1, stride):
-                self._samples.append((rec_idx, start))
+            if sig.size >= n_long:
+                # Full-length records: rolling windows
+                stride = int(fs * self.stride_sec)
+                for start in range(0, sig.size - n_long + 1, stride):
+                    self._samples.append((rec_idx, start))
+            else:
+                # Short records (>= 10s but < 300s): one sample using full signal
+                # HRV will be mostly NaN (imputed to 0); CNN still gets valid 10s
+                self._samples.append((rec_idx, 0))
 
     def __len__(self) -> int:
         return len(self._samples)
@@ -63,7 +69,11 @@ class PhysioDataset(Dataset):
         n_long = int(fs * self.long_window_sec)
 
         short = sig[start : start + n_short]
-        long_ = sig[start : start + n_long]
+        if sig.size >= start + n_long:
+            long_ = sig[start : start + n_long]
+        else:
+            # Short record: use full signal (HRV pipeline handles short input gracefully)
+            long_ = sig
         label = rec.get("label")
         if label is None:
             label = -1  # sentinel for unlabeled
