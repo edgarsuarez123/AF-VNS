@@ -293,6 +293,24 @@ def main():
         _fit_scaler_from_train_dataset(train_loader.dataset, args.config, scaler_path)
         scaler = load_scaler(path=scaler_path, config_path=args.config)
 
+    # Compute pos_weight from training label distribution to handle class imbalance
+    all_train_labels = []
+    for batch in train_loader:
+        if use_cache:
+            labels_batch = batch[2]
+        else:
+            labels_batch = batch[2]
+        all_train_labels.append(labels_batch)
+    all_train_labels = torch.cat(all_train_labels)
+    n_pos = (all_train_labels == 1).sum().float()
+    n_neg = (all_train_labels == 0).sum().float()
+    if n_pos > 0:
+        pos_weight = (n_neg / n_pos).clamp(max=10.0)  # cap at 10 to avoid instability
+    else:
+        pos_weight = torch.tensor(1.0)
+    pos_weight = pos_weight.to(device)
+    logger.info("Class balance: %d positive, %d negative, pos_weight=%.2f", int(n_pos), int(n_neg), pos_weight.item())
+
     model = build_model(config_path=args.config, checkpoint_path=None, device=device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -324,7 +342,7 @@ def main():
                 labels_t = labels_t.to(device)
                 optimizer.zero_grad()
                 logits = model(short_t, hrv_t).squeeze(-1)
-                loss = F.binary_cross_entropy_with_logits(logits, labels_t)
+                loss = F.binary_cross_entropy_with_logits(logits, labels_t, pos_weight=pos_weight)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
@@ -339,7 +357,7 @@ def main():
                 )
                 optimizer.zero_grad()
                 logits = model(short_t, hrv_t).squeeze(-1)
-                loss = F.binary_cross_entropy_with_logits(logits, labels_t)
+                loss = F.binary_cross_entropy_with_logits(logits, labels_t, pos_weight=pos_weight)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
