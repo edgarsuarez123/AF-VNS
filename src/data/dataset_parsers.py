@@ -150,6 +150,9 @@ def parse_mimic3_wfdb_record(record_dir: Path, record_name: str) -> Optional[Rec
     else:
         signal = signal.ravel()
 
+    # Sanitize NaN — MIMIC ICU signals use NaN for missing/invalid samples
+    signal = np.nan_to_num(signal, nan=0.0)
+
     fs = float(record.fs)
 
     # Read label from .label file (written by download_mimic3_waveforms.py)

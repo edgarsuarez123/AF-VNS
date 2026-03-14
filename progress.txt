@@ -577,6 +577,50 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
     4. Consider domain adaptation / transfer learning techniques
     5. Increase training dataset size (currently only 41 records)
 
+--- 2.14 NaN Logit Root Cause + Fix (2026-03-14) ---
+
+  10 of 60 MIMIC-III records produced NaN logits during cross-dataset eval.
+
+  ROOT CAUSE: MIMIC-III ICU waveform recordings (WFDB p_signal) contain NaN
+  values for missing/invalid samples — equipment disconnections, lead-off
+  events, and signal gaps that are common in ICU settings. These NaN values
+  propagate through: wavelet denoising → peak detection → HRV → model → NaN
+  logit. PhysioNet clean databases (afdb, nsrdb) never have NaN in signals.
+
+  FIX: Added np.nan_to_num(signal, nan=0.0) in parse_mimic3_wfdb_record()
+  immediately after channel selection. This zeros out missing samples at parse
+  time, before any downstream processing. Zero-fill is acceptable because:
+  - ICU signal gaps are typically short (< 1s)
+  - Wavelet denoising smooths over brief zero segments
+  - The alternative (skipping records) would lose ~17% of holdout data
+
+  Also added: holdout_path parameter to evaluate_mimic3() and --holdout CLI
+  flag for restricting evaluation to reserved holdout subjects only.
+
+  RESULT (2026-03-14): 60/60 valid logits, 0 NaN. Clean baseline:
+    AUROC=0.6656, F1=0.6286, Sensitivity=0.7333, Specificity=0.4000
+    NFR-3.1 still FAIL (expected — data expansion needed, not just NaN fix).
+
+--- 2.15 Data Expansion Strategy (2026-03-14) ---
+
+  PROBLEM: 41 PhysioNet records (23 AF + 18 NSR) is far too small. The model
+  learned equipment signatures (afdb vs nsrdb) instead of AF physiology.
+  Industry minimum for reliable classification: 500+ per class.
+
+  SOLUTION: PhysioNet Computing in Cardiology Challenge 2017 dataset:
+  - 8,528 labeled records: 771 AF, 5,154 Normal, 2,557 Other, 46 Noisy
+  - Open access (no credentials required)
+  - WFDB format (.hea + .mat), 300 Hz, 30-61 seconds per record
+  - Labels in REFERENCE.csv (A=AF, N=Normal, O=Other, ~=Noisy)
+  - Use only AF (A) and Normal (N) classes; skip Other/Noisy
+
+  After expansion: ~800 AF + ~5,200 NSR training records (from 3 sources).
+  All 60 MIMIC records remain as pure holdout for cross-dataset eval.
+
+  This addresses the core generalization failure: with 3+ recording sources
+  in training (afdb 250Hz + nsrdb 128Hz + challenge2017 300Hz), the model
+  cannot shortcut on equipment-specific artifacts.
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------

@@ -161,11 +161,15 @@ def evaluate_mimic3(
     checkpoint_path: Optional[str] = None,
     save_plots: bool = True,
     artifacts_dir: Optional[str] = None,
+    holdout_path: Optional[str] = None,
 ) -> dict:
     """Cross-dataset evaluation on MIMIC-III holdout (NFR-3.1).
 
     Processes records individually to handle variable lengths (30s-900s)
     without requiring PhysioDataset or split.json.
+
+    If holdout_path is set, evaluates only on the reserved holdout subjects
+    (records that were NOT used in mixed-source training).
     """
     config = load_config(config_path)
     paths_cfg = config.get("paths", {})
@@ -176,6 +180,15 @@ def evaluate_mimic3(
     mimic3_dir = Path(data_cfg.get("mimic3_subdir", "data/raw/mimic3"))
     target_fs = float(data_cfg.get("target_fs", 250))
     waveform_sec = float(data_cfg.get("waveform_sec", 10))
+
+    # If holdout_path provided, restrict to those subject IDs only
+    holdout_ids: Optional[set] = None
+    if holdout_path and Path(holdout_path).exists():
+        with open(holdout_path) as f:
+            import json as _json
+            _hd = _json.load(f)
+        holdout_ids = set(_hd.get("all", []))
+        logger.info("Holdout mode: evaluating %d subjects from %s", len(holdout_ids), holdout_path)
 
     if artifacts_dir is None:
         artifacts_dir = str(Path(scaler_path).parent / "mimic3_eval")
@@ -208,6 +221,8 @@ def evaluate_mimic3(
 
     with torch.no_grad():
         for rec in records:
+            if holdout_ids is not None and rec["subject_id"] not in holdout_ids:
+                continue
             if rec["label"] is None:
                 n_skipped += 1
                 continue
@@ -364,6 +379,8 @@ def main():
     parser.add_argument("--no-plots", action="store_true", help="Do not save ROC/confusion plots")
     parser.add_argument("--mimic3", action="store_true",
                         help="Cross-dataset evaluation on MIMIC-III holdout (NFR-3.1)")
+    parser.add_argument("--holdout", default=None,
+                        help="Path to mimic3_holdout.json — restrict evaluation to unseen holdout subjects")
     args = parser.parse_args()
 
     if args.mimic3:
@@ -371,6 +388,7 @@ def main():
             config_path=args.config,
             checkpoint_path=args.checkpoint,
             save_plots=not args.no_plots,
+            holdout_path=args.holdout,
         )
     else:
         run_evaluation(
