@@ -18,6 +18,23 @@ logger = logging.getLogger(__name__)
 
 RecordDict = Dict[str, Any]  # subject_id, signal, fs, label
 
+# Lead priority for ECG channel selection in multi-channel MIMIC-III records
+_ECG_PRIORITY = ["II", "I", "III", "V", "MCL", "MCL1", "aVR", "AVR", "AVL", "AVF"]
+
+
+def _select_ecg_channel(sig_names: list, units: list) -> int:
+    """Return index of best ECG channel by priority. Fallback: first mV channel, then 0."""
+    names_upper = [n.strip().upper() for n in sig_names]
+    for lead in _ECG_PRIORITY:
+        lead_up = lead.upper()
+        if lead_up in names_upper:
+            return names_upper.index(lead_up)
+    # Fallback: first channel with mV units
+    for i, u in enumerate(units):
+        if "mv" in u.lower():
+            return i
+    return 0
+
 
 def load_config(config_path: str = "config.yaml") -> dict:
     """Load config from project root if needed."""
@@ -94,6 +111,52 @@ def parse_wfdb_record(record_dir: Path, record_name: str, db_name: str) -> Optio
             label = 1  # afdb is AF cohort
     elif db_name == "nsrdb":
         label = 0  # Normal sinus rhythm
+
+    return {
+        "subject_id": record_name,
+        "signal": signal,
+        "fs": fs,
+        "label": label,
+    }
+
+
+def parse_mimic3_wfdb_record(record_dir: Path, record_name: str) -> Optional[RecordDict]:
+    """Parse one MIMIC-III WFDB record + .label file, selecting best ECG channel."""
+    try:
+        import wfdb
+    except ImportError:
+        raise ImportError("wfdb is required")
+
+    record_path = record_dir / record_name
+    if not record_path.with_suffix(".hea").exists():
+        return None
+    try:
+        record = wfdb.rdrecord(str(record_path))
+    except Exception as e:
+        logger.warning("Failed to read MIMIC-III WFDB %s: %s", record_name, e)
+        return None
+    if record is None:
+        return None
+
+    signal = record.p_signal if record.p_signal is not None else record.d_signal
+    if signal is None:
+        return None
+    signal = np.asarray(signal, dtype=np.float64)
+
+    # Select best ECG channel (MIMIC records have mixed channels)
+    if signal.ndim == 2 and signal.shape[1] > 1:
+        ch_idx = _select_ecg_channel(record.sig_name, record.units)
+        signal = signal[:, ch_idx]
+    else:
+        signal = signal.ravel()
+
+    fs = float(record.fs)
+
+    # Read label from .label file (written by download_mimic3_waveforms.py)
+    label: Optional[int] = None
+    label_path = record_dir / f"{record_name}.label"
+    if label_path.exists():
+        label = int(label_path.read_text().strip())
 
     return {
         "subject_id": record_name,
@@ -183,12 +246,24 @@ def parse_mimic3_csv(csv_path: Path, subject_id_col: str = "subject_id", time_co
 
 
 def parse_mimic3_dir(mimic3_dir: Path, fs_default: float = 250.0) -> List[RecordDict]:
-    """Parse MIMIC-III directory: CSV(s) with subject_id, time, ecg/ppg, optional label; or EDF."""
+    """Parse MIMIC-III directory: WFDB (.hea+.dat+.label), CSV, or EDF."""
     records = []
     if not mimic3_dir.is_dir():
         return records
+    seen_hea = set()
     for f in mimic3_dir.iterdir():
-        if f.suffix.lower() == ".csv":
+        if f.suffix.lower() == ".hea":
+            name = f.stem
+            # Skip non-record files (e.g. DIAGNOSES_ICD.csv also in directory)
+            if name.upper().startswith("DIAGNOSES"):
+                continue
+            if name in seen_hea:
+                continue
+            seen_hea.add(name)
+            rec = parse_mimic3_wfdb_record(mimic3_dir, name)
+            if rec is not None:
+                records.append(rec)
+        elif f.suffix.lower() == ".csv" and not f.stem.upper().startswith("DIAGNOSES"):
             rec = parse_mimic3_csv(f, fs=fs_default)
             if rec is not None:
                 records.append(rec)

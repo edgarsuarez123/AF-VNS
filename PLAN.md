@@ -138,6 +138,26 @@ After all tests pass:
 | 12   | Done        | 2026-03-14   |
 | 13   | Done        | 2026-03-14   |
 | 14   | Done        | 2026-03-14   |
+| 15   | Done        | 2026-03-14   |
+| 16   | Done        | 2026-03-14   |
+| 17   | Done        | 2026-03-14   |
+| 18   | Done        | 2026-03-14   |
+
+---
+
+## Round 4: MIMIC-III Cross-Dataset Evaluation (NFR-3.1, 2026-03-14)
+
+### Step 15: Parse MIMIC-III WFDB records — dataset_parsers.py
+Added `_select_ecg_channel()`, `parse_mimic3_wfdb_record()`, updated `parse_mimic3_dir()` for WFDB+.label.
+
+### Step 16: evaluate_mimic3() — evaluate.py
+Per-record inference loop for variable-length MIMIC-III records. `--mimic3` CLI flag.
+
+### Step 17: Tests — 4 new (37/37 passing)
+Channel selection, WFDB parsing, short-record HRV.
+
+### Step 18: Run evaluation + update docs
+Running MIMIC-III evaluation...
 
 ---
 
@@ -284,4 +304,14 @@ After cache verified:
 
 ## Resume From Here
 
-**Next action:** Start Step 6 (config.yaml updates), then proceed sequentially through Step 13.
+**Current state (2026-03-14):**
+- Rounds 1-4 complete. 37/37 tests passing.
+- Training: val_auroc=0.9999 (epoch 14, early stop at 29)
+- MIMIC-III cross-dataset: AUROC=0.6667, F1=0.6667, NFR-3.1 FAIL
+- Model overfits to dataset artifacts. Needs: mixed-source training, more data, augmentation.
+
+**Next actions:**
+1. Investigate 10 NaN-output records (pipeline instability)
+2. Add MIMIC-III to training set (mixed afdb+nsrdb+mimic3 training)
+3. Data augmentation: noise injection, signal scaling, temporal shifts
+4. Retrain and re-evaluate cross-dataset performance

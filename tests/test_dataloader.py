@@ -111,6 +111,57 @@ def test_resampling_uniform_fs():
             assert abs(rec["fs"] - 250.0) < 0.1, f"Record {rec['subject_id']} has fs={rec['fs']}, expected 250"
 
 
+def test_select_ecg_channel_priority():
+    """_select_ecg_channel returns Lead II when present, even if not first."""
+    from src.data.dataset_parsers import _select_ecg_channel
+    assert _select_ecg_channel(["RESP", "II", "V"], ["NU", "mV", "mV"]) == 1
+    assert _select_ecg_channel(["V", "I", "PLETH"], ["mV", "mV", "NU"]) == 1  # I beats V
+    assert _select_ecg_channel(["II", "ART", "RESP"], ["mV", "mmHg", "NU"]) == 0
+
+
+def test_select_ecg_channel_fallback_mv():
+    """Falls back to first mV channel when no named ECG lead matches."""
+    from src.data.dataset_parsers import _select_ecg_channel
+    # No named ECG lead, but second channel has mV
+    assert _select_ecg_channel(["RESP", "ABP", "UNKNOWN"], ["NU", "mV", "NU"]) == 1
+    # No mV at all → returns 0
+    assert _select_ecg_channel(["RESP", "ABP"], ["NU", "mmHg"]) == 0
+
+
+def test_parse_mimic3_wfdb_record():
+    """Synthetic WFDB record + .label file → correct RecordDict with right channel."""
+    import wfdb
+    from src.data.dataset_parsers import parse_mimic3_wfdb_record
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        # Create a 2-channel record: RESP (noise) + II (ECG-like sine)
+        n_samples = 1250  # 10s at 125 Hz
+        resp = np.random.randn(n_samples) * 10.0
+        ecg = np.sin(2 * np.pi * 1.2 * np.arange(n_samples) / 125.0)
+        signal = np.column_stack([resp, ecg])
+        wfdb.wrsamp(
+            "test_rec",
+            fs=125,
+            units=["NU", "mV"],
+            sig_name=["RESP", "II"],
+            p_signal=signal,
+            write_dir=str(tmp_dir),
+        )
+        # Write label file
+        (tmp_dir / "test_rec.label").write_text("1")
+
+        rec = parse_mimic3_wfdb_record(tmp_dir, "test_rec")
+        assert rec is not None
+        assert rec["subject_id"] == "test_rec"
+        assert rec["fs"] == 125.0
+        assert rec["label"] == 1
+        assert rec["signal"].ndim == 1
+        assert rec["signal"].shape[0] == n_samples
+        # Should have selected channel 1 (II), not channel 0 (RESP)
+        np.testing.assert_allclose(rec["signal"], ecg, atol=1e-6)
+
+
 def test_stride_increases_samples():
     """PhysioDataset with stride_sec=5 produces more samples than stride_sec=10."""
     fs = 250.0

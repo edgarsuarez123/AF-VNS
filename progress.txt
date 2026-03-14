@@ -519,14 +519,63 @@ WHY 30 SECONDS MINIMUM (not 5 minutes):
   - Records with >=5 minutes will get full HRV; shorter ones test whether
     the model degrades gracefully with partial features
 
-STATUS: Download script running. Downloading 30 AF + 30 non-AF patients
-  from MIMIC-III Waveform Matched Subset via PhysioNet authenticated API.
+STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
 
-NEXT AFTER DOWNLOAD:
-  1. Update dataset_parsers.py to read MIMIC-III WFDB records with .label files
-  2. Run evaluate.py on MIMIC-III holdout
-  3. Report AUROC, F1, sensitivity, specificity vs training performance
-  4. If F1 degradation >5%, investigate what the model is actually learning
+--- 2.13 MIMIC-III Evaluation Pipeline (2026-03-14) ---
+
+  Built cross-dataset evaluation pipeline for MIMIC-III holdout (NFR-3.1).
+
+  CHANGES:
+    1. dataset_parsers.py: Added _select_ecg_channel() for multi-channel MIMIC
+       records (priority: II > I > III > V > MCL > ... > fallback mV > ch 0).
+       Added parse_mimic3_wfdb_record() to read .hea/.dat with .label files.
+       Updated parse_mimic3_dir() to handle WFDB records (was CSV/EDF only).
+    2. evaluate.py: Added evaluate_mimic3() — standalone per-record inference
+       loop that handles variable-length records (30s-900s) without PhysioDataset.
+       Added --mimic3 CLI flag. Resamples 125 Hz → 250 Hz, extracts center 10s
+       for CNN, first min(len, 300s) for HRV, scales, infers, reports metrics.
+    3. Tests: 4 new tests (channel selection, WFDB parsing, short-record HRV).
+       37/37 passing.
+
+  WHY SEPARATE EVALUATION PATH:
+    PhysioDataset skips records < 300s and requires split.json. 12 of 60 MIMIC
+    records are < 300s. evaluate_mimic3() processes records individually so it
+    handles any length >= 10s. Short records get all-zero HRV (CNN-only);
+    the model was trained with ~7% NaN HRV so it handles this gracefully.
+
+  RUN: .venv/Scripts/python -m src.training.evaluate --mimic3
+
+  RESULTS (2026-03-14):
+    Records: 60 (30 AF, 30 NSR), 10 produced NaN (excluded from metrics)
+    12 short records (<300s) — CNN-only, HRV=zeros
+
+    Metric       Training   MIMIC-III   Delta
+    AUROC        0.9999     0.6667      -0.3332
+    F1           ~1.0       0.6667      ~-0.33
+    Sensitivity  ~1.0       0.7308      ~-0.27
+    Specificity  ~1.0       0.5000      ~-0.50
+
+    NFR-3.1 (<5% F1 degradation): FAIL
+
+  ANALYSIS:
+    The massive drop confirms the model exploits dataset-specific artifacts
+    (afdb vs nsrdb equipment/sampling differences) rather than learning
+    AF physiology. Specificity=0.50 means the model is essentially guessing
+    on NSR records — it tends to predict AF with high confidence (prob=1.0)
+    for both AF and NSR MIMIC records, suggesting it learned a feature
+    correlated with the training data source rather than with AF itself.
+
+    10 records produced NaN logits — likely from wavelet denoising or peak
+    detection encountering unusual signal characteristics in MIMIC ICU data
+    (arterial line interference, equipment noise patterns not seen in
+    PhysioNet clean databases).
+
+  NEXT STEPS:
+    1. Investigate NaN logits — which pipeline stage introduces NaN
+    2. Add MIMIC-III records to training set (mixed-source training)
+    3. Data augmentation: noise injection, signal scaling, temporal jitter
+    4. Consider domain adaptation / transfer learning techniques
+    5. Increase training dataset size (currently only 41 records)
 
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES

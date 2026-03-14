@@ -331,3 +331,23 @@ def test_pipeline_corrected_rr_af_pattern():
     # RMSSD (col 0) and SDNN (col 1) should have at least some valid values
     valid_rmssd = np.sum(~np.isnan(seq[:, 0]))
     assert valid_rmssd >= 1, f"Expected at least 1 valid RMSSD, got {valid_rmssd}"
+
+
+def test_short_record_hrv_all_nan():
+    """Signal < 300s → waveform_to_hrv_sequence returns all-NaN (5,7)."""
+    import yaml as _yaml
+    fs = 250.0
+    # 60s signal — not enough for 5 subwindows of 60s (needs 300s)
+    signal = np.random.randn(int(fs * 60)).astype(np.float64) * 0.5
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        cfg = {
+            "hrv": {"subwindow_sec": 60},
+            "wavelet": {"family": "cmor", "scale_range": [1, 64]},
+            "artifact": {"amplitude_mad_multiple": 30, "rr_deviation_percent": 60, "rr_fraction_threshold": 0.30},
+        }
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump(cfg, f)
+        seq = waveform_to_hrv_sequence(signal, fs, subwindow_sec=60.0, config_path=cfg_path)
+    assert seq.shape == (5, N_FEATURES), f"Expected (5, {N_FEATURES}), got {seq.shape}"
+    assert np.all(np.isnan(seq)), "All HRV features should be NaN for <300s signal"
