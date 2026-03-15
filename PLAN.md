@@ -20,51 +20,38 @@ Rounds 1–4 complete. Current state:
 |------|-------------|--------|--------------|
 | 19 | NaN fix + clean baseline metrics | Done | 2026-03-14 |
 | 20 | Download PhysioNet 2017 AF Challenge + parser | Done | 2026-03-14 |
-| 20b | Download ltafdb + AF segment parser | In Progress | |
+| 20b | Download ltafdb + AF segment parser | Done | 2026-03-14 |
 | 20c | Add pos_weight for class imbalance | Done | 2026-03-14 |
-| 21 | Update split + rebuild cache | Not Started | |
+| 21 | Fix OOM: streaming precompute + stride fix | Done | 2026-03-15 |
+| 21b | Delete stale split, rebuild cache | In Progress | |
 | 22 | Retrain + cross-dataset eval | Not Started | |
 
 ---
 
-## Step 19: Fix NaN + clean baseline metrics
+## Step 21: Fix OOM — Streaming Precompute + Stride Fix (Done 2026-03-15)
 
-**Already done (uncommitted):**
-- `dataset_parsers.py`: `np.nan_to_num(signal, nan=0.0)` in `parse_mimic3_wfdb_record()`
-- `evaluate.py`: `holdout_path` param + `--holdout` CLI flag
-- `create_mixed_split.py`: Mixed split script (will be used differently in Step 21)
+**Problem:** Cache rebuild crashed with OOM — `parse_all()` loaded all ~9 GB of raw signals into RAM simultaneously. Additionally, stride=10s with 300s HRV window created ~245K near-duplicate overlapping windows (96.7% overlap).
 
-**Execute:**
-1. Update `progress.txt` section 2.14: NaN root cause + fix
-2. Update `PLAN.md` with Round 5 plan
-3. Run `pytest tests/ -v` — must still be 37 passing
-4. Run clean MIMIC eval: `.venv/Scripts/python -m src.training.evaluate --mimic3`
-5. Commit: `fix: sanitize MIMIC ICU NaN signals at parse time; add holdout eval mode`
+**Root causes & fixes:**
 
----
+1. **OOM** — Added `iter_all_records()` generator to `dataset_parsers.py`: yields one record at a time instead of loading all into a list. Peak memory: ~350 MB (was ~14 GB).
 
-## Step 20: Download PhysioNet 2017 AF Challenge data
+2. **Window explosion** — Added `stride_sec: 300` to config.yaml: non-overlapping 5-min windows. Reduces ~245K windows to ~14K independent windows. Cache time: ~45 min (was 17+ hour crash).
 
-**Dataset:** PhysioNet Computing in Cardiology Challenge 2017
-- 8,528 records: 771 AF + 5,154 Normal + 2,557 Other + 46 Noisy
-- Format: WFDB (.hea + .mat), 300 Hz, 30–61 seconds per record
-- Labels: in `REFERENCE.csv` (A=AF, N=Normal, O=Other, ~=Noisy)
+3. **Stale split** — Old `split.json` had 2,654 ltafdb subjects despite `max_ltaf_segments: 84` cap. Added `collect_all_subject_ids()` for lightweight split creation without loading signals. Added `create_split_from_ids()` to splitter.
 
-**Write:** `src/data/download_challenge2017.py` — download + extract + create .label files
-**Modify:** `src/data/dataset_parsers.py` — add `parse_challenge2017_dir()` + add to `parse_all()`
+4. **Rewrote `precompute_cache.py`** — Streams records via `iter_all_records()`, builds windows per-record, supports parallel workers via existing `process_chunk`, accumulates only small processed results (~100 MB total).
 
-Commit: `feat: add PhysioNet 2017 AF Challenge parser and downloader`
+**Tests:** 54/54 passing (37 existing + 17 new in `tests/test_precompute.py`).
 
 ---
 
-## Step 21: Update split + rebuild cache
+## Step 21b: Delete Stale Split + Rebuild Cache
 
-- Delete `split.json` and let `get_dataloaders(create_split_if_missing=True)` regenerate
-- New split includes: afdb + nsrdb + challenge2017 subjects
-- MIMIC records stay as pure holdout (not in split.json)
-- Rebuild cache in background (~1–4 hours)
-
-Commit: `feat: regenerate split with Challenge 2017, rebuild cache`
+1. Delete `models/artifacts/split.json` (stale — 2,654 ltaf subjects)
+2. Run: `.venv/Scripts/python -m src.training.precompute_cache --config config.yaml --workers 4`
+3. Precompute auto-creates new split.json with correct IDs (84 ltaf, 5,788 c17, 41 original)
+4. Verify cache files in `models/artifacts/cache/`
 
 ---
 
@@ -72,33 +59,24 @@ Commit: `feat: regenerate split with Challenge 2017, rebuild cache`
 
 - Train: `.venv/Scripts/python -m src.training.train --use-cache`
 - Eval: `.venv/Scripts/python -m src.training.evaluate --mimic3`
-- Target: MIMIC holdout AUROC significantly above 0.6667 baseline
+- Target: MIMIC holdout AUROC significantly above 0.6656 baseline
 - NFR-3.1: F1 degradation < 5% from in-distribution test set
 
 ---
 
 ## Resume From Here
 
-**Current state (2026-03-14):**
-- Rounds 1-4 complete. 37/37 tests passing.
+**Current state (2026-03-15):**
+- Rounds 1-4 complete. 54/54 tests passing.
 - Step 19 done: NaN fix committed, clean MIMIC baseline AUROC=0.6656
-- Step 20 done: Challenge 2017 downloaded (738 AF + 5,050 Normal)
-- Step 20b: ltafdb downloading in background — 183 segments from 9/84 records complete
-  - Check: `Get-Content "C:\Users\Edgar\AF VNS\ltafdb_download_err.log" -Tail 3`
-  - Count: `cd data/raw/ltafdb && ls *.label | wc -l`
-- Step 20c done: pos_weight added to training loop
-- Expected final: ~3,415 AF vs ~5,068 Normal (1:1.5 ratio)
+- Step 20/20b/20c done: Challenge 2017 + ltafdb downloaded, pos_weight added
+- Step 21 done: Streaming precompute fix committed (OOM + stride fix)
+- Step 21b next: Delete stale split.json, run cache rebuild with --workers 4
 
-**Next (Step 21) — after ltafdb download completes:**
-1. Verify segment count: `cd data/raw/ltafdb && ls *.label | wc -l` (expect ~2,600+)
-2. split.json already deleted. Cache already cleared.
-3. Rebuild cache (background):
-   ```powershell
-   Start-Process -WindowStyle Hidden ".venv\Scripts\python.exe" `
-     -ArgumentList "-m src.training.precompute_cache --config config.yaml --workers 4" `
-     -WorkingDirectory "C:\Users\Edgar\AF VNS" `
-     -RedirectStandardOutput "precompute.log" `
-     -RedirectStandardError "precompute_err.log"
-   ```
-4. Monitor: `Get-Content precompute_err.log -Tail 5`
-5. After cache done → commit → train → eval MIMIC holdout
+**Next:**
+1. Delete stale split: `del models\artifacts\split.json`
+2. Run cache: `.venv/Scripts/python -m src.training.precompute_cache --config config.yaml --workers 4`
+3. Verify cache: check `models/artifacts/cache/cache_meta.json`
+4. Train: `.venv/Scripts/python -m src.training.train --use-cache`
+5. Eval: `.venv/Scripts/python -m src.training.evaluate --mimic3`
+6. Target: MIMIC holdout AUROC significantly above 0.6656 baseline

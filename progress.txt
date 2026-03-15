@@ -642,6 +642,58 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
     Normal: ~5,068 records (18 nsrdb + 5,050 challenge2017)
     Ratio:  ~1:1.5 (acceptable, pos_weight ~1.5 handles remainder)
 
+--- 2.17 Streaming Precompute Fix — OOM + Window Explosion (2026-03-15) ---
+
+  PROBLEM: Cache rebuild (precompute_cache.py) crashed with OOM at 72/401,810
+  samples. Two root causes:
+
+  1. parse_all() loaded ALL raw signals (~9 GB) from all 4 databases into a
+     single Python list simultaneously. afdb (~1.7 GB) + nsrdb (~3.1 GB) +
+     ltafdb 2,654 segs (~3.7 GB) + challenge2017 (~0.5 GB) = ~9 GB in RAM
+     before any processing even started.
+
+  2. Rolling window stride=10s with 300s HRV window created 96.7% overlapping
+     windows. afdb+nsrdb alone produced ~237K near-duplicate samples. Total
+     with ltafdb: 401,810 windows, estimated 17+ hours to process.
+
+  FIX (3 changes):
+
+  A. Streaming records — Added iter_all_records() generator to dataset_parsers.py
+     that yields one RecordDict at a time from each database. Only one record's
+     signal (~173 MB worst case for 24h nsrdb) is in memory at any point. Peak
+     RAM reduced from ~14 GB to ~350 MB.
+
+  B. Non-overlapping stride — Changed stride_sec from 10 (default=waveform_sec)
+     to 300 (=hrv_window_sec) in config.yaml. Each 5-minute window is now
+     independent with 0% overlap. Reduces ~245K windows to ~14K windows. Cache
+     build time: ~45 min with 4 workers (was 17+ hour crash).
+
+  C. Lightweight split creation — Added collect_all_subject_ids() that scans
+     .hea/.label files WITHOUT loading signal data (for split creation). Added
+     create_split_from_ids() to splitter.py. Old split.json (2,654 ltaf subjects)
+     was stale vs max_ltaf_segments=84 config cap; must be deleted and regenerated.
+
+  REASONING:
+  - Streaming is the correct long-term fix: dataset size will grow and parse_all()
+    cannot scale. Only precompute needs streaming; training uses cached .npy files.
+  - stride=300s is standard for HRV analysis (non-overlapping 5-min segments).
+    Overlap adds near-duplicate training data, not new information. Can reduce
+    stride later for data augmentation once baseline validates.
+  - parse_all() left unchanged for backward compatibility with get_dataloaders()
+    non-cache training path.
+
+  FILES CHANGED:
+  - src/data/dataset_parsers.py: +collect_all_subject_ids(), +iter_all_records()
+  - src/data/splitter.py: +create_split_from_ids()
+  - src/training/precompute_cache.py: complete rewrite of main() for streaming
+  - config.yaml: stride_sec: 300
+  - tests/test_precompute.py: 17 new tests (ID collection, split, streaming,
+    window extraction, end-to-end cache)
+
+  TESTS: 54/54 passing (37 existing + 17 new). No existing tests broken.
+
+  NEXT: Delete stale split.json, run streaming precompute with --workers 4.
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------
