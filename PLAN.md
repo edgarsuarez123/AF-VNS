@@ -34,23 +34,33 @@ learn padding shortcuts), and no augmentation exists for real-world noise condit
 | 25b | Add augmentation config section | Done | 2026-03-15 |
 | 25c | Integrate augmentation into PrecomputedDataset | Done | 2026-03-15 |
 | 25d | Tests for augmentation | Done | 2026-03-15 |
-| 26a | Delete stale cache + rebuild | Not Started | |
-| 26b | Train | Not Started | |
-| 26c | Evaluate on MIMIC holdout | Not Started | |
+| 26a | Delete stale cache + rebuild | Done | 2026-03-15 |
+| 26b | Train (masking+aug only, no MIMIC train data) | Done | 2026-03-15 |
+| 26c | Evaluate on MIMIC holdout | Done | 2026-03-15 |
+| 26d | Download 400 MIMIC records | In Progress | ~11/400 downloaded |
+| 26e | Rebuild cache with MIMIC training data | Not Started | |
+| 26f | Retrain + re-evaluate | Not Started | |
 
 ---
+
+## Round 6 Intermediate Results (masking+aug only, no MIMIC training data)
+
+  Train: val_auroc=0.9912, early stop epoch 35
+  MIMIC holdout: AUROC=0.6333, F1=0.6176, Sens=0.7000, Spec=0.4333
+  Improvement from masking+augmentation alone: +0.031 AUROC vs Round 5
 
 ## Resume From Here
 
 **Current state (2026-03-15):**
 - Steps 23-25 complete. 75/75 tests passing.
-- Step 23c skipped: downloading 400 MIMIC records requires PhysioNet creds.
-  Current 60 records serve as holdout-only for eval. New records downloaded
-  later will automatically be included in training (holdout JSON excludes them).
-- Step 26 next: delete stale cache, rebuild (includes HRV lengths), train, eval.
+- Step 26a-c done: trained with masking+aug, evaluated on holdout.
+- Step 26d in progress: MIMIC-III download running as background process.
+  ~11/400 records downloaded. Check: `tail -5 mimic_download_err.log`
+  Count: `find data/raw/mimic3/ -name "*.hea" | wc -l` (subtract 60 for new)
+- After download completes: rebuild cache + retrain + re-evaluate.
 
-**Next:**
-1. Delete stale cache: `del models\artifacts\cache\*.npy` + `del models\artifacts\scaler.pkl` + `del models\artifacts\split.json`
+**Next (after download finishes):**
+1. Delete stale cache: `rm models/artifacts/cache/*.npy models/artifacts/scaler.pkl models/artifacts/split.json`
 2. Rebuild cache: `.venv/Scripts/python -m src.training.precompute_cache --config config.yaml --workers 4`
 3. Train: `.venv/Scripts/python -m src.training.train --use-cache`
 4. Eval: `.venv/Scripts/python -m src.training.evaluate --mimic3`
