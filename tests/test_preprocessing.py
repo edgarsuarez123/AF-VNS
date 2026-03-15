@@ -333,12 +333,57 @@ def test_pipeline_corrected_rr_af_pattern():
     assert valid_rmssd >= 1, f"Expected at least 1 valid RMSSD, got {valid_rmssd}"
 
 
-def test_short_record_hrv_all_nan():
-    """Signal < 300s → waveform_to_hrv_sequence returns all-NaN (5,7)."""
+def test_short_record_60s_has_partial_hrv():
+    """60s signal < 300s → row 0 has valid time-domain HRV, rows 1-4 NaN."""
+    import neurokit2 as nk
     import yaml as _yaml
     fs = 250.0
-    # 60s signal — not enough for 5 subwindows of 60s (needs 300s)
-    signal = np.random.randn(int(fs * 60)).astype(np.float64) * 0.5
+    ecg = nk.ecg_simulate(duration=60, sampling_rate=int(fs), heart_rate=72)
+    ecg = np.asarray(ecg, dtype=np.float64)
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        cfg = {
+            "hrv": {"subwindow_sec": 60},
+            "wavelet": {"family": "cmor", "scale_range": [1, 64]},
+            "artifact": {"amplitude_mad_multiple": 30, "rr_deviation_percent": 60, "rr_fraction_threshold": 0.30},
+        }
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump(cfg, f)
+        seq = waveform_to_hrv_sequence(ecg, fs, subwindow_sec=60.0, config_path=cfg_path)
+    assert seq.shape == (5, N_FEATURES), f"Expected (5, {N_FEATURES}), got {seq.shape}"
+    assert not np.isnan(seq[0, 0]), "RMSSD should be valid for 60s ECG"
+    assert not np.isnan(seq[0, 1]), "SDNN should be valid for 60s ECG"
+    assert np.all(np.isnan(seq[1:])), "Rows 1-4 should be NaN for short record"
+
+
+def test_short_record_30s_partial_hrv():
+    """30s ECG → row 0 has valid time-domain features, rows 1-4 NaN."""
+    import neurokit2 as nk
+    import yaml as _yaml
+    fs = 250.0
+    ecg = nk.ecg_simulate(duration=30, sampling_rate=int(fs), heart_rate=72)
+    ecg = np.asarray(ecg, dtype=np.float64)
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        cfg = {
+            "hrv": {"subwindow_sec": 60},
+            "wavelet": {"family": "cmor", "scale_range": [1, 64]},
+            "artifact": {"amplitude_mad_multiple": 30, "rr_deviation_percent": 60, "rr_fraction_threshold": 0.30},
+        }
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump(cfg, f)
+        seq = waveform_to_hrv_sequence(ecg, fs, subwindow_sec=60.0, config_path=cfg_path)
+    assert seq.shape == (5, N_FEATURES)
+    assert not np.isnan(seq[0, 0]), "RMSSD should be valid for 30s ECG"
+    assert not np.isnan(seq[0, 1]), "SDNN should be valid for 30s ECG"
+    assert np.all(np.isnan(seq[1:])), "Rows 1-4 should be NaN"
+
+
+def test_very_short_record_5s_all_nan():
+    """5s random noise → too few peaks, all-NaN HRV."""
+    import yaml as _yaml
+    fs = 250.0
+    signal = np.random.randn(int(fs * 5)).astype(np.float64) * 0.01
     with tempfile.TemporaryDirectory() as tmp:
         cfg_path = str(Path(tmp) / "test_config.yaml")
         cfg = {
@@ -349,5 +394,103 @@ def test_short_record_hrv_all_nan():
         with open(cfg_path, "w") as f:
             _yaml.safe_dump(cfg, f)
         seq = waveform_to_hrv_sequence(signal, fs, subwindow_sec=60.0, config_path=cfg_path)
-    assert seq.shape == (5, N_FEATURES), f"Expected (5, {N_FEATURES}), got {seq.shape}"
-    assert np.all(np.isnan(seq)), "All HRV features should be NaN for <300s signal"
+    assert seq.shape == (5, N_FEATURES)
+    assert np.all(np.isnan(seq)), "All HRV should be NaN for 5s noise"
+
+
+def test_nonlinear_inf_clamped_to_nan():
+    """Constant RR intervals produce inf sampen; guard should clamp to NaN."""
+    from src.features.hrv_nonlinear import compute_hrv_nonlinear
+    # Constant intervals trigger inf from entropy_sample (no template matches)
+    rr = np.ones(50, dtype=np.float64) * 0.8
+    result = compute_hrv_nonlinear(rr)
+    assert not np.isinf(result["sampen"]), "sampen must not be inf"
+    assert not np.isinf(result["dfa_alpha1"]), "dfa_alpha1 must not be inf"
+
+
+def test_fit_scaler_ignores_inf():
+    """Scaler fit should ignore inf values, not be poisoned by them."""
+    X = np.random.randn(100, 7).astype(np.float64)
+    X[0, 5] = np.inf
+    X[1, 5] = -np.inf
+    X[2, 5] = np.nan
+    with tempfile.TemporaryDirectory() as tmp:
+        path = str(Path(tmp) / "scaler.pkl")
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        import yaml as _yaml
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump({"paths": {"scaler": path}}, f)
+        scaler = fit_scaler(X, path=path, config_path=cfg_path)
+    assert np.isfinite(scaler.mean_[5]), f"mean[5] should be finite, got {scaler.mean_[5]}"
+    assert scaler.scale_[5] > 0, f"scale[5] should be > 0, got {scaler.scale_[5]}"
+
+
+def test_transform_treats_inf_as_nan():
+    """Transform should treat inf values as missing (NaN in output)."""
+    X_train = np.random.randn(50, 7).astype(np.float64)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = str(Path(tmp) / "scaler.pkl")
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        import yaml as _yaml
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump({"paths": {"scaler": path}}, f)
+        scaler = fit_scaler(X_train, path=path, config_path=cfg_path)
+    X_test = np.random.randn(10, 7).astype(np.float64)
+    X_test[3, 2] = np.inf
+    X_test[7, 5] = -np.inf
+    out = transform(X_test, scaler)
+    assert np.isnan(out[3, 2]), "inf should become NaN after transform"
+    assert np.isnan(out[7, 5]), "-inf should become NaN after transform"
+    assert np.isfinite(out[0, 0]), "Normal values should stay finite"
+
+
+def test_e2e_inf_sampen_survives_scaling():
+    """End-to-end: inf in sampen column doesn't zero out all sampen values."""
+    X = np.random.uniform(0.5, 2.0, (50, 7)).astype(np.float64)
+    X[0, 5] = np.inf  # one inf sampen
+    X[1, 5] = np.inf  # another
+    with tempfile.TemporaryDirectory() as tmp:
+        path = str(Path(tmp) / "scaler.pkl")
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        import yaml as _yaml
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump({"paths": {"scaler": path}}, f)
+        scaler = fit_scaler(X, path=path, config_path=cfg_path)
+    out = transform(X, scaler)
+    np.nan_to_num(out, nan=0.0, copy=False)
+    # Non-inf sampen values should survive as non-zero
+    non_inf_sampen = out[2:, 5]  # rows 2+ had valid values
+    assert np.any(non_inf_sampen != 0), "Valid sampen values should be non-zero after scaling"
+    # inf positions should be 0 (NaN -> 0)
+    assert out[0, 5] == 0.0, "inf sampen should become 0 after nan_to_num"
+    assert out[1, 5] == 0.0, "inf sampen should become 0 after nan_to_num"
+
+
+def test_e2e_short_record_nonzero_after_scaling():
+    """End-to-end: 45s ECG produces non-zero scaled HRV in row 0."""
+    import neurokit2 as nk
+    import yaml as _yaml
+    fs = 250.0
+    ecg = nk.ecg_simulate(duration=45, sampling_rate=int(fs), heart_rate=72)
+    ecg = np.asarray(ecg, dtype=np.float64)
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg_path = str(Path(tmp) / "test_config.yaml")
+        cfg = {
+            "hrv": {"subwindow_sec": 60},
+            "wavelet": {"family": "cmor", "scale_range": [1, 64]},
+            "artifact": {"amplitude_mad_multiple": 30, "rr_deviation_percent": 60, "rr_fraction_threshold": 0.30},
+        }
+        with open(cfg_path, "w") as f:
+            _yaml.safe_dump(cfg, f)
+        seq = waveform_to_hrv_sequence(ecg, fs, subwindow_sec=60.0, config_path=cfg_path)
+        # Fit scaler on synthetic training data (not the single test sample)
+        train_hrv = np.random.uniform(0.01, 2.0, (200, N_FEATURES)).astype(np.float64)
+        scaler_path = str(Path(tmp) / "scaler.pkl")
+        scaler = fit_scaler(train_hrv, path=scaler_path, config_path=cfg_path)
+        scaled = transform(seq, scaler)
+        np.nan_to_num(scaled, nan=0.0, copy=False)
+    # Row 0 time-domain features should be non-zero
+    assert scaled[0, 0] != 0.0, "Scaled RMSSD should be non-zero for 45s ECG"
+    assert scaled[0, 1] != 0.0, "Scaled SDNN should be non-zero for 45s ECG"
+    # Rows 1-4 should be all zero (NaN -> 0)
+    assert np.all(scaled[1:] == 0.0), "Rows 1-4 should be zero after nan_to_num"

@@ -53,7 +53,7 @@ def fit_scaler(
     any_valid = False
     for col in range(n_features):
         col_vals = X[:, col]
-        valid = col_vals[~np.isnan(col_vals)]
+        valid = col_vals[np.isfinite(col_vals)]
         if len(valid) > 0:
             means[col] = valid.mean()
             vars_[col] = valid.var() if len(valid) > 1 else 1.0
@@ -100,7 +100,7 @@ def transform(features: np.ndarray, scaler: "StandardScaler") -> np.ndarray:
     n_features = X_flat.shape[1]
     for col in range(n_features):
         col_vals = X_flat[:, col]
-        valid = ~np.isnan(col_vals)
+        valid = np.isfinite(col_vals)
         if np.any(valid):
             out[valid, col] = (col_vals[valid] - scaler.mean_[col]) / scaler.scale_[col]
     return out.reshape(orig_shape).astype(np.float32)

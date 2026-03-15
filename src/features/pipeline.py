@@ -75,6 +75,22 @@ def waveform_to_hrv_sequence(
     # Compute HRV for however many complete subwindows fit (supports short records)
     n_available = min(n_steps, denoised.size // n_per_sub) if n_per_sub > 0 else 0
     if n_available == 0:
+        # Short record: compute HRV over full available signal as single pseudo-window
+        full_rr = get_rr_intervals(denoised, fs)
+        if len(full_rr) < 5:
+            return out
+
+        if should_reject_window(denoised, full_rr, rr_fraction_threshold=rr_fraction_threshold, config_path=config_path):
+            return out
+
+        full_rr_corrected, _ = correct_rr_intervals(full_rr, config_path=config_path)
+        if len(full_rr_corrected) < 5:
+            return out
+
+        d_time = compute_hrv_time(full_rr_corrected)
+        d_freq = compute_hrv_freq(full_rr_corrected)
+        d_nl = compute_hrv_nonlinear(full_rr_corrected)
+        out[0] = _hrv_dict_to_vector(d_time, d_freq, d_nl)
         return out
 
     # Compute nonlinear features from full available RR pool

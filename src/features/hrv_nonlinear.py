@@ -30,6 +30,8 @@ def compute_hrv_nonlinear(rr_intervals: np.ndarray) -> Dict[str, float]:
         if isinstance(se, tuple):
             se = se[0]
         out["sampen"] = float(se)
+        if not np.isfinite(out["sampen"]):
+            out["sampen"] = np.nan
     except Exception:
         pass
 
@@ -42,6 +44,8 @@ def compute_hrv_nonlinear(rr_intervals: np.ndarray) -> Dict[str, float]:
                 val = dfa_result["HRV_DFA_alpha1"].iloc[0]
                 if not np.isnan(val):
                     out["dfa_alpha1"] = float(val)
+                    if not np.isfinite(out["dfa_alpha1"]):
+                        out["dfa_alpha1"] = np.nan
     except Exception:
         pass
 
