@@ -694,6 +694,60 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
 
   NEXT: Delete stale split.json, run streaming precompute with --workers 4.
 
+--- 2.18 HRV Pipeline Bug Fixes: inf sampen + short record fallback (2026-03-15) ---
+
+  Cache rebuild (Step 21b) completed but inspection revealed two bugs that
+  crippled the HRV branch of the ensemble model:
+
+  BUG 1 — inf sampen poisons scaler (100% of feature 5 zeroed out):
+    nk.entropy_sample() returns inf for 7 out of 28,404 valid sampen values
+    (when no template match is found). compute_hrv_nonlinear() stored inf as-is.
+    fit_scaler() only filtered NaN, not inf → scaler.mean_[5] = inf,
+    scaler.scale_[5] = nan. transform() then computed (x - inf) / nan = NaN
+    for ALL sampen values → nan_to_num → 0.0. The entire sampen feature was
+    zeroed out across the entire dataset.
+
+  BUG 2 — 89.5% of records too short for HRV subwindows (37.7% all-NaN):
+    Challenge 2017 records are 30-60s. With subwindow_sec=60, pipeline.py
+    computed n_available = signal_samples // (fs * 60) = 0 for anything < 60s.
+    This returned all-NaN (5,7) HRV. 3,783 of 10,046 train windows (37.7%)
+    had completely empty HRV — the RNN/Transformer branches learned nothing
+    from them.
+
+  FIXES APPLIED:
+
+    1. hrv_nonlinear.py: Added np.isfinite() guard after sampen and dfa_alpha1
+       computation. Any inf value is clamped to NaN (the pipeline's established
+       "missing data" sentinel).
+
+    2. scaler.py: Changed ~np.isnan() to np.isfinite() in both fit_scaler()
+       and transform(). This filters NaN, +inf, and -inf in a single call.
+       Defense in depth: even if a new feature source introduces inf, the
+       scaler cannot be corrupted.
+
+    3. pipeline.py: When n_available == 0 (signal shorter than subwindow_sec),
+       compute HRV over the full available signal as a single pseudo-window.
+       Fill timestep 0 with whatever features are computable (time-domain if
+       >= 5 RR intervals, freq-domain if >= 32, nonlinear if >= 10). Timesteps
+       1-4 remain NaN → 0 after scaling. Output shape stays (5, 7).
+
+    4. tests/test_preprocessing.py: Updated 1 existing test, added 8 new tests:
+       - test_short_record_60s_has_partial_hrv (updated from all-NaN assertion)
+       - test_short_record_30s_partial_hrv
+       - test_very_short_record_5s_all_nan
+       - test_nonlinear_inf_clamped_to_nan
+       - test_fit_scaler_ignores_inf
+       - test_transform_treats_inf_as_nan
+       - test_e2e_inf_sampen_survives_scaling
+       - test_e2e_short_record_nonzero_after_scaling
+
+  TESTS: 61/61 passing (53 existing + 8 new).
+
+  EXPECTED IMPACT: After cache rebuild, sampen non-zero rate should rise from
+  0% to > 40%. All-zero sample fraction should drop from 37.7% to < 10%.
+
+  NEXT: Rebuild cache with --workers 4, verify metrics, then retrain (Step 22).
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------

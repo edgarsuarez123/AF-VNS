@@ -23,7 +23,9 @@ Rounds 1–4 complete. Current state:
 | 20b | Download ltafdb + AF segment parser | Done | 2026-03-14 |
 | 20c | Add pos_weight for class imbalance | Done | 2026-03-14 |
 | 21 | Fix OOM: streaming precompute + stride fix | Done | 2026-03-15 |
-| 21b | Delete stale split, rebuild cache | In Progress | |
+| 21b | Delete stale split, rebuild cache | Done | 2026-03-15 |
+| 21c | Fix inf sampen + short record HRV fallback | Done | 2026-03-15 |
+| 21d | Rebuild cache with fixes | In Progress | |
 | 22 | Retrain + cross-dataset eval | Not Started | |
 
 ---
@@ -64,19 +66,47 @@ Rounds 1–4 complete. Current state:
 
 ---
 
+## Step 21c: Fix inf sampen + short record HRV fallback (Done 2026-03-15)
+
+**Problem:** Cache inspection revealed two HRV pipeline bugs:
+
+1. **inf sampen poisons scaler** — `nk.entropy_sample()` returns inf for 7 records (no template match). `fit_scaler()` only filtered NaN, not inf → `scaler.mean_[5] = inf`, `scaler.scale_[5] = nan` → 100% of sampen zeroed after transform.
+
+2. **Short records produce all-NaN HRV** — 89.5% of records are < 60s (Challenge 2017). With `subwindow_sec=60`, `n_available = signal_samples // (fs*60) = 0` → 37.7% of training windows have all-NaN HRV (model's RNN/Transformer learn nothing from them).
+
+**Fixes:**
+- `hrv_nonlinear.py`: Clamp inf sampen/dfa_alpha1 to NaN
+- `scaler.py`: Changed `~np.isnan` to `np.isfinite` in fit_scaler and transform (filters inf defensively)
+- `pipeline.py`: When `n_available == 0`, compute HRV over full available signal and fill timestep 0 instead of returning all-NaN
+- 8 new tests: inf guard, scaler defense, short record partial HRV, e2e integration
+
+**Tests:** 61/61 passing (53 existing + 8 new).
+
+---
+
+## Step 21d: Rebuild Cache With Fixes
+
+1. Delete stale cache: `del models\artifacts\cache\*.npy` and `del models\artifacts\scaler.pkl`
+2. Run: `.venv/Scripts/python -m src.training.precompute_cache --config config.yaml --workers 4`
+3. Verify: `scaler.mean_[5]` is finite, sampen non-zero rate > 40%, all-zero sample rate < 10%
+
+---
+
 ## Resume From Here
 
 **Current state (2026-03-15):**
-- Rounds 1-4 complete. 54/54 tests passing.
+- Rounds 1-4 complete. 61/61 tests passing.
 - Step 19 done: NaN fix committed, clean MIMIC baseline AUROC=0.6656
 - Step 20/20b/20c done: Challenge 2017 + ltafdb downloaded, pos_weight added
 - Step 21 done: Streaming precompute fix committed (OOM + stride fix)
-- Step 21b next: Delete stale split.json, run cache rebuild with --workers 4
+- Step 21b done: Cache rebuilt (revealed two HRV bugs)
+- Step 21c done: inf sampen guard + short record HRV fallback
+- Step 21d next: Rebuild cache with fixes
 
 **Next:**
-1. Delete stale split: `del models\artifacts\split.json`
+1. Delete stale cache: `del models\artifacts\cache\*.npy` + `del models\artifacts\scaler.pkl`
 2. Run cache: `.venv/Scripts/python -m src.training.precompute_cache --config config.yaml --workers 4`
-3. Verify cache: check `models/artifacts/cache/cache_meta.json`
+3. Verify cache: sampen non-zero > 40%, all-zero samples < 10%
 4. Train: `.venv/Scripts/python -m src.training.train --use-cache`
 5. Eval: `.venv/Scripts/python -m src.training.evaluate --mimic3`
 6. Target: MIMIC holdout AUROC significantly above 0.6656 baseline
