@@ -748,6 +748,92 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
 
   NEXT: Rebuild cache with --workers 4, verify metrics, then retrain (Step 22).
 
+--- 2.19 Round 5 Cache Verification, Training, and MIMIC-III Eval (2026-03-15) ---
+
+  CACHE VERIFICATION (post-fix rebuild):
+
+    Before fixes → After fixes:
+      Sampen non-zero:   0.0% → 61.6%  (feature fully recovered)
+      All-zero samples: 37.7% →  5.4%  (short record fallback working)
+      Scaler mean[5]:    inf  → 1.296  (finite, no longer poisoned)
+      Any inf in cache:  yes  → no
+
+    Per-feature non-zero rates (all ~60-63%):
+      rmssd: 63.0%, sdnn: 63.0%, lf: 60.6%, hf: 60.6%,
+      lf_hf_ratio: 60.6%, sampen: 61.6%, dfa_alpha1: 62.9%
+
+    Remaining 5.4% all-zero samples: signals too noisy or too short (< 5s)
+    for any HRV computation. Acceptable.
+
+    36.3% of samples have exactly 1/5 valid timesteps (short Challenge 2017
+    records). Timesteps 1-4 are structurally zero — no signal exists for
+    those time periods. GRU/Transformer see these zeros as real data (no
+    masking). This is a known limitation; attention masking is a future fix.
+
+  TRAINING (Step 22, Round 5):
+
+    Dataset: 10,046 train / 1,720 val / 2,367 test windows
+    Sources: afdb (23 AF) + nsrdb (18 NSR) + challenge2017 (5,788 AF+NSR)
+             + ltafdb (84 AF segments)
+    Class balance: 2,761 positive / 7,285 negative, pos_weight=2.64
+    Hardware: CUDA (RTX 3080), ~190 batch/s, ~2s/epoch
+
+    Best checkpoint: epoch 44, val_auroc=0.9920
+    Early stopped at epoch 59 (patience=15)
+    LR schedule: 1e-3 → 2.5e-4 → 1.25e-4 → 6.25e-5
+
+    val_auroc=0.9920 is lower than Round 4's 0.9999. This is expected and
+    good — the expanded dataset with 4 sources makes it harder to overfit
+    to equipment artifacts. Still suspiciously high for in-distribution.
+
+  MIMIC-III CROSS-DATASET EVAL (Round 5):
+
+    Records: 60 (30 AF, 30 NSR), 0 NaN outputs (fixed in Round 4)
+
+    Metric       Round 4    Round 5    Delta
+    AUROC        0.6656     0.6022     -0.063
+    F1           0.6286     0.6061     -0.023
+    Sensitivity  0.7333     0.6667     -0.067
+    Specificity  0.4000     0.4667     +0.067
+
+    NFR-3.1 (<5% F1 degradation): STILL FAIL
+
+  ANALYSIS:
+
+    Despite fixing the HRV pipeline (sampen recovered, short records now
+    contribute) and expanding training data from 41 to ~5,900 records across
+    4 sources, MIMIC-III generalization did not improve. Slightly worse AUROC.
+
+    The model still produces polarized predictions (prob=0.000 or prob=1.000)
+    on MIMIC records — it's making confident but often wrong decisions. This
+    strongly suggests the model is still learning source-specific artifacts
+    rather than AF physiology.
+
+    Key observations:
+    1. The model has NEVER seen ICU-quality signals during training. All 4
+       training sources are research-grade or portable-grade recordings.
+       MIMIC ICU signals have fundamentally different noise characteristics.
+    2. 36% of training samples have zero-padded HRV (1/5 timesteps valid).
+       The GRU/Transformer may learn zero-padding patterns as a shortcut.
+    3. No data augmentation — the model sees clean signals only, so any
+       recording-condition variation at test time is foreign.
+
+  ROOT CAUSE (unchanged from Round 4):
+    The core problem is domain shift. The model generalizes across 4
+    PhysioNet sources (afdb, nsrdb, c2017, ltafdb) but not to ICU data.
+    Adding more PhysioNet data doesn't help because all PhysioNet data
+    shares characteristics that ICU data does not.
+
+  NEXT STEPS (revised priority):
+    1. Download more MIMIC-III data (200+ AF, 200+ NSR) — split for
+       training and holdout. The model must see ICU signals during training.
+    2. Attention masking — stop GRU/Transformer from learning zero-padding
+       shortcuts on the 36% of samples with 1/5 valid HRV timesteps.
+    3. Data augmentation — noise injection, gain variation, baseline wander,
+       signal dropout. Critical for eventual earpiece deployment where
+       sweat, movement, and loose fit create artifacts.
+    4. Retrain and eval with all three improvements.
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------
