@@ -16,7 +16,8 @@ data:
   waveform_sec: 10
   hrv_window_sec: 300  # 5 min for RNN; also use hrv.window_sec [30, 300] for short HRV
   target_fs: 250  # resample all records to uniform rate (afdb=250Hz, nsrdb=128Hz)
-  # stride_sec: 5   # disabled: doubles cache time for marginal benefit; revisit after baseline training
+  max_ltaf_segments: 84  # DECISION: cap at 1 segment per patient (84 patients) for diversity; 2654 segs -> ~47k windows (was 401k)
+  stride_sec: 300  # non-overlapping 5-min windows for baseline; reduce later for augmentation
 
 # LSL live stream (FR-1.1)
 lsl:

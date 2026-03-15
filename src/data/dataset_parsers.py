@@ -7,7 +7,7 @@ ECG/PPG channel mapping: WFDB first channel; EDF/MIMIC per config/comment.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import numpy as np
 import yaml
@@ -404,6 +404,10 @@ def parse_all(config_path: str = "config.yaml") -> List[RecordDict]:
     ltafdb_path = raw_dir / "ltafdb"
     if ltafdb_path.is_dir():
         ltaf_recs = parse_ltafdb_dir(ltafdb_path)
+        max_ltaf = data_cfg.get("max_ltaf_segments", None)
+        if max_ltaf is not None and len(ltaf_recs) > max_ltaf:
+            ltaf_recs = ltaf_recs[:max_ltaf]
+            logger.info("Capped ltafdb to %d segments (max_ltaf_segments)", max_ltaf)
         all_records.extend(ltaf_recs)
         logger.info("Parsed %d AF segments from ltafdb", len(ltaf_recs))
 
@@ -429,3 +433,168 @@ def parse_all(config_path: str = "config.yaml") -> List[RecordDict]:
                 rec["fs"] = target_fs
 
     return all_records
+
+
+def collect_all_subject_ids(config_path: str = "config.yaml") -> List[str]:
+    """Collect all subject IDs without loading signal data.
+
+    Scans .hea/.label files on disk to build the same ID list that parse_all()
+    would produce — but without ever calling wfdb.rdrecord(). Used for
+    lightweight split creation in the streaming precompute pipeline.
+    """
+    config = load_config(config_path)
+    data_cfg = config.get("data", {})
+    raw_dir = Path(data_cfg.get("raw_dir", "data/raw"))
+
+    ids: List[str] = []
+
+    # afdb
+    afdb_path = raw_dir / "afdb"
+    afdb_dir = _wfdb_dir_with_hea(afdb_path)
+    if afdb_dir:
+        seen = set()
+        for hea in sorted(afdb_dir.glob("*.hea")):
+            if hea.stem not in seen:
+                seen.add(hea.stem)
+                ids.append(hea.stem)
+        logger.info("Collected %d subject IDs from afdb", len(seen))
+
+    # nsrdb
+    nsrdb_path = raw_dir / "nsrdb"
+    nsrdb_dir = _wfdb_dir_with_hea(nsrdb_path)
+    if nsrdb_dir:
+        seen = set()
+        for hea in sorted(nsrdb_dir.glob("*.hea")):
+            if hea.stem not in seen:
+                seen.add(hea.stem)
+                ids.append(hea.stem)
+        logger.info("Collected %d subject IDs from nsrdb", len(seen))
+
+    # ltafdb — cap at max_ltaf_segments
+    ltafdb_path = raw_dir / "ltafdb"
+    if ltafdb_path.is_dir():
+        max_ltaf = data_cfg.get("max_ltaf_segments", None)
+        count = 0
+        for label_path in sorted(ltafdb_path.glob("*.label")):
+            if max_ltaf is not None and count >= max_ltaf:
+                break
+            if (ltafdb_path / f"{label_path.stem}.hea").exists():
+                ids.append(f"ltaf_{label_path.stem}")
+                count += 1
+        logger.info("Collected %d subject IDs from ltafdb", count)
+
+    # challenge2017
+    c17_path = raw_dir / "challenge2017"
+    if c17_path.is_dir():
+        count = 0
+        for label_path in sorted(c17_path.glob("*.label")):
+            if (c17_path / f"{label_path.stem}.hea").exists():
+                ids.append(f"c17_{label_path.stem}")
+                count += 1
+        logger.info("Collected %d subject IDs from challenge2017", count)
+
+    return ids
+
+
+def iter_all_records(config_path: str = "config.yaml") -> Iterator[RecordDict]:
+    """Yield one RecordDict at a time from all configured databases.
+
+    Memory-efficient: only one record's signal is in memory at a time.
+    Applies target_fs resampling inline. Databases are iterated in the same
+    order as parse_all(): afdb, nsrdb, ltafdb, challenge2017.
+    """
+    config = load_config(config_path)
+    data_cfg = config.get("data", {})
+    raw_dir = Path(data_cfg.get("raw_dir", "data/raw"))
+    target_fs = float(data_cfg.get("target_fs", 0))
+
+    def _maybe_resample(rec: RecordDict) -> None:
+        if target_fs > 0 and abs(rec["fs"] - target_fs) >= 0.1:
+            logger.info("Resampling %s from %.0f Hz to %.0f Hz",
+                        rec["subject_id"], rec["fs"], target_fs)
+            rec["signal"] = _resample_to_target_fs(rec["signal"], rec["fs"], target_fs)
+            rec["fs"] = target_fs
+
+    # afdb — one record at a time
+    afdb_dir = _wfdb_dir_with_hea(raw_dir / "afdb")
+    if afdb_dir:
+        count = 0
+        seen = set()
+        for hea in sorted(afdb_dir.glob("*.hea")):
+            if hea.stem in seen:
+                continue
+            seen.add(hea.stem)
+            rec = parse_wfdb_record(afdb_dir, hea.stem, "afdb")
+            if rec is not None:
+                _maybe_resample(rec)
+                yield rec
+                count += 1
+        logger.info("Yielded %d records from afdb", count)
+
+    # nsrdb — one record at a time
+    nsrdb_dir = _wfdb_dir_with_hea(raw_dir / "nsrdb")
+    if nsrdb_dir:
+        count = 0
+        seen = set()
+        for hea in sorted(nsrdb_dir.glob("*.hea")):
+            if hea.stem in seen:
+                continue
+            seen.add(hea.stem)
+            rec = parse_wfdb_record(nsrdb_dir, hea.stem, "nsrdb")
+            if rec is not None:
+                _maybe_resample(rec)
+                yield rec
+                count += 1
+        logger.info("Yielded %d records from nsrdb", count)
+
+    # ltafdb — one segment at a time, cap at max_ltaf_segments
+    ltafdb_path = raw_dir / "ltafdb"
+    if ltafdb_path.is_dir():
+        try:
+            import wfdb
+        except ImportError:
+            raise ImportError("wfdb is required")
+
+        max_ltaf = data_cfg.get("max_ltaf_segments", None)
+        count = 0
+        for label_path in sorted(ltafdb_path.glob("*.label")):
+            if max_ltaf is not None and count >= max_ltaf:
+                break
+            record_name = label_path.stem
+            hea_path = ltafdb_path / f"{record_name}.hea"
+            if not hea_path.exists():
+                continue
+            try:
+                record = wfdb.rdrecord(str(ltafdb_path / record_name))
+            except Exception as e:
+                logger.warning("Failed to read ltafdb segment %s: %s", record_name, e)
+                continue
+            signal = record.p_signal if record.p_signal is not None else record.d_signal
+            if signal is None:
+                continue
+            signal = _ensure_1d(np.asarray(signal, dtype=np.float64))
+            signal = np.nan_to_num(signal, nan=0.0)
+            rec: RecordDict = {
+                "subject_id": f"ltaf_{record_name}",
+                "signal": signal,
+                "fs": float(record.fs),
+                "label": int(label_path.read_text().strip()),
+            }
+            _maybe_resample(rec)
+            yield rec
+            count += 1
+        if count > 0:
+            logger.info("Yielded %d AF segments from ltafdb", count)
+
+    # challenge2017 — one record at a time
+    c17_path = raw_dir / "challenge2017"
+    if c17_path.is_dir():
+        count = 0
+        for label_path in sorted(c17_path.glob("*.label")):
+            rec = parse_challenge2017_record(c17_path, label_path.stem)
+            if rec is not None:
+                _maybe_resample(rec)
+                yield rec
+                count += 1
+        if count > 0:
+            logger.info("Yielded %d records from challenge2017", count)
