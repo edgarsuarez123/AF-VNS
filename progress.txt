@@ -2,7 +2,7 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-14
+Last updated: 2026-03-15
 
 --------------------------------------------------------------------------------
 1. PROJECT GOAL & CONTEXT
@@ -833,6 +833,55 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
        signal dropout. Critical for eventual earpiece deployment where
        sweat, movement, and loose fit create artifacts.
     4. Retrain and eval with all three improvements.
+
+--- 2.20 Round 6: MIMIC Mixed Training + Attention Masking + Augmentation (2026-03-15) ---
+
+  IMPLEMENTATION (Steps 23-25):
+
+    Step 23 — MIMIC-III mixed-source training pipeline:
+      - Snapshot 60 existing MIMIC record stems into data/raw/mimic3_holdout.json
+      - Modified dataset_parsers.py: parse_all(), iter_all_records(), and
+        collect_all_subject_ids() now include non-holdout MIMIC-III records in
+        training. Holdout JSON is loaded from config key data.mimic3_holdout.
+      - Modified download_mimic3_waveforms.py: skip-if-exists check (avoids
+        re-downloading), env var credential support (PHYSIONET_USER/PHYSIONET_PASS).
+      - Modified evaluate.py: defaults to holdout-only via config.
+      - Step 23c (download 400 MIMIC records) skipped — requires PhysioNet
+        credentials. Current 60 records serve as holdout-only. Future downloads
+        will automatically be included in training (holdout JSON excludes them).
+
+    Step 24 — HRV attention masking:
+      - precompute_cache.py + precompute_worker.py: compute and save
+        {split}_hrv_lengths.npy (int32) — count of valid (non-all-NaN) HRV timesteps.
+      - rnn.py (GRUEncoder): pack_padded_sequence support via lengths parameter.
+        GRU processes only valid timesteps, ignoring zero-padding.
+      - transformer.py (TransformerEncoder): src_key_padding_mask support via
+        lengths parameter. Masked mean pooling averages only valid positions.
+      - ensemble.py (HybridEnsemble): passes hrv_lengths through to GRU and
+        Transformer. All models accept lengths=None for backward compat.
+      - train.py: PrecomputedDataset returns 4-tuple (short, hrv, label, hrv_len).
+        Training loop and validation both pass hrv_lengths to model.
+      - evaluate.py: computes hrv_len for each MIMIC-III record and passes it.
+
+    Step 25 — On-the-fly data augmentation:
+      - New file: src/features/augmentation.py — augment_waveform() applies random
+        subset of 5 augmentation types:
+        1. Gaussian noise (SNR 20-40 dB) — ambient electrical noise
+        2. Amplitude scaling (0.8-1.2x) — electrode impedance variation
+        3. Baseline wander (0.1-0.5 Hz) — movement/breathing
+        4. Signal dropout (0.05-0.3s zero, 20% prob) — loose electrode
+        5. Powerline interference (50/60 Hz, 30% prob) — electrical environment
+      - Config section: augmentation.enabled, snr/scale/freq/amp ranges.
+      - Integrated into PrecomputedDataset: is_train=True applies augmentation
+        to waveforms on-the-fly; val/test use is_train=False (no augmentation).
+
+  TESTS: 75/75 passing (14 new):
+    - 6 model masking tests (GRU with/without lengths, Transformer with/without
+      lengths, masked mean differs, ensemble with/without lengths)
+    - 5 augmentation tests (shape preserved, differs, reproducible, no NaN, zero input)
+    - 3 MIMIC holdout exclusion tests (iter_all_records, collect_ids, parse_all)
+
+  NEXT: Step 26 — delete stale cache, rebuild (with HRV lengths), train, eval.
 
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
