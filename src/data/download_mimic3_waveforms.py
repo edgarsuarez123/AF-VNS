@@ -85,8 +85,8 @@ def _download_wfdb_record(record_name: str, record_path: str, out_dir: Path,
 
 def main():
     parser = argparse.ArgumentParser(description="Download MIMIC-III waveforms for AF validation.")
-    parser.add_argument("--username", required=True, help="PhysioNet username")
-    parser.add_argument("--password", required=True, help="PhysioNet password")
+    parser.add_argument("--username", default=os.environ.get("PHYSIONET_USER"), help="PhysioNet username (or set PHYSIONET_USER env var)")
+    parser.add_argument("--password", default=os.environ.get("PHYSIONET_PASS"), help="PhysioNet password (or set PHYSIONET_PASS env var)")
     parser.add_argument("--n-af", type=int, default=30, help="Number of AF patients to download")
     parser.add_argument("--n-control", type=int, default=30, help="Number of non-AF patients to download")
     parser.add_argument("--diagnoses-csv", default="data/raw/mimic3/DIAGNOSES_ICD.csv",
@@ -97,6 +97,10 @@ def main():
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not args.username or not args.password:
+        logger.error("PhysioNet credentials required. Set PHYSIONET_USER/PHYSIONET_PASS or use --username/--password.")
+        sys.exit(1)
 
     # Load diagnoses
     logger.info("Loading diagnoses from %s", args.diagnoses_csv)
@@ -132,6 +136,12 @@ def main():
         for sid in subjects:
             if downloaded[label] >= targets[label]:
                 break
+            # Skip patients already downloaded
+            existing = list(out_dir.glob(f"p{sid:06d}_*.hea"))
+            if existing:
+                logger.info("Skipping patient %d (%s) — already downloaded", sid, label)
+                downloaded[label] += 1
+                continue
             record_path = subject_map[sid]
             logger.info("Checking patient %d (%s) at %s", sid, label, record_path)
 

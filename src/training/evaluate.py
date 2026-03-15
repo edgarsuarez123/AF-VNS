@@ -181,6 +181,10 @@ def evaluate_mimic3(
     target_fs = float(data_cfg.get("target_fs", 250))
     waveform_sec = float(data_cfg.get("waveform_sec", 10))
 
+    # Default holdout_path from config if not explicitly provided
+    if holdout_path is None:
+        holdout_path = data_cfg.get("mimic3_holdout")
+
     # If holdout_path provided, restrict to those subject IDs only
     holdout_ids: Optional[set] = None
     if holdout_path and Path(holdout_path).exists():
@@ -251,11 +255,15 @@ def evaluate_mimic3(
             hrv_scaled = transform(hrv_seq, scaler)
             hrv_scaled = np.nan_to_num(hrv_scaled, nan=0.0).astype(np.float32)
 
+            # Compute HRV length (number of valid timesteps)
+            hrv_len = max(1, int(np.sum(~np.all(np.isnan(hrv_seq), axis=-1))))
+
             # Build tensors
             short_t = torch.tensor(short_denoised, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
             hrv_t = torch.tensor(hrv_scaled, dtype=torch.float32).unsqueeze(0).to(device)
+            hrv_lengths_t = torch.tensor([hrv_len], dtype=torch.long).to(device)
 
-            logit = model(short_t, hrv_t).squeeze(-1).item()
+            logit = model(short_t, hrv_t, hrv_lengths=hrv_lengths_t).squeeze(-1).item()
             prob = 1.0 / (1.0 + np.exp(-np.clip(logit, -50, 50)))
 
             all_logits.append(logit)

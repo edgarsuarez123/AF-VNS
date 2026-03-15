@@ -68,25 +68,43 @@ class TransformerEncoder(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=cfg.num_encoder_layers)
         self.norm = nn.LayerNorm(cfg.d_model)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor = None) -> torch.Tensor:
         """
         x: (B, S, F)
+        lengths: (B,) int tensor of valid timesteps per sample (optional)
         returns: (B, D)
         """
         if x.ndim != 3:
             raise ValueError(f"TransformerEncoder expected input of shape (B, S, F); got {tuple(x.shape)}")
+        B, S, _ = x.shape
         h = self.input_proj(x)
         h = self.pos(h)
 
+        # Build padding mask: True = IGNORE position
+        mask = None
+        if lengths is not None:
+            positions = torch.arange(S, device=x.device).unsqueeze(0)  # (1, S)
+            mask = positions >= lengths.unsqueeze(1)  # (B, S), True=pad
+
         if self._batch_first:
-            z = self.encoder(h)  # (B, S, D)
+            z = self.encoder(h, src_key_padding_mask=mask)  # (B, S, D)
         else:
-            z = self.encoder(h.transpose(0, 1)).transpose(0, 1)  # (B, S, D)
+            z = self.encoder(h.transpose(0, 1), src_key_padding_mask=mask).transpose(0, 1)  # (B, S, D)
 
         z = self.norm(z)
         if self.cfg.pooling == "last":
+            if lengths is not None:
+                # Use last valid position per sample
+                last_idx = (lengths.clamp(min=1) - 1).long()  # (B,)
+                return z[torch.arange(B, device=z.device), last_idx]
             return z[:, -1]
         if self.cfg.pooling == "mean":
+            if mask is not None:
+                # Masked mean pooling: average only valid positions
+                valid_mask = ~mask  # (B, S), True=valid
+                valid_mask_f = valid_mask.unsqueeze(-1).float()  # (B, S, 1)
+                z_masked = z * valid_mask_f
+                return z_masked.sum(dim=1) / valid_mask_f.sum(dim=1).clamp(min=1.0)
             return z.mean(dim=1)
         raise ValueError(f"Unknown pooling='{self.cfg.pooling}' (expected 'mean' or 'last')")
 

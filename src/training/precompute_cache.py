@@ -77,7 +77,7 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
                 len(train_ids), len(val_ids), len(test_ids))
 
     # --- Accumulators for processed results (small per window) ---
-    accum = {name: {"short": [], "hrv": [], "labels": []} for name in ("train", "val", "test")}
+    accum = {name: {"short": [], "hrv": [], "labels": [], "hrv_lengths": []} for name in ("train", "val", "test")}
     max_short_len = 0
     n_records = 0
     n_windows = 0
@@ -139,9 +139,12 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
                     hrv = waveform_to_hrv_sequence(long_np, fs_val, config_path=config_path)
                     short_d = waveform_10s_denoised(short_np, fs_val, config_path=config_path)
                     short_d = np.asarray(short_d, dtype=np.float32)
+                    # Count valid (non-all-NaN) HRV timesteps
+                    hrv_len = max(1, int(np.sum(~np.all(np.isnan(hrv), axis=-1))))
                     accum[split_name]["short"].append(short_d)
                     accum[split_name]["hrv"].append(hrv)
                     accum[split_name]["labels"].append(lbl)
+                    accum[split_name]["hrv_lengths"].append(hrv_len)
                     if short_d.size > max_short_len:
                         max_short_len = short_d.size
             else:
@@ -151,10 +154,11 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
                     sub = chunk_data[sub_start: sub_start + chunk_size]
                     futures.append(executor.submit(_process_chunk, (sub, config_path)))
                 for fut in futures:
-                    for short_d, hrv, lbl in fut.result():
+                    for short_d, hrv, lbl, hrv_len in fut.result():
                         accum[split_name]["short"].append(short_d)
                         accum[split_name]["hrv"].append(hrv)
                         accum[split_name]["labels"].append(lbl)
+                        accum[split_name]["hrv_lengths"].append(hrv_len)
                         if short_d.size > max_short_len:
                             max_short_len = short_d.size
 
@@ -184,6 +188,7 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
         short_list = accum[name]["short"]
         hrv_list = accum[name]["hrv"]
         labels_list = accum[name]["labels"]
+        hrv_lengths_list = accum[name]["hrv_lengths"]
         n = len(labels_list)
         split_lengths[name] = n
 
@@ -193,6 +198,7 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
                     np.zeros((0, hrv_steps, N_FEATURES), dtype=np.float32))
             np.save(cache_dir / f"{name}_labels.npy", np.zeros(0, dtype=np.float32))
             np.save(cache_dir / f"{name}_short.npy", np.zeros((0, 0), dtype=np.float32))
+            np.save(cache_dir / f"{name}_hrv_lengths.npy", np.zeros(0, dtype=np.int32))
             logger.warning("Empty %s set; wrote empty arrays.", name)
             continue
 
@@ -201,6 +207,8 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
         np.save(cache_dir / f"{name}_hrv.npy", hrv_arr)
         # Labels
         np.save(cache_dir / f"{name}_labels.npy", np.array(labels_list, dtype=np.float32))
+        # HRV lengths
+        np.save(cache_dir / f"{name}_hrv_lengths.npy", np.array(hrv_lengths_list, dtype=np.int32))
         # Padded short waveforms
         out = np.zeros((n, max_short_len), dtype=np.float32)
         for i, s in enumerate(short_list):

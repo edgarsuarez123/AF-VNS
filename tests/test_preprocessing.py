@@ -466,6 +466,59 @@ def test_e2e_inf_sampen_survives_scaling():
     assert out[1, 5] == 0.0, "inf sampen should become 0 after nan_to_num"
 
 
+# ─── Augmentation tests (Step 25d) ──────────────────────────────────────────
+
+
+def test_augment_shape_preserved():
+    """Augmented waveform has same shape and dtype as input."""
+    from src.features.augmentation import augment_waveform
+    rng = np.random.default_rng(42)
+    waveform = np.random.randn(2500).astype(np.float32)
+    out = augment_waveform(waveform, fs=250.0, rng=rng)
+    assert out.shape == waveform.shape
+    assert out.dtype == np.float32
+
+
+def test_augment_differs_from_original():
+    """Augmented waveform is different from original."""
+    from src.features.augmentation import augment_waveform
+    rng = np.random.default_rng(42)
+    waveform = np.sin(np.linspace(0, 10 * np.pi, 2500)).astype(np.float32)
+    out = augment_waveform(waveform, fs=250.0, rng=rng)
+    assert not np.allclose(out, waveform), "Augmented should differ from original"
+
+
+def test_augment_reproducible_with_seed():
+    """Same rng seed produces identical output."""
+    from src.features.augmentation import augment_waveform
+    waveform = np.random.randn(2500).astype(np.float32)
+    out1 = augment_waveform(waveform, fs=250.0, rng=np.random.default_rng(99))
+    out2 = augment_waveform(waveform, fs=250.0, rng=np.random.default_rng(99))
+    assert np.allclose(out1, out2), "Same seed should produce identical augmentation"
+
+
+def test_augment_no_nan():
+    """Augmented output contains no NaN values."""
+    from src.features.augmentation import augment_waveform
+    rng = np.random.default_rng(42)
+    waveform = np.random.randn(2500).astype(np.float32)
+    out = augment_waveform(waveform, fs=250.0, rng=rng)
+    assert not np.any(np.isnan(out)), "Augmented output should have no NaN"
+
+
+def test_augment_zero_input():
+    """Augmentation doesn't crash on all-zero input."""
+    from src.features.augmentation import augment_waveform
+    rng = np.random.default_rng(42)
+    waveform = np.zeros(2500, dtype=np.float32)
+    out = augment_waveform(waveform, fs=250.0, rng=rng)
+    assert out.shape == waveform.shape
+    assert not np.any(np.isnan(out))
+
+
+# ─── End-to-end tests ──────────────────────────────────────────────────────
+
+
 def test_e2e_short_record_nonzero_after_scaling():
     """End-to-end: 45s ECG produces non-zero scaled HRV in row 0."""
     import neurokit2 as nk

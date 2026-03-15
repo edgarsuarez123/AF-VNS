@@ -17,6 +17,7 @@ data:
   hrv_window_sec: 300  # 5 min for RNN; also use hrv.window_sec [30, 300] for short HRV
   target_fs: 250  # resample all records to uniform rate (afdb=250Hz, nsrdb=128Hz)
   max_ltaf_segments: 84  # DECISION: cap at 1 segment per patient (84 patients) for diversity; 2654 segs -> ~47k windows (was 401k)
+  mimic3_holdout: data/raw/mimic3_holdout.json  # 60 original MIMIC records reserved for eval
   stride_sec: 300  # non-overlapping 5-min windows for baseline; reduce later for augmentation
 
 # LSL live stream (FR-1.1)
@@ -62,3 +63,15 @@ model:
   transformer_dim_feedforward: 128
   hrv_seq_len: 5
   hrv_n_features: 7
+
+# On-the-fly waveform augmentation (training only)
+augmentation:
+  enabled: true
+  gaussian_snr_range: [20, 40]
+  amplitude_scale_range: [0.8, 1.2]
+  baseline_freq_range: [0.1, 0.5]
+  baseline_amp_range: [0.0, 0.1]
+  dropout_prob: 0.2
+  dropout_duration_range: [0.05, 0.3]
+  powerline_prob: 0.3
+  powerline_amp_range: [0.0, 0.05]

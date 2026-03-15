@@ -44,15 +44,17 @@ class HybridEnsemble(nn.Module):
             nn.Linear(fused_dim, 1),
         )
 
-    def forward(self, waveform_10s: torch.Tensor, hrv_sequence: torch.Tensor) -> torch.Tensor:
+    def forward(self, waveform_10s: torch.Tensor, hrv_sequence: torch.Tensor,
+                hrv_lengths: torch.Tensor = None) -> torch.Tensor:
         """
         waveform_10s: (B, 1, T)
         hrv_sequence: (B, seq_len, 7) (scaled)
+        hrv_lengths: (B,) int tensor of valid HRV timesteps (optional)
         returns: (B, 1) logits
         """
         cnn_emb = self.cnn(waveform_10s)
-        rnn_emb = self.rnn(hrv_sequence)
-        tr_emb = self.transformer(hrv_sequence)
+        rnn_emb = self.rnn(hrv_sequence, lengths=hrv_lengths)
+        tr_emb = self.transformer(hrv_sequence, lengths=hrv_lengths)
         fused = torch.cat([cnn_emb, rnn_emb, tr_emb], dim=1)
         return self.head(fused)
 

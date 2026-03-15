@@ -41,23 +41,61 @@ class _EmptyCacheDataset(torch.utils.data.Dataset):
 
 
 class PrecomputedDataset(torch.utils.data.Dataset):
-    """Dataset that loads precomputed short (denoised 10s), scaled HRV, and labels from cache."""
+    """Dataset that loads precomputed short (denoised 10s), scaled HRV, and labels from cache.
 
-    def __init__(self, cache_dir: Path, split: str):
+    Supports HRV lengths for attention masking and on-the-fly augmentation for training.
+    """
+
+    def __init__(self, cache_dir: Path, split: str, is_train: bool = False,
+                 config_path: str = "config.yaml"):
         self.cache_dir = Path(cache_dir)
         self.split = split
+        self.is_train = is_train
         self._short = np.load(self.cache_dir / f"{split}_short.npy", mmap_mode="r")
         self._hrv = np.load(self.cache_dir / f"{split}_hrv_scaled.npy", mmap_mode="r")
         self._labels = np.load(self.cache_dir / f"{split}_labels.npy", mmap_mode="r")
+
+        # HRV lengths (backward compat: default to seq_len if file missing)
+        lengths_path = self.cache_dir / f"{split}_hrv_lengths.npy"
+        if lengths_path.exists():
+            self._hrv_lengths = np.load(lengths_path, mmap_mode="r")
+        else:
+            self._hrv_lengths = None
+
+        # Augmentation setup (training only)
+        self._augment_fn = None
+        if is_train:
+            config = load_config(config_path)
+            aug_cfg = config.get("augmentation", {})
+            if aug_cfg.get("enabled", False):
+                from src.features.augmentation import augment_waveform
+                data_cfg = config.get("data", {})
+                self._aug_fs = float(data_cfg.get("target_fs", 250))
+                self._aug_cfg = aug_cfg
+                self._augment_fn = augment_waveform
 
     def __len__(self):
         return len(self._labels)
 
     def __getitem__(self, i):
-        short_i = torch.from_numpy(self._short[i : i + 1].astype(np.float32))  # (1, max_T)
+        short_arr = self._short[i : i + 1].astype(np.float32).copy()  # (1, max_T)
+
+        # On-the-fly augmentation for training
+        if self._augment_fn is not None:
+            rng = np.random.default_rng()
+            short_arr[0] = self._augment_fn(short_arr[0], self._aug_fs,
+                                             config=self._aug_cfg, rng=rng)
+
+        short_i = torch.from_numpy(short_arr)  # (1, max_T)
         hrv_i = torch.from_numpy(self._hrv[i].astype(np.float32))  # (seq_len, 7)
         label_i = torch.tensor(self._labels[i], dtype=torch.float32)
-        return short_i, hrv_i, label_i
+
+        if self._hrv_lengths is not None:
+            hrv_len_i = torch.tensor(int(self._hrv_lengths[i]), dtype=torch.long)
+        else:
+            hrv_len_i = torch.tensor(self._hrv[i].shape[0], dtype=torch.long)
+
+        return short_i, hrv_i, label_i, hrv_len_i
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -172,18 +210,22 @@ def run_validation(model, val_loader, scaler, device, config_path: str):
 
 
 def run_validation_from_cache(model, val_loader, device):
-    """Run validation from precomputed cache batches (short, hrv, labels)."""
+    """Run validation from precomputed cache batches (short, hrv, labels, hrv_lengths)."""
     model.eval()
     all_logits = []
     all_labels = []
     total_loss = 0.0
     n = 0
     with torch.no_grad():
-        for short_t, hrv_t, labels_t in val_loader:
+        for batch in val_loader:
+            short_t, hrv_t, labels_t = batch[0], batch[1], batch[2]
+            hrv_lengths = batch[3] if len(batch) > 3 else None
             short_t = short_t.to(device)
             hrv_t = hrv_t.to(device)
             labels_t = labels_t.to(device)
-            logits = model(short_t, hrv_t).squeeze(-1)
+            if hrv_lengths is not None:
+                hrv_lengths = hrv_lengths.to(device)
+            logits = model(short_t, hrv_t, hrv_lengths=hrv_lengths).squeeze(-1)
             loss = F.binary_cross_entropy_with_logits(logits, labels_t)
             total_loss += loss.item() * short_t.shape[0]
             n += short_t.shape[0]
@@ -245,9 +287,9 @@ def main():
                 missing,
             )
             sys.exit(1)
-        train_ds = PrecomputedDataset(cache_dir, "train")
+        train_ds = PrecomputedDataset(cache_dir, "train", is_train=True, config_path=args.config)
         try:
-            val_ds = PrecomputedDataset(cache_dir, "val")
+            val_ds = PrecomputedDataset(cache_dir, "val", is_train=False, config_path=args.config)
         except FileNotFoundError:
             # Legacy cache without val files (precompute_cache now writes empty splits)
             import json
@@ -296,10 +338,7 @@ def main():
     # Compute pos_weight from training label distribution to handle class imbalance
     all_train_labels = []
     for batch in train_loader:
-        if use_cache:
-            labels_batch = batch[2]
-        else:
-            labels_batch = batch[2]
+        labels_batch = batch[2]
         all_train_labels.append(labels_batch)
     all_train_labels = torch.cat(all_train_labels)
     n_pos = (all_train_labels == 1).sum().float()
@@ -336,12 +375,16 @@ def main():
             leave=False,
         )
         if use_cache:
-            for short_t, hrv_t, labels_t in pbar:
+            for batch in pbar:
+                short_t, hrv_t, labels_t = batch[0], batch[1], batch[2]
+                hrv_lengths = batch[3] if len(batch) > 3 else None
                 short_t = short_t.to(device)
                 hrv_t = hrv_t.to(device)
                 labels_t = labels_t.to(device)
+                if hrv_lengths is not None:
+                    hrv_lengths = hrv_lengths.to(device)
                 optimizer.zero_grad()
-                logits = model(short_t, hrv_t).squeeze(-1)
+                logits = model(short_t, hrv_t, hrv_lengths=hrv_lengths).squeeze(-1)
                 loss = F.binary_cross_entropy_with_logits(logits, labels_t, pos_weight=pos_weight)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)

@@ -417,11 +417,20 @@ def parse_all(config_path: str = "config.yaml") -> List[RecordDict]:
         all_records.extend(c17_recs)
         logger.info("Parsed %d records from Challenge 2017", len(c17_recs))
 
-    # NOTE: MIMIC-III is excluded from parse_all() — it is reserved as pure holdout
-    # for cross-dataset evaluation (NFR-3.1). evaluate_mimic3() parses it separately.
-    if mimic3_subdir.is_dir() and any(mimic3_subdir.iterdir()):
-        logger.info("MIMIC-III dir found (%s) — skipped (holdout only, use evaluate --mimic3)",
-                     mimic3_subdir)
+    # Include non-holdout MIMIC-III records in training (Round 6: mixed-source training)
+    holdout_ids: set = set()
+    holdout_path = data_cfg.get("mimic3_holdout")
+    if holdout_path and Path(holdout_path).exists():
+        import json as _json
+        with open(holdout_path) as _f:
+            holdout_ids = set(_json.load(_f).get("all", []))
+        logger.info("Loaded %d MIMIC-III holdout IDs from %s", len(holdout_ids), holdout_path)
+    if mimic3_subdir.is_dir():
+        mimic_recs = parse_mimic3_dir(mimic3_subdir)
+        train_recs = [r for r in mimic_recs if r["subject_id"] not in holdout_ids]
+        all_records.extend(train_recs)
+        logger.info("Parsed %d MIMIC-III records (%d holdout excluded, %d for training)",
+                     len(mimic_recs), len(mimic_recs) - len(train_recs), len(train_recs))
 
     # Resample to uniform rate if target_fs is set (avoids sampling-rate bias in CNN)
     target_fs = float(data_cfg.get("target_fs", 0))
@@ -492,6 +501,31 @@ def collect_all_subject_ids(config_path: str = "config.yaml") -> List[str]:
                 ids.append(f"c17_{label_path.stem}")
                 count += 1
         logger.info("Collected %d subject IDs from challenge2017", count)
+
+    # MIMIC-III training records (exclude holdout)
+    mimic3_subdir = Path(data_cfg.get("mimic3_subdir", "data/raw/mimic3"))
+    holdout_ids: set = set()
+    holdout_path = data_cfg.get("mimic3_holdout")
+    if holdout_path and Path(holdout_path).exists():
+        import json as _json
+        with open(holdout_path) as _f:
+            holdout_ids = set(_json.load(_f).get("all", []))
+    if mimic3_subdir.is_dir():
+        count = 0
+        seen_hea = set()
+        for hea in sorted(mimic3_subdir.glob("*.hea")):
+            name = hea.stem
+            if name in seen_hea or name in holdout_ids:
+                continue
+            if name.upper().startswith("DIAGNOSES"):
+                continue
+            label_path = mimic3_subdir / f"{name}.label"
+            if not label_path.exists():
+                continue
+            seen_hea.add(name)
+            ids.append(name)
+            count += 1
+        logger.info("Collected %d MIMIC-III training IDs (excluded %d holdout)", count, len(holdout_ids))
 
     return ids
 
@@ -598,3 +632,29 @@ def iter_all_records(config_path: str = "config.yaml") -> Iterator[RecordDict]:
                 count += 1
         if count > 0:
             logger.info("Yielded %d records from challenge2017", count)
+
+    # MIMIC-III training records (exclude holdout)
+    mimic3_subdir = Path(data_cfg.get("mimic3_subdir", "data/raw/mimic3"))
+    holdout_ids: set = set()
+    holdout_path = data_cfg.get("mimic3_holdout")
+    if holdout_path and Path(holdout_path).exists():
+        import json as _json
+        with open(holdout_path) as _f:
+            holdout_ids = set(_json.load(_f).get("all", []))
+    if mimic3_subdir.is_dir():
+        count = 0
+        seen_hea: set = set()
+        for hea in sorted(mimic3_subdir.glob("*.hea")):
+            name = hea.stem
+            if name in seen_hea or name in holdout_ids:
+                continue
+            if name.upper().startswith("DIAGNOSES"):
+                continue
+            seen_hea.add(name)
+            rec = parse_mimic3_wfdb_record(mimic3_subdir, name)
+            if rec is not None:
+                _maybe_resample(rec)
+                yield rec
+                count += 1
+        if count > 0:
+            logger.info("Yielded %d MIMIC-III training records", count)

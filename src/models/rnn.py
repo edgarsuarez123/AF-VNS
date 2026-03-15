@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import torch
 from torch import nn
+from torch.nn.utils.rnn import pack_padded_sequence
 
 
 @dataclass(frozen=True)
@@ -34,14 +35,21 @@ class GRUEncoder(nn.Module):
             dropout=cfg.dropout if cfg.num_layers > 1 else 0.0,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor = None) -> torch.Tensor:
         """
         x: (B, seq_len, input_size)
+        lengths: (B,) int tensor of valid HRV timesteps per sample (optional)
         returns: (B, hidden_size) using last-layer last hidden state
         """
         if x.ndim != 3:
             raise ValueError(f"GRUEncoder expected input of shape (B, seq_len, F); got {tuple(x.shape)}")
-        _, h_n = self.gru(x)
+        if lengths is not None:
+            packed = pack_padded_sequence(
+                x, lengths.cpu().clamp(min=1), batch_first=True, enforce_sorted=False
+            )
+            _, h_n = self.gru(packed)
+        else:
+            _, h_n = self.gru(x)
         # h_n: (num_layers, B, hidden_size) -> take last layer
         return h_n[-1]
 

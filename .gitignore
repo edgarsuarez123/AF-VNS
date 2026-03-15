@@ -3,6 +3,7 @@
 *.csv
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/mimic3_holdout.json
 data/**/*.npy
 
 # Trained artifacts
