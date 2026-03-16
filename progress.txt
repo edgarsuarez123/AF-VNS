@@ -934,8 +934,16 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
 
   TESTS: 80/80 passing (5 new across 2 test files).
 
-  NEXT: Step 28 (download 300 more MIMIC records, needs PhysioNet creds),
-        then Step 30 (cache rebuild + retrain + eval targeting AUROC ≥ 0.75).
+  Step 30 — Cache rebuild + retrain + eval:
+    - Deleted stale cache + scaler, rebuilt with 7 workers (~35 min).
+    - Cache: 9,980 train / 2,081 val / 2,807 test windows.
+    - Train: val_auroc=0.9602, early stop epoch 42.
+    - MIMIC holdout (160 records): AUROC=0.6777, F1=0.6554, Sens=0.7250, Spec=0.5125
+    - vs Round 7: AUROC +0.003, F1 +0.026, Sens +0.088, Spec -0.100
+    - Label smoothing shifted model toward predicting AF — sensitivity up significantly
+      but specificity dropped. AUROC nearly flat. NFR-3.1 gap = 0.0223.
+
+  NEXT: Step 28 (download 300 more MIMIC records, needs PhysioNet creds) — biggest lever.
 
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES

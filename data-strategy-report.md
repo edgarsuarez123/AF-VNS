@@ -601,12 +601,22 @@ Specificity gain (+0.146) is the key win — model is no longer AF-biased (no lo
 | `data` | `stride_sec` | 300 | Unchanged — default for all non-MIMIC sources |
 | `data` | `mimic_stride_sec` | 150 | NEW — halved stride for MIMIC records |
 
-### 16.3 Status
+### 16.3 Round 8 Eval Results (Step 30)
 
-- Steps 27 and 29 committed (487acc1, cdf486d). 80/80 tests passing.
-- Cache rebuild required before per-source stride takes effect (Step 30).
-- Step 28 (download 300 more MIMIC records) pending — requires PhysioNet credentials.
-- Target: AUROC ≥ 0.75 after Step 30.
+Cache rebuilt with 7 workers (~35 min). 9,980 train / 2,081 val / 2,807 test windows.
+
+| Metric | Round 7 | Round 8 | Delta |
+|--------|---------|---------|-------|
+| **val_auroc** | 0.9582 | **0.9602** | +0.002 |
+| **MIMIC AUROC** | 0.6747 | **0.6777** | +0.003 |
+| **F1** | 0.6296 | **0.6554** | +0.026 |
+| **Sensitivity** | 0.6375 | **0.7250** | +0.088 |
+| **Specificity** | 0.6125 | **0.5125** | -0.100 |
+| **NFR-3.1** | FAIL | **FAIL** | — |
+
+**Analysis:** Label smoothing pushed the model toward predicting AF more freely — sensitivity recovered significantly (+0.088) but specificity dropped (-0.100). The net effect on AUROC is nearly flat (+0.003). The sensitivity/specificity tradeoff shifted but AUROC (which measures the full ROC curve) barely moved. The per-source MIMIC stride contribution is hard to isolate.
+
+**NFR-3.1 gap: 0.0223.** Primary remaining lever: more MIMIC training data (Step 28).
 
 ### 16.4 Updated AUROC Trajectory
 
@@ -616,8 +626,8 @@ Specificity gain (+0.146) is the key win — model is no longer AF-biased (no lo
 | Round 5 | 0.6022 | 4 sources, fixed HRV — same domain |
 | Round 6 | 0.6333 | Masking + aug only (no MIMIC train) |
 | Round 7 | 0.6747 | +298 MIMIC training records, 160-rec holdout |
-| **Round 8** | **pending** | Label smoothing + per-source stride + cache rebuild |
+| **Round 8** | **0.6777** | Label smoothing + per-source stride |
 
 ---
 
-*Last updated: March 16, 2026. Reflects Round 8 code changes (Steps 27, 29). Round 8 eval pending cache rebuild + retrain (Step 30).*
+*Last updated: March 16, 2026. Round 8 complete. Next: Step 28 — download 300 more MIMIC records (requires PhysioNet credentials).*

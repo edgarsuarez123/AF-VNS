@@ -51,15 +51,120 @@ learn padding shortcuts), and no augmentation exists for real-world noise condit
   vs Round 5: AUROC +0.072, Specificity +0.146 (major win — model no longer AF-biased)
   NFR-3.1 target (AUROC ≥ 0.75): not yet met — gap = 0.0253
 
+## Round 8 Results (label smoothing + per-source MIMIC stride)
+
+  Train: val_auroc=0.9602, early stop epoch 42
+  MIMIC holdout (160 records, 80 AF + 80 NSR):
+    AUROC=0.6777, F1=0.6554, Sens=0.7250, Spec=0.5125
+  vs Round 7: AUROC +0.003, F1 +0.026, Sens +0.088, Spec -0.100
+  Analysis: label smoothing shifted model toward predicting AF — sensitivity up but
+    specificity down. AUROC nearly flat. NFR-3.1 gap = 0.0223.
+
 ## Resume From Here
 
-**Current state (2026-03-15):**
-- Round 7 complete. 75/75 tests passing.
+**Current state (2026-03-16):**
+- Round 8 complete. 80/80 tests passing.
+- 298 MIMIC training records. 160-record holdout locked.
+- AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777
+- Next: Step 28 (download 300 more MIMIC records, needs PhysioNet creds) — biggest remaining lever.
+
+---
+
+# Round 8: Label Smoothing + More MIMIC Data + MIMIC Stride Reduction
+
+## Context
+
+AUROC gap to NFR-3.1 target (0.75): **0.0253**. Three levers identified:
+1. Model outputs prob=0.000 or prob=1.000 on nearly everything — overconfident, hurts calibration and AUROC on OOD data. Label smoothing fixes this.
+2. Only 298 MIMIC training records — more ICU data is the biggest long-term lever.
+3. MIMIC records are 500-900s but stride=300s gives only 1-2 windows each. Halving stride doubles MIMIC training windows for free.
+4. HRV NaN rate ~42% — largely structural (Challenge 2017 short records). Attention masking already handles zeros; further reduction is lower priority.
+
+---
+
+## Steps
+
+| Step | Description | Status | Completed At |
+|------|-------------|--------|--------------|
+| 27 | Label smoothing (ε=0.1) in training loss | Done | 2026-03-16 |
+| 28 | Download 300 more MIMIC records (seed=44) | Not Started | |
+| 29 | Per-source stride: MIMIC stride=150s, others=300s | Done | 2026-03-16 |
+| 30 | Rebuild cache + retrain + eval | Done | 2026-03-16 |
+
+---
+
+## Step 27: Label Smoothing
+
+**File:** `src/training/train.py`
+
+Replace hard 0/1 labels with smoothed targets before loss:
+```python
+# label_smoothing: replace 0→epsilon, 1→1-epsilon
+epsilon = config.get("training", {}).get("label_smoothing", 0.0)
+if epsilon > 0:
+    labels_t = labels_t * (1 - epsilon) + epsilon * 0.5
+```
+
+Add to `config.yaml`:
+```yaml
+training:
+  label_smoothing: 0.1
+```
+
+Apply in both cache training loop and non-cache loop. No cache rebuild needed — labels are smoothed at training time, not stored.
+
+**Expected impact:** +0.02-0.04 AUROC on OOD data. Forces model away from prob=0.000/1.000 extremes.
+
+---
+
+## Step 28: Download 300 More MIMIC Records
+
+Run with seed=44, skip-if-exists handles duplicates:
+```bash
+export PHYSIONET_USER=edgarsuarez123
+export PHYSIONET_PASS=<password>
+python -m src.data.download_mimic3_waveforms \
+  --n-af 300 --n-control 300 --seed 44 --out-dir data/raw/mimic3
+```
+
+After download: update holdout (add ~75 AF + 75 NSR to holdout from new batch → ~310 total holdout), rest goes to training (~450 MIMIC training records total).
+
+---
+
+## Step 29: Per-Source Stride Reduction for MIMIC
+
+**File:** `src/training/precompute_cache.py`
+
+Add logic: if record subject_id matches MIMIC pattern (starts with `p0`), use `mimic_stride_sec` from config instead of global `stride_sec`.
+
+**File:** `config.yaml`:
+```yaml
+data:
+  stride_sec: 300        # default for afdb/nsrdb/ltafdb/c17
+  mimic_stride_sec: 150  # halved stride for MIMIC → 2-4x more windows per record
+```
+
+**Expected impact:** ~600 → ~1200+ MIMIC training windows from existing records.
+
+---
+
+## Step 30: Rebuild Cache + Retrain + Eval
+
+```bash
+rm models/artifacts/cache/*.npy models/artifacts/scaler.pkl models/artifacts/split.json
+python -m src.training.precompute_cache --config config.yaml --workers 6
+python -m src.training.train --use-cache
+python -m src.training.evaluate --mimic3
+```
+
+Target: AUROC ≥ 0.75 on holdout.
+
+---
+
+## Resume From Here
+
+**Current state (2026-03-16):**
+- Steps 27 (label smoothing) and 29 (per-source MIMIC stride) implemented. 80/80 tests passing.
 - 298 MIMIC training records included. 160-record holdout locked.
 - AUROC trajectory: 0.6022 → 0.6333 → 0.6747
-
-**Ideas for Round 8 (gap to 0.75):**
-1. Download more MIMIC records (target 400 AF + 400 NSR total training)
-2. Reduce stride_sec for MIMIC records to 150s (2x windows per record)
-3. Label smoothing to reduce overconfident binary predictions
-4. Longer training with lower LR floor
+- Next: Step 28 (download 300 more MIMIC records) then Step 30 (cache rebuild + retrain + eval).
