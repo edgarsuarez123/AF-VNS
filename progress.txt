@@ -883,6 +883,60 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
 
   NEXT: Step 26 — delete stale cache, rebuild (with HRV lengths), train, eval.
 
+--- 2.21 Round 7 Results: MIMIC Mixed Training (2026-03-15) ---
+
+  Step 26 completed:
+    - Deleted stale cache, rebuilt with HRV lengths + MIMIC training records.
+    - Expanded holdout from 60 to 160 records (80 AF + 80 NSR) — 100 added.
+    - 298 MIMIC training records included in training split.
+
+  RESULTS:
+    Train: val_auroc=0.9582, early stop epoch 30
+    MIMIC holdout (160 records, 80 AF + 80 NSR):
+      AUROC=0.6747, F1=0.6296, Sens=0.6375, Spec=0.6125
+    vs Round 5: AUROC +0.0725, Specificity +0.1458 (model no longer AF-biased)
+
+  NFR-3.1 target (AUROC ≥ 0.75): not yet met — gap = 0.0253
+  Tests: 75/75 passing.
+
+--- 2.22 Round 8: Label Smoothing + Per-Source MIMIC Stride (2026-03-16) ---
+
+  IMPLEMENTATION (Steps 27 + 29):
+
+    Step 27 — Label smoothing (ε=0.1):
+      - config.yaml: added training.label_smoothing: 0.1
+      - train.py: read label_smoothing from config once after train_cfg is loaded.
+        Applied in both training loops (cache and non-cache):
+          labels_t = labels_t * (1 - label_smoothing) + label_smoothing * 0.5
+        Validation loops (run_validation, run_validation_from_cache) unchanged —
+        keep hard labels for honest AUROC evaluation.
+        pos_weight calculation unchanged — uses raw 0/1 labels for class balance.
+      - Rationale: model outputs prob=0.000 or 1.000 on nearly all OOD samples.
+        Label smoothing forces output distribution away from extremes, improving
+        calibration on unseen ICU recordings.
+      - New file: tests/test_label_smoothing.py (2 tests).
+      - No cache rebuild needed — applied at training time.
+      - Committed: 487acc1
+
+    Step 29 — Per-source MIMIC stride (150s vs 300s):
+      - config.yaml: added data.mimic_stride_sec: 150
+      - precompute_cache.py: import re added. Read mimic_stride_sec from config
+        (default = stride_sec if not set). Per-record stride applied:
+          if re.match(r'^p\d{6}_', sid): stride = int(fs * mimic_stride_sec)
+          else: stride = int(fs * stride_sec)
+        MIMIC record IDs are p + 6 digits + underscore (e.g. p000042_test).
+        Regex is stricter than startswith("p0") — safe for future IDs above p099999.
+      - Rationale: MIMIC records 500-900s; at stride=300s yield 1-2 windows each.
+        At stride=150s yield 3-5 windows — doubles MIMIC training data for free.
+      - 3 new tests in tests/test_precompute.py (TestMimicStride class).
+      - Cache rebuild required before effect is seen.
+      - Committed: cdf486d
+
+  TESTS: 80/80 passing (5 new across 2 test files).
+
+  NEXT: Step 28 (download 300 more MIMIC records, needs PhysioNet creds),
+        then Step 30 (cache rebuild + retrain + eval targeting AUROC ≥ 0.75).
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------
