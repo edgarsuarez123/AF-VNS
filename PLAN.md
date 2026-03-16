@@ -37,31 +37,29 @@ learn padding shortcuts), and no augmentation exists for real-world noise condit
 | 26a | Delete stale cache + rebuild | Done | 2026-03-15 |
 | 26b | Train (masking+aug only, no MIMIC train data) | Done | 2026-03-15 |
 | 26c | Evaluate on MIMIC holdout | Done | 2026-03-15 |
-| 26d | Download 400 MIMIC records | In Progress | ~11/400 downloaded |
-| 26e | Rebuild cache with MIMIC training data | Not Started | |
-| 26f | Retrain + re-evaluate | Not Started | |
+| 26d | Download 400 MIMIC records | Done | 2026-03-15 |
+| 26e | Expand holdout 60→160, rebuild cache | Done | 2026-03-15 |
+| 26f | Retrain + re-evaluate | Done | 2026-03-15 |
 
 ---
 
-## Round 6 Intermediate Results (masking+aug only, no MIMIC training data)
+## Round 7 Results (MIMIC mixed training, 160-record holdout)
 
-  Train: val_auroc=0.9912, early stop epoch 35
-  MIMIC holdout: AUROC=0.6333, F1=0.6176, Sens=0.7000, Spec=0.4333
-  Improvement from masking+augmentation alone: +0.031 AUROC vs Round 5
+  Train: val_auroc=0.9582, early stop epoch 30
+  MIMIC holdout (160 records, 80 AF + 80 NSR):
+    AUROC=0.6747, F1=0.6296, Sens=0.6375, Spec=0.6125
+  vs Round 5: AUROC +0.072, Specificity +0.146 (major win — model no longer AF-biased)
+  NFR-3.1 target (AUROC ≥ 0.75): not yet met — gap = 0.0253
 
 ## Resume From Here
 
 **Current state (2026-03-15):**
-- Steps 23-25 complete. 75/75 tests passing.
-- Step 26a-c done: trained with masking+aug, evaluated on holdout.
-- Step 26d in progress: MIMIC-III download running as background process.
-  ~11/400 records downloaded. Check: `tail -5 mimic_download_err.log`
-  Count: `find data/raw/mimic3/ -name "*.hea" | wc -l` (subtract 60 for new)
-- After download completes: rebuild cache + retrain + re-evaluate.
+- Round 7 complete. 75/75 tests passing.
+- 298 MIMIC training records included. 160-record holdout locked.
+- AUROC trajectory: 0.6022 → 0.6333 → 0.6747
 
-**Next (after download finishes):**
-1. Delete stale cache: `rm models/artifacts/cache/*.npy models/artifacts/scaler.pkl models/artifacts/split.json`
-2. Rebuild cache: `.venv/Scripts/python -m src.training.precompute_cache --config config.yaml --workers 4`
-3. Train: `.venv/Scripts/python -m src.training.train --use-cache`
-4. Eval: `.venv/Scripts/python -m src.training.evaluate --mimic3`
-5. Target: AUROC > 0.75 on holdout
+**Ideas for Round 8 (gap to 0.75):**
+1. Download more MIMIC records (target 400 AF + 400 NSR total training)
+2. Reduce stride_sec for MIMIC records to 150s (2x windows per record)
+3. Label smoothing to reduce overconfident binary predictions
+4. Longer training with lower LR floor
