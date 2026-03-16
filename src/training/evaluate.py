@@ -21,7 +21,7 @@ if __name__ == "__main__":
         sys.path.insert(0, str(_root))
 
 from src.data.dataloaders import get_dataloaders
-from src.data.dataset_parsers import parse_mimic3_dir, _resample_to_target_fs
+from src.data.dataset_parsers import parse_challenge2017_dir, parse_mimic3_dir, _resample_to_target_fs
 from src.features.pipeline import waveform_10s_denoised, waveform_to_hrv_sequence
 from src.features.scaler import load_scaler, transform
 
@@ -379,6 +379,168 @@ def evaluate_mimic3(
     }
 
 
+def evaluate_challenge2017(
+    config_path: str = CONFIG_PATH,
+    checkpoint_path: Optional[str] = None,
+    scaler_path: Optional[str] = None,
+    save_plots: bool = True,
+    artifacts_dir: Optional[str] = None,
+) -> dict:
+    """OOD evaluation on PhysioNet Challenge 2017 (ambulatory AliveCor ECG).
+
+    Records are 30-61s at 300 Hz. CNN works fine (10s windows).
+    HRV has limited context (0-1 valid timesteps out of 5) — masking handles this.
+    """
+    config = load_config(config_path)
+    paths_cfg = config.get("paths", {})
+    data_cfg = config.get("data", {})
+
+    checkpoint_path = checkpoint_path or paths_cfg.get(
+        "phase2_checkpoint", paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth"))
+    scaler_path = scaler_path or paths_cfg.get(
+        "phase2_scaler", paths_cfg.get("scaler", "models/artifacts/scaler.pkl"))
+    raw_dir = Path(data_cfg.get("raw_dir", "data/raw"))
+    c17_dir = raw_dir / "challenge2017"
+    target_fs = float(data_cfg.get("target_fs", 250))
+    waveform_sec = float(data_cfg.get("waveform_sec", 10))
+
+    if artifacts_dir is None:
+        artifacts_dir = str(Path(scaler_path).parent / "c2017_eval")
+    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
+
+    if not c17_dir.is_dir():
+        print(f"Challenge 2017 directory not found: {c17_dir}")
+        return {}
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = build_model(config_path=config_path, checkpoint_path=checkpoint_path, device=device)
+    model.eval()
+    scaler = load_scaler(path=scaler_path, config_path=config_path)
+
+    records = parse_challenge2017_dir(c17_dir)
+    logger.info("Parsed %d Challenge 2017 records", len(records))
+
+    # Resample to target_fs
+    if target_fs > 0:
+        for rec in records:
+            if abs(rec["fs"] - target_fs) >= 0.1:
+                rec["signal"] = _resample_to_target_fs(rec["signal"], rec["fs"], target_fs)
+                rec["fs"] = target_fs
+
+    min_samples = int(waveform_sec * target_fs)
+    hrv_window_samples = int(300 * target_fs)
+
+    all_logits = []
+    all_labels = []
+    n_skipped = 0
+    n_short = 0
+
+    with torch.no_grad():
+        for rec in records:
+            if rec["label"] is None:
+                n_skipped += 1
+                continue
+            signal = rec["signal"]
+            fs = rec["fs"]
+
+            if len(signal) < min_samples:
+                n_skipped += 1
+                continue
+
+            is_short = len(signal) < hrv_window_samples
+            if is_short:
+                n_short += 1
+
+            # CNN input: center 10s
+            center = len(signal) // 2
+            start = max(0, center - min_samples // 2)
+            short_signal = signal[start : start + min_samples]
+            short_denoised = waveform_10s_denoised(short_signal, fs, config_path)
+
+            # HRV input
+            long_signal = signal[:hrv_window_samples] if len(signal) >= hrv_window_samples else signal
+            hrv_seq = waveform_to_hrv_sequence(long_signal, fs, config_path=config_path)
+            hrv_scaled = transform(hrv_seq, scaler)
+            hrv_scaled = np.nan_to_num(hrv_scaled, nan=0.0).astype(np.float32)
+            hrv_len = max(1, int(np.sum(~np.all(np.isnan(hrv_seq), axis=-1))))
+
+            short_t = torch.tensor(short_denoised, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
+            hrv_t = torch.tensor(hrv_scaled, dtype=torch.float32).unsqueeze(0).to(device)
+            hrv_lengths_t = torch.tensor([hrv_len], dtype=torch.long).to(device)
+
+            logit = model(short_t, hrv_t, hrv_lengths=hrv_lengths_t).squeeze(-1).item()
+            all_logits.append(logit)
+            all_labels.append(rec["label"])
+
+    if not all_labels:
+        print("No Challenge 2017 records with labels found.")
+        return {}
+
+    logits_np = np.array(all_logits)
+    labels_np = np.array(all_labels)
+    probs = 1.0 / (1.0 + np.exp(-np.clip(logits_np, -50, 50)))
+
+    valid_mask = ~np.isnan(probs)
+    probs_valid = probs[valid_mask]
+    labels_valid = labels_np[valid_mask]
+    preds = (probs_valid >= 0.5).astype(np.int64)
+
+    from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
+
+    try:
+        auroc = float(roc_auc_score(labels_valid, probs_valid))
+    except Exception:
+        auroc = float("nan")
+    f1 = float(f1_score(labels_valid, preds, zero_division=0))
+    cm = confusion_matrix(labels_valid, preds)
+    if cm.size == 4:
+        tn, fp, fn, tp = cm.ravel()
+    else:
+        tn = fp = fn = tp = 0
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else float("nan")
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else float("nan")
+
+    n_af = int(np.sum(labels_np == 1))
+    n_nsr = int(np.sum(labels_np == 0))
+    print()
+    print("=" * 55)
+    print("  OOD Evaluation (PhysioNet Challenge 2017)")
+    print("=" * 55)
+    print(f"  Records:    {len(labels_np)} ({n_af} AF, {n_nsr} NSR)")
+    print(f"  Skipped:    {n_skipped}")
+    print(f"  Short:      {n_short} (<300s, limited HRV context)")
+    print()
+    print(f"  {'Metric':<14} {'C2017 OOD':>10}")
+    print(f"  {'-'*14} {'-'*10}")
+    print(f"  {'AUROC':<14} {auroc:>10.4f}")
+    print(f"  {'F1':<14} {f1:>10.4f}")
+    print(f"  {'Sensitivity':<14} {sensitivity:>10.4f}")
+    print(f"  {'Specificity':<14} {specificity:>10.4f}")
+    print("=" * 55)
+
+    if save_plots and labels_valid.size > 0:
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from sklearn.metrics import RocCurveDisplay
+
+            fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+            RocCurveDisplay.from_predictions(labels_valid, probs_valid, ax=ax, name=f"AUROC={auroc:.3f}")
+            ax.set_title("ROC curve (Challenge 2017 OOD)")
+            roc_path = Path(artifacts_dir) / "roc_c2017.png"
+            fig.savefig(roc_path, dpi=100, bbox_inches="tight")
+            plt.close(fig)
+            print(f"  Saved ROC to {roc_path}")
+        except ImportError:
+            pass
+
+    return {
+        "auroc": auroc, "f1": f1, "sensitivity": sensitivity, "specificity": specificity,
+        "n_records": len(labels_np), "n_skipped": n_skipped, "n_short": n_short,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Hybrid Ensemble on a split.")
     parser.add_argument("--config", default=CONFIG_PATH, help="Config YAML path")
@@ -389,9 +551,17 @@ def main():
                         help="Cross-dataset evaluation on MIMIC-III holdout (NFR-3.1)")
     parser.add_argument("--holdout", default=None,
                         help="Path to mimic3_holdout.json — restrict evaluation to unseen holdout subjects")
+    parser.add_argument("--challenge2017", action="store_true",
+                        help="OOD evaluation on PhysioNet Challenge 2017 (ambulatory AliveCor ECG)")
     args = parser.parse_args()
 
-    if args.mimic3:
+    if args.challenge2017:
+        evaluate_challenge2017(
+            config_path=args.config,
+            checkpoint_path=args.checkpoint,
+            save_plots=not args.no_plots,
+        )
+    elif args.mimic3:
         evaluate_mimic3(
             config_path=args.config,
             checkpoint_path=args.checkpoint,
