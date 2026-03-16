@@ -50,6 +50,7 @@ training:
   learning_rate: 1.0e-3
   batch_size: 32
   max_epochs: 100  # N for AUROC contingency
+  label_smoothing: 0.1  # soften 0→0.05, 1→0.95 to reduce OOD overconfidence
 
 # Step 4: Hybrid model architecture (Phase 1)
 model:

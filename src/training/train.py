@@ -261,6 +261,7 @@ def main():
     paths_cfg = config.get("paths", {})
     data_cfg = config.get("data", {})
     train_cfg = config.get("training", {})
+    label_smoothing = float(train_cfg.get("label_smoothing", 0.0))
 
     checkpoint_path = paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth")
     scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
@@ -383,6 +384,8 @@ def main():
                 labels_t = labels_t.to(device)
                 if hrv_lengths is not None:
                     hrv_lengths = hrv_lengths.to(device)
+                if label_smoothing > 0:
+                    labels_t = labels_t * (1 - label_smoothing) + label_smoothing * 0.5
                 optimizer.zero_grad()
                 logits = model(short_t, hrv_t, hrv_lengths=hrv_lengths).squeeze(-1)
                 loss = F.binary_cross_entropy_with_logits(logits, labels_t, pos_weight=pos_weight)
@@ -398,6 +401,8 @@ def main():
                 short_t, hrv_t, labels_t = _batch_to_device_and_model(
                     short_pad, long_pad, labels, fs_list, scaler, device, args.config
                 )
+                if label_smoothing > 0:
+                    labels_t = labels_t * (1 - label_smoothing) + label_smoothing * 0.5
                 optimizer.zero_grad()
                 logits = model(short_t, hrv_t).squeeze(-1)
                 loss = F.binary_cross_entropy_with_logits(logits, labels_t, pos_weight=pos_weight)
