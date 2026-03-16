@@ -27,6 +27,7 @@ class EnsembleConfig:
     rnn: RNNConfig = RNNConfig()
     transformer: TransformerConfig = TransformerConfig()
     dropout: float = 0.2
+    head_hidden_dim: int = 0  # 0 = single linear (legacy), >0 = expanded head for transfer learning
 
 
 class HybridEnsemble(nn.Module):
@@ -39,10 +40,19 @@ class HybridEnsemble(nn.Module):
         self.transformer = TransformerEncoder(cfg.transformer)
 
         fused_dim = cfg.cnn.embed_dim + cfg.rnn.hidden_size + cfg.transformer.d_model
-        self.head = nn.Sequential(
-            nn.Dropout(p=cfg.dropout),
-            nn.Linear(fused_dim, 1),
-        )
+        if cfg.head_hidden_dim > 0:
+            self.head = nn.Sequential(
+                nn.Dropout(p=cfg.dropout),
+                nn.Linear(fused_dim, cfg.head_hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(p=0.1),
+                nn.Linear(cfg.head_hidden_dim, 1),
+            )
+        else:
+            self.head = nn.Sequential(
+                nn.Dropout(p=cfg.dropout),
+                nn.Linear(fused_dim, 1),
+            )
 
     def forward(self, waveform_10s: torch.Tensor, hrv_sequence: torch.Tensor,
                 hrv_lengths: torch.Tensor = None) -> torch.Tensor:

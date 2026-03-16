@@ -255,6 +255,10 @@ def main():
         action="store_true",
         help="Train from precomputed cache (run python -m src.training.precompute_cache first)",
     )
+    parser.add_argument("--phase", type=int, choices=[0, 1, 2], default=0,
+                        help="0=legacy, 1=pre-train all layers on MIMIC, 2=freeze backbone, fine-tune head")
+    parser.add_argument("--phase1-checkpoint", default=None,
+                        help="Path to Phase 1 checkpoint (required for --phase 2)")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -263,13 +267,37 @@ def main():
     train_cfg = config.get("training", {})
     label_smoothing = float(train_cfg.get("label_smoothing", 0.0))
 
-    checkpoint_path = paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth")
-    scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
-    cache_dir = Path(paths_cfg.get("cache_dir", "models/artifacts/cache"))
-    split_path = data_cfg.get("split_path", "models/artifacts/split.json")
-    lr = float(train_cfg.get("learning_rate", 1e-3))
+    # Phase-aware paths and hyperparameters
+    phase = args.phase
+    if phase == 1:
+        checkpoint_path = paths_cfg.get("phase1_checkpoint", "models/checkpoints/phase1_model.pth")
+        scaler_path = paths_cfg.get("phase1_scaler", "models/artifacts/phase1_scaler.pkl")
+        cache_dir = Path(paths_cfg.get("phase1_cache_dir", "models/artifacts/cache_phase1"))
+        split_path = paths_cfg.get("phase1_split", "models/artifacts/phase1_split.json")
+        lr = float(train_cfg.get("learning_rate", 1e-3))
+        max_epochs = args.max_epochs if args.max_epochs is not None else int(train_cfg.get("max_epochs", 100))
+        patience = 15
+    elif phase == 2:
+        checkpoint_path = paths_cfg.get("phase2_checkpoint", "models/checkpoints/phase2_model.pth")
+        scaler_path = paths_cfg.get("phase2_scaler", "models/artifacts/phase2_scaler.pkl")
+        cache_dir = Path(paths_cfg.get("phase2_cache_dir", "models/artifacts/cache_phase2"))
+        split_path = paths_cfg.get("phase2_split", "models/artifacts/phase2_split.json")
+        lr = 5e-4  # lower LR for fine-tuning
+        max_epochs = args.max_epochs if args.max_epochs is not None else 50
+        patience = 10
+        if not args.phase1_checkpoint:
+            # Auto-resolve Phase 1 checkpoint
+            args.phase1_checkpoint = paths_cfg.get("phase1_checkpoint", "models/checkpoints/phase1_model.pth")
+    else:
+        checkpoint_path = paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth")
+        scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
+        cache_dir = Path(paths_cfg.get("cache_dir", "models/artifacts/cache"))
+        split_path = data_cfg.get("split_path", "models/artifacts/split.json")
+        lr = float(train_cfg.get("learning_rate", 1e-3))
+        max_epochs = args.max_epochs if args.max_epochs is not None else int(train_cfg.get("max_epochs", 100))
+        patience = 15
+
     batch_size = int(train_cfg.get("batch_size", 32))
-    max_epochs = args.max_epochs if args.max_epochs is not None else int(train_cfg.get("max_epochs", 100))
 
     Path(checkpoint_path).parent.mkdir(parents=True, exist_ok=True)
     Path(scaler_path).parent.mkdir(parents=True, exist_ok=True)
@@ -351,19 +379,51 @@ def main():
     pos_weight = pos_weight.to(device)
     logger.info("Class balance: %d positive, %d negative, pos_weight=%.2f", int(n_pos), int(n_neg), pos_weight.item())
 
-    model = build_model(config_path=args.config, checkpoint_path=None, device=device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    # Build model — Phase 2 loads Phase 1 checkpoint first
+    if phase == 2 and args.phase1_checkpoint:
+        logger.info("Phase 2: loading Phase 1 checkpoint from %s", args.phase1_checkpoint)
+        model = build_model(config_path=args.config, checkpoint_path=args.phase1_checkpoint, device=device)
+        # Freeze backbone (CNN, GRU, Transformer) — only head is trainable
+        for param in model.cnn.parameters():
+            param.requires_grad = False
+        for param in model.rnn.parameters():
+            param.requires_grad = False
+        for param in model.transformer.parameters():
+            param.requires_grad = False
+        # Keep backbone in eval mode (BatchNorm stays frozen)
+        model.cnn.eval()
+        model.rnn.eval()
+        model.transformer.eval()
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total = sum(p.numel() for p in model.parameters())
+        logger.info("Phase 2: frozen backbone. Trainable: %d / %d params (head only)", trainable, total)
+        train_params = model.head.parameters()
+    else:
+        model = build_model(config_path=args.config, checkpoint_path=None, device=device)
+        train_params = model.parameters()
+
+    optimizer = torch.optim.AdamW(train_params, lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="max", patience=5, factor=0.5, min_lr=1e-6
     )
     best_auroc = 0.0
-    patience = 15
     epochs_without_improvement = 0
 
     log_path = Path(scaler_path).parent / "training_log.csv"
     with open(log_path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["epoch", "train_loss", "val_loss", "val_auroc"])
+
+    # Phase 2: override train() to keep backbone in eval mode
+    _original_train = model.train
+    if phase == 2:
+        def _phase2_train(mode=True):
+            _original_train(mode)
+            model.cnn.eval()
+            model.rnn.eval()
+            model.transformer.eval()
+            return model
+        model.train = _phase2_train
 
     for epoch in range(max_epochs):
         model.train()

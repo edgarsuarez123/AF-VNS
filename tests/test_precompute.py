@@ -84,6 +84,7 @@ def _make_synthetic_db(tmp: Path, config_path: Path,
             "hrv_window_sec": 300,
             "stride_sec": stride_sec,
             "target_fs": target_fs,
+            "include_challenge2017": True,  # tests that create C2017 data expect it included
         },
         "paths": {
             "cache_dir": str(tmp / "cache"),
@@ -378,12 +379,11 @@ class TestStreamingPrecompute:
 
 
 # ---------------------------------------------------------------------------
-# Tests: MIMIC-III holdout exclusion (Step 23g)
+# Tests: MIMIC-III inclusion (all records, no holdout — C2017 is sole OOD)
 # ---------------------------------------------------------------------------
 
-def _make_synthetic_db_with_mimic(tmp: Path, config_path: Path,
-                                   n_mimic: int = 5, holdout_ids: list = None):
-    """Create synthetic DB with MIMIC-III records and a holdout JSON."""
+def _make_synthetic_db_with_mimic(tmp: Path, config_path: Path, n_mimic: int = 5):
+    """Create synthetic DB with MIMIC-III records (all included, no holdout)."""
     raw_dir = tmp / "data" / "raw"
 
     # afdb: 2 records for baseline
@@ -401,18 +401,10 @@ def _make_synthetic_db_with_mimic(tmp: Path, config_path: Path,
         _write_synthetic_wfdb(mimic_dir, name, fs=250.0, duration_sec=600.0, label=i % 2)
         mimic_names.append(name)
 
-    # Create holdout JSON
-    holdout_path = tmp / "mimic3_holdout.json"
-    if holdout_ids is None:
-        holdout_ids = mimic_names[:2]  # first 2 are holdout
-    with open(holdout_path, "w") as f:
-        json.dump({"all": holdout_ids}, f)
-
     cfg = {
         "data": {
             "raw_dir": str(raw_dir),
             "mimic3_subdir": str(mimic_dir),
-            "mimic3_holdout": str(holdout_path),
             "split_path": str(tmp / "split.json"),
             "waveform_sec": 10,
             "hrv_window_sec": 300,
@@ -445,50 +437,38 @@ def _make_synthetic_db_with_mimic(tmp: Path, config_path: Path,
     return config_path, mimic_names
 
 
-class TestMimicHoldoutExclusion:
+class TestMimicInclusion:
 
-    def test_mimic3_train_included_in_iter_all_records(self):
-        """iter_all_records yields non-holdout MIMIC records but skips holdout IDs."""
+    def test_all_mimic_in_iter_all_records(self):
+        """iter_all_records yields ALL MIMIC records (no holdout)."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             cfg_path = tmp / "config.yaml"
-            # First call to get mimic_names, then recreate with holdout set
-            _, mimic_names = _make_synthetic_db_with_mimic(tmp, cfg_path, n_mimic=5)
-            # Holdout first 2 IDs
-            cfg_path, mimic_names = _make_synthetic_db_with_mimic(
-                tmp, cfg_path, n_mimic=5, holdout_ids=mimic_names[:2]
-            )
+            cfg_path, mimic_names = _make_synthetic_db_with_mimic(tmp, cfg_path, n_mimic=5)
             records = list(iter_all_records(str(cfg_path)))
             mimic_records = [r for r in records if r["subject_id"].startswith("p0")]
-            # 5 total, 2 holdout -> 3 training
-            assert len(mimic_records) == 3
+            assert len(mimic_records) == 5
 
-    def test_mimic3_holdout_excluded_from_collect_ids(self):
-        """collect_all_subject_ids returns only non-holdout MIMIC IDs."""
+    def test_all_mimic_in_collect_ids(self):
+        """collect_all_subject_ids returns ALL MIMIC IDs."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             cfg_path = tmp / "config.yaml"
-            _, mimic_names = _make_synthetic_db_with_mimic(tmp, cfg_path, n_mimic=5)
-            cfg_path, mimic_names = _make_synthetic_db_with_mimic(
-                tmp, cfg_path, n_mimic=5, holdout_ids=mimic_names[:2]
-            )
+            cfg_path, mimic_names = _make_synthetic_db_with_mimic(tmp, cfg_path, n_mimic=5)
             ids = collect_all_subject_ids(str(cfg_path))
             mimic_ids = [x for x in ids if x.startswith("p0")]
-            assert len(mimic_ids) == 3
+            assert len(mimic_ids) == 5
 
-    def test_mimic3_holdout_excluded_from_parse_all(self):
-        """parse_all returns only non-holdout MIMIC records."""
+    def test_all_mimic_in_parse_all(self):
+        """parse_all returns ALL MIMIC records."""
         from src.data.dataset_parsers import parse_all
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             cfg_path = tmp / "config.yaml"
-            _, mimic_names = _make_synthetic_db_with_mimic(tmp, cfg_path, n_mimic=5)
-            cfg_path, mimic_names = _make_synthetic_db_with_mimic(
-                tmp, cfg_path, n_mimic=5, holdout_ids=mimic_names[:2]
-            )
+            cfg_path, mimic_names = _make_synthetic_db_with_mimic(tmp, cfg_path, n_mimic=5)
             records = parse_all(str(cfg_path))
             mimic_records = [r for r in records if r["subject_id"].startswith("p0")]
-            assert len(mimic_records) == 3
+            assert len(mimic_records) == 5
 
 
 # ---------------------------------------------------------------------------

@@ -50,7 +50,11 @@ def build_ensemble_config(config_path: str = "config.yaml") -> EnsembleConfig:
         seq_len=int(m.get("hrv_seq_len", 5)),
         pooling="mean",
     )
-    return EnsembleConfig(cnn=cnn_cfg, rnn=rnn_cfg, transformer=trans_cfg, dropout=0.2)
+    head_hidden = int(m.get("head_hidden_dim", 0))
+    return EnsembleConfig(
+        cnn=cnn_cfg, rnn=rnn_cfg, transformer=trans_cfg,
+        dropout=0.2, head_hidden_dim=head_hidden,
+    )
 
 
 def build_model(
@@ -67,9 +71,9 @@ def build_model(
     if checkpoint_path and os.path.isfile(checkpoint_path):
         state = torch.load(checkpoint_path, map_location="cpu")
         if isinstance(state, dict) and "state_dict" in state:
-            model.load_state_dict(state["state_dict"], strict=True)
+            model.load_state_dict(state["state_dict"], strict=False)
         else:
-            model.load_state_dict(state, strict=True)
+            model.load_state_dict(state, strict=False)
     if device is not None:
         model = model.to(device)
     return model

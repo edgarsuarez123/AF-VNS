@@ -6,6 +6,15 @@ paths:
   checkpoint: models/checkpoints/best_model.pth
   split: models/artifacts/split.json
   cache_dir: models/artifacts/cache
+  # Two-phase transfer learning paths
+  phase1_split: models/artifacts/phase1_split.json
+  phase2_split: models/artifacts/phase2_split.json
+  phase1_cache_dir: models/artifacts/cache_phase1
+  phase2_cache_dir: models/artifacts/cache_phase2
+  phase1_scaler: models/artifacts/phase1_scaler.pkl
+  phase2_scaler: models/artifacts/phase2_scaler.pkl
+  phase1_checkpoint: models/checkpoints/phase1_model.pth
+  phase2_checkpoint: models/checkpoints/phase2_model.pth
 
 # Data paths and windows (Step 2; FR-1.2, FR-2.2)
 data:
@@ -17,7 +26,8 @@ data:
   hrv_window_sec: 300  # 5 min for RNN; also use hrv.window_sec [30, 300] for short HRV
   target_fs: 250  # resample all records to uniform rate (afdb=250Hz, nsrdb=128Hz)
   max_ltaf_segments: 84  # DECISION: cap at 1 segment per patient (84 patients) for diversity; 2654 segs -> ~47k windows (was 401k)
-  mimic3_holdout: data/raw/mimic3_holdout.json  # 60 original MIMIC records reserved for eval
+  # mimic3_holdout removed — all MIMIC-3 goes into Phase 1 training; C2017 is sole OOD eval
+  include_challenge2017: false  # removed from training; 30-61s records can't fill 300s HRV window
   stride_sec: 300  # non-overlapping 5-min windows for baseline; reduce later for augmentation
   mimic_stride_sec: 150  # halved stride for MIMIC → 2-4x more windows per record
 
@@ -65,6 +75,7 @@ model:
   transformer_dim_feedforward: 128
   hrv_seq_len: 5
   hrv_n_features: 7
+  head_hidden_dim: 64  # intermediate head dimension for two-phase transfer learning
 
 # On-the-fly waveform augmentation (training only)
 augmentation:

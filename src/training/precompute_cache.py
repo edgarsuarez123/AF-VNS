@@ -23,7 +23,7 @@ if __name__ == "__main__":
         sys.path.insert(0, str(_root))
 
 from src.data.dataset_parsers import collect_all_subject_ids, iter_all_records
-from src.data.splitter import create_split_from_ids, load_split
+from src.data.splitter import create_phase_splits, create_split_from_ids, load_split
 from src.features.pipeline import waveform_10s_denoised, waveform_to_hrv_sequence
 from src.features.scaler import fit_scaler, load_scaler, transform
 
@@ -39,7 +39,19 @@ N_FEATURES = 7
 CHUNK_SIZE = 8
 
 
-def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHUNK_SIZE):
+def _should_include(sid: str, phase: int) -> bool:
+    """Filter records by phase for two-phase transfer learning."""
+    is_mimic = bool(re.match(r'^p\d{6}_', sid))
+    is_c17 = sid.startswith('c17_')
+    if phase == 1:
+        return is_mimic
+    elif phase == 2:
+        return not is_mimic and not is_c17
+    return True  # no phase filter
+
+
+def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHUNK_SIZE,
+         phase: int = 0):
     if workers == 0:
         workers = os.cpu_count() or 4
     # Resolve to absolute so worker processes always find config
@@ -48,8 +60,21 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
     config = load_config(config_path)
     paths_cfg = config.get("paths", {})
     data_cfg = config.get("data", {})
-    cache_dir = Path(paths_cfg.get("cache_dir", "models/artifacts/cache"))
-    scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
+
+    # Phase-aware paths
+    if phase == 1:
+        cache_dir = Path(paths_cfg.get("phase1_cache_dir", "models/artifacts/cache_phase1"))
+        scaler_path = paths_cfg.get("phase1_scaler", "models/artifacts/phase1_scaler.pkl")
+        split_path = paths_cfg.get("phase1_split", "models/artifacts/phase1_split.json")
+    elif phase == 2:
+        cache_dir = Path(paths_cfg.get("phase2_cache_dir", "models/artifacts/cache_phase2"))
+        scaler_path = paths_cfg.get("phase2_scaler", "models/artifacts/phase2_scaler.pkl")
+        split_path = paths_cfg.get("phase2_split", "models/artifacts/phase2_split.json")
+    else:
+        cache_dir = Path(paths_cfg.get("cache_dir", "models/artifacts/cache"))
+        scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
+        split_path = data_cfg.get("split_path", paths_cfg.get("split", "models/artifacts/split.json"))
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     Path(scaler_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -59,9 +84,18 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
     stride_sec = float(data_cfg.get("stride_sec", long_sec))
     mimic_stride_sec = float(data_cfg.get("mimic_stride_sec", stride_sec))
 
-    # --- Load or create split (lightweight, no signal loading) ---
-    split_path = data_cfg.get("split_path", paths_cfg.get("split", "models/artifacts/split.json"))
-    if not Path(split_path).exists():
+    # --- Load or create split ---
+    if phase in (1, 2) and not Path(split_path).exists():
+        logger.info("Phase %d split not found; creating phase-specific splits...", phase)
+        all_ids = collect_all_subject_ids(config_path)
+        p1_path = paths_cfg.get("phase1_split", "models/artifacts/phase1_split.json")
+        p2_path = paths_cfg.get("phase2_split", "models/artifacts/phase2_split.json")
+        result = create_phase_splits(all_ids, p1_path, p2_path)
+        logger.info("Phase splits created: Phase1 MIMIC=%d, Phase2 AFDB/NSRDB/LTAFDB=%d, excluded C2017=%d",
+                     len(result["phase1"]["train"]) + len(result["phase1"]["val"]),
+                     len(result["phase2"]["train"]) + len(result["phase2"]["val"]) + len(result["phase2"]["test"]),
+                     result["excluded_c17"])
+    elif not Path(split_path).exists():
         logger.info("Split file not found; collecting subject IDs for split creation...")
         all_ids = collect_all_subject_ids(config_path)
         logger.info("Collected %d subject IDs, creating 70/15/15 split", len(all_ids))
@@ -92,6 +126,11 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
         pbar = tqdm(iter_all_records(config_path), desc="Streaming records", unit="rec")
         for rec in pbar:
             sid = rec["subject_id"]
+
+            # Phase filtering: skip records not in current phase
+            if phase > 0 and not _should_include(sid, phase):
+                continue
+
             split_name = split_lookup.get(sid)
             if split_name is None:
                 n_skipped += 1
@@ -274,5 +313,8 @@ if __name__ == "__main__":
     )
     p.add_argument("--chunk-size", type=int, default=CHUNK_SIZE,
                     help="Samples per chunk when using --workers > 1.")
+    p.add_argument("--phase", type=int, choices=[0, 1, 2], default=0,
+                    help="0=all (legacy), 1=MIMIC-3 only (pre-train), 2=AFDB/NSRDB/LTAFDB only (fine-tune)")
     args = p.parse_args()
-    main(config_path=args.config, workers=args.workers, chunk_size=args.chunk_size)
+    main(config_path=args.config, workers=args.workers, chunk_size=args.chunk_size,
+         phase=args.phase)

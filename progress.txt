@@ -945,6 +945,66 @@ STATUS: Download complete. 30 AF + 30 non-AF WFDB records in data/raw/mimic3/.
 
   NEXT: Step 28 (download 300 more MIMIC records, needs PhysioNet creds) — biggest lever.
 
+--- 2.23 Round 9: Two-Phase Transfer Learning + OOD Evaluation (2026-03-16) ---
+
+  CRITICAL DISCOVERY:
+
+    PhysioNet Challenge 2017 makes up 93% of training data (5,788 of 6,213
+    subjects). C2017 records are 30-61s — far too short for the 300s HRV window
+    (5 timesteps × 60s). Result: 93% of training has 4/5 HRV timesteps
+    zero-padded. The GRU and Transformer are learning from garbage HRV for
+    the vast majority of training. This is likely the primary reason AUROC is
+    stuck at 0.68.
+
+  ARCHITECTURE CHANGE — Two-Phase Transfer Learning:
+
+    Switching from single-phase joint training to two-phase transfer learning,
+    as specified in project document (patent WO 2024/081854 A1):
+
+    Phase 1 (Pre-train): Train ALL layers on MIMIC-3 only (~700 ICU records).
+      Model learns real-world ECG patterns, noise robustness, artifact handling
+      from messy ICU data. All records have sufficient duration for 300s HRV.
+
+    Phase 2 (Fine-tune): Freeze CNN, GRU, Transformer (feature extraction).
+      Train only the classification head on AFDB/NSRDB/LTAFDB (~125 records).
+      Head learns clean AF vs NSR discrimination from curated data.
+      Head expanded from Linear(256→1) to Linear(256→64→ReLU→64→1) for
+      sufficient fine-tuning capacity (~16.5K trainable params).
+
+  DATA STRATEGY CHANGE:
+
+    - Remove Challenge 2017 from training entirely (fixes garbage HRV problem)
+    - Use C2017 (5,788 records) as sole OOD evaluation set (ambulatory AliveCor
+      ECG — completely different device from training data)
+    - No MIMIC-3 holdout — ALL ~700 MIMIC-3 records go into Phase 1 training
+    - Phase 2 test split (AFDB/NSRDB/LTAFDB 70/15/15) = in-distribution eval
+    - C2017 OOD eval = true cross-device generalization metric
+
+  WHY THIS SHOULD WORK:
+
+    1. Clean gradients: every training sample has full 300s HRV (no zero-padding)
+    2. Domain bridging: MIMIC pre-training teaches noise tolerance from ICU data
+    3. Clean discrimination: Phase 2 fine-tunes on curated AF/NSR data where HRV
+       features are high-quality and all 7 features are meaningful
+    4. Proper OOD: C2017 ambulatory ECG is true cross-device test
+
+  IMPLEMENTATION (Steps 31-42):
+
+    Step 31 — Download 300 more MIMIC-3 records (n-af=350, n-control=350, seed=44).
+      Running as background process. Existing 200+200 skipped (counted toward target).
+      Expected result: ~700 total MIMIC-3 records.
+
+    Steps 32-42 — Code changes for two-phase training (in progress):
+      - dataset_parsers.py: include_challenge2017 config flag
+      - splitter.py: phase-specific splits
+      - ensemble.py: expanded head
+      - precompute_cache.py: --phase argument with source filtering
+      - train.py: --phase argument, backbone freezing, phase-aware paths
+      - evaluate.py: --challenge2017 OOD evaluation
+      - tests/test_transfer_learning.py: 5 new tests
+
+  EXPECTED IMPACT: AUROC 0.72-0.78 on Phase 2 test set.
+
 --------------------------------------------------------------------------------
 3. RATIONALE FOR KEY CHOICES
 --------------------------------------------------------------------------------
