@@ -24,17 +24,17 @@ holdout needed anymore — all MIMIC-3 goes into Phase 1 training.
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| 31 | Download 300 more MIMIC-3 records (n-af=350, n-control=350, seed=44) | In Progress | |
-| 32 | Remove Challenge 2017 from training pipeline (config flag) | Not Started | |
-| 33 | Create phase-specific splits (Phase 1: MIMIC-3 85/15, Phase 2: AFDB/NSRDB/LTAFDB 70/15/15) | Not Started | |
-| 34 | Expand model head (Linear 256→64→1 for fine-tuning capacity) | Not Started | |
-| 35 | Add phase filtering to precompute_cache.py (--phase 1 or 2) | Not Started | |
-| 36 | Implement two-phase training in train.py (--phase, freezing, phase-aware paths) | Not Started | |
-| 37 | Add C2017 OOD evaluation to evaluate.py (--challenge2017) | Not Started | |
-| 38 | Build Phase 1 cache (MIMIC-3 only) + train Phase 1 | Not Started | |
+| 31 | Download 300 more MIMIC-3 records (n-af=350, n-control=350, seed=44) | In Progress | running as background process |
+| 32 | Remove Challenge 2017 from training pipeline (config flag) | Done | 2026-03-16 |
+| 33 | Create phase-specific splits (Phase 1: MIMIC-3 85/15, Phase 2: AFDB/NSRDB/LTAFDB 70/15/15) | Done | 2026-03-16 |
+| 34 | Expand model head (Linear 256→64→1 for fine-tuning capacity) | Done | 2026-03-16 |
+| 35 | Add phase filtering to precompute_cache.py (--phase 1 or 2) | Done | 2026-03-16 |
+| 36 | Implement two-phase training in train.py (--phase, freezing, phase-aware paths) | Done | 2026-03-16 |
+| 37 | Add C2017 OOD evaluation to evaluate.py (--challenge2017) | Done | 2026-03-16 |
+| 38 | Build Phase 1 cache (MIMIC-3 only) + train Phase 1 | Not Started | waiting for Step 31 |
 | 39 | Build Phase 2 cache (AFDB/NSRDB/LTAFDB) + train Phase 2 | Not Started | |
 | 40 | Evaluate: Phase 2 test AUROC + C2017 OOD AUROC | Not Started | |
-| 41 | Write tests for transfer learning | Not Started | |
+| 41 | Write tests for transfer learning | Done | 2026-03-16 |
 | 42 | Update progress.txt with Round 9 results | Not Started | |
 
 ---
@@ -103,5 +103,6 @@ Result: ~700 total MIMIC-3 records. ALL go into Phase 1 training (no holdout).
 **Current state (2026-03-16):**
 - Round 8 complete. AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777
 - Step 31 (MIMIC-3 download) in progress as background process
-- Steps 32-42 to be implemented while download runs
+- Steps 32-37, 41 DONE (code changes + tests). 88/88 tests passing
+- Commits: 10bebbd (Steps 32-36), 5ac6d8d (Steps 37, 41)
 - Key insight: C2017 (93% of training) had garbage HRV — removing it + two-phase transfer learning is the path to 0.75+
