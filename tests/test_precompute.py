@@ -489,3 +489,48 @@ class TestMimicHoldoutExclusion:
             records = parse_all(str(cfg_path))
             mimic_records = [r for r in records if r["subject_id"].startswith("p0")]
             assert len(mimic_records) == 3
+
+
+# ---------------------------------------------------------------------------
+# Tests: per-source MIMIC stride
+# ---------------------------------------------------------------------------
+
+class TestMimicStride:
+
+    def test_mimic_stride_produces_more_windows(self):
+        """MIMIC record with stride=150 yields more windows than stride=300."""
+        import re
+        fs = 250.0
+        n_long = int(fs * 300)
+
+        # 900s MIMIC record
+        sig_size = int(fs * 900)
+        sid = "p000042_test"
+        assert re.match(r'^p\d{6}_', sid)
+
+        starts_300 = list(range(0, sig_size - n_long + 1, int(fs * 300)))
+        starts_150 = list(range(0, sig_size - n_long + 1, int(fs * 150)))
+
+        assert len(starts_300) == 3   # 0, 300, 600
+        assert len(starts_150) == 5   # 0, 150, 300, 450, 600
+        assert len(starts_150) > len(starts_300)
+
+    def test_non_mimic_stride_unchanged(self):
+        """Non-MIMIC records should NOT match the MIMIC ID pattern."""
+        import re
+        pattern = r'^p\d{6}_'
+        assert not re.match(pattern, "af003")
+        assert not re.match(pattern, "nsr042")
+        assert not re.match(pattern, "ltaf_seg001")
+        assert not re.match(pattern, "c17_A00001")
+
+    def test_mimic_id_regex_coverage(self):
+        """Regex matches real MIMIC ID formats."""
+        import re
+        pattern = r'^p\d{6}_'
+        # Real MIMIC IDs
+        assert re.match(pattern, "p000302_3967145_0062")
+        assert re.match(pattern, "p000042_test")
+        assert re.match(pattern, "p099797_1234567_0001")
+        # Future high-numbered IDs
+        assert re.match(pattern, "p100000_test")

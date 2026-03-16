@@ -19,6 +19,7 @@ data:
   max_ltaf_segments: 84  # DECISION: cap at 1 segment per patient (84 patients) for diversity; 2654 segs -> ~47k windows (was 401k)
   mimic3_holdout: data/raw/mimic3_holdout.json  # 60 original MIMIC records reserved for eval
   stride_sec: 300  # non-overlapping 5-min windows for baseline; reduce later for augmentation
+  mimic_stride_sec: 150  # halved stride for MIMIC → 2-4x more windows per record
 
 # LSL live stream (FR-1.1)
 lsl:

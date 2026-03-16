@@ -9,6 +9,7 @@ Use --workers N (or 0 for all cores) for parallel speedup.
 import json
 import logging
 import os
+import re
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -56,6 +57,7 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
     long_sec = float(data_cfg.get("hrv_window_sec", 300))
     # Default stride = long_sec (non-overlapping 5-min windows)
     stride_sec = float(data_cfg.get("stride_sec", long_sec))
+    mimic_stride_sec = float(data_cfg.get("mimic_stride_sec", stride_sec))
 
     # --- Load or create split (lightweight, no signal loading) ---
     split_path = data_cfg.get("split_path", paths_cfg.get("split", "models/artifacts/split.json"))
@@ -105,7 +107,11 @@ def main(config_path: str = CONFIG_PATH, workers: int = 1, chunk_size: int = CHU
 
             n_short = int(fs * waveform_sec)
             n_long = int(fs * long_sec)
-            stride = int(fs * stride_sec)
+            # Per-source stride: MIMIC records get tighter stride for more windows
+            if re.match(r'^p\d{6}_', sid):
+                stride = int(fs * mimic_stride_sec)
+            else:
+                stride = int(fs * stride_sec)
 
             if sig.size < n_short:
                 n_skipped += 1
