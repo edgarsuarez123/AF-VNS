@@ -60,6 +60,8 @@ def run_evaluation(
     config = load_config(config_path)
     paths_cfg = config.get("paths", {})
     train_cfg = config.get("training", {})
+    eval_cfg = config.get("evaluation", {})
+    threshold = float(eval_cfg.get("threshold", 0.5))
 
     checkpoint_path = checkpoint_path or paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth")
     scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
@@ -90,7 +92,7 @@ def run_evaluation(
     logits_np = np.concatenate(all_logits, axis=0)
     labels_np = np.concatenate(all_labels, axis=0)
     probs = 1.0 / (1.0 + np.exp(-np.clip(logits_np, -50, 50)))
-    preds = (probs >= 0.5).astype(np.int64)
+    preds = (probs >= threshold).astype(np.int64)
 
     # Metrics
     from sklearn.metrics import (
@@ -174,6 +176,8 @@ def evaluate_mimic3(
     config = load_config(config_path)
     paths_cfg = config.get("paths", {})
     data_cfg = config.get("data", {})
+    eval_cfg = config.get("evaluation", {})
+    threshold = float(eval_cfg.get("threshold", 0.5))
 
     checkpoint_path = checkpoint_path or paths_cfg.get("checkpoint", "models/checkpoints/best_model.pth")
     scaler_path = paths_cfg.get("scaler", "models/artifacts/scaler.pkl")
@@ -272,8 +276,8 @@ def evaluate_mimic3(
                 "subject_id": rec["subject_id"],
                 "label": rec["label"],
                 "prob": float(prob),
-                "pred": int(prob >= 0.5),
-                "correct": int((prob >= 0.5) == rec["label"]),
+                "pred": int(prob >= threshold),
+                "correct": int((prob >= threshold) == rec["label"]),
                 "short": is_short,
                 "duration_s": len(rec["signal"]) / fs,
             })
@@ -291,7 +295,7 @@ def evaluate_mimic3(
     n_nan = int(np.sum(~valid_mask))
     probs_valid = probs[valid_mask]
     labels_valid = labels_np[valid_mask]
-    preds = (probs_valid >= 0.5).astype(np.int64)
+    preds = (probs_valid >= threshold).astype(np.int64)
 
     from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 
@@ -309,8 +313,8 @@ def evaluate_mimic3(
     specificity = tn / (tn + fp) if (tn + fp) > 0 else float("nan")
 
     # Print results
-    n_af = int(np.sum(labels_np == 1))
-    n_nsr = int(np.sum(labels_np == 0))
+    n_af = int(np.sum(labels_valid == 1))
+    n_nsr = int(np.sum(labels_valid == 0))
     print()
     print("=" * 55)
     print("  Cross-Dataset Evaluation (MIMIC-III)  -- NFR-3.1")
@@ -379,18 +383,12 @@ def evaluate_mimic3(
     }
 
 
-def evaluate_challenge2017(
+def _run_c2017_inference(
     config_path: str = CONFIG_PATH,
     checkpoint_path: Optional[str] = None,
     scaler_path: Optional[str] = None,
-    save_plots: bool = True,
-    artifacts_dir: Optional[str] = None,
-) -> dict:
-    """OOD evaluation on PhysioNet Challenge 2017 (ambulatory AliveCor ECG).
-
-    Records are 30-61s at 300 Hz. CNN works fine (10s windows).
-    HRV has limited context (0-1 valid timesteps out of 5) — masking handles this.
-    """
+) -> tuple:
+    """Run inference on C2017 records. Returns (labels, probs, n_skipped, n_short) or empty tuple."""
     config = load_config(config_path)
     paths_cfg = config.get("paths", {})
     data_cfg = config.get("data", {})
@@ -404,13 +402,9 @@ def evaluate_challenge2017(
     target_fs = float(data_cfg.get("target_fs", 250))
     waveform_sec = float(data_cfg.get("waveform_sec", 10))
 
-    if artifacts_dir is None:
-        artifacts_dir = str(Path(scaler_path).parent / "c2017_eval")
-    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
-
     if not c17_dir.is_dir():
         print(f"Challenge 2017 directory not found: {c17_dir}")
-        return {}
+        return ()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model(config_path=config_path, checkpoint_path=checkpoint_path, device=device)
@@ -420,7 +414,6 @@ def evaluate_challenge2017(
     records = parse_challenge2017_dir(c17_dir)
     logger.info("Parsed %d Challenge 2017 records", len(records))
 
-    # Resample to target_fs
     if target_fs > 0:
         for rec in records:
             if abs(rec["fs"] - target_fs) >= 0.1:
@@ -451,13 +444,11 @@ def evaluate_challenge2017(
             if is_short:
                 n_short += 1
 
-            # CNN input: center 10s
             center = len(signal) // 2
             start = max(0, center - min_samples // 2)
             short_signal = signal[start : start + min_samples]
             short_denoised = waveform_10s_denoised(short_signal, fs, config_path)
 
-            # HRV input
             long_signal = signal[:hrv_window_samples] if len(signal) >= hrv_window_samples else signal
             hrv_seq = waveform_to_hrv_sequence(long_signal, fs, config_path=config_path)
             hrv_scaled = transform(hrv_seq, scaler)
@@ -474,7 +465,7 @@ def evaluate_challenge2017(
 
     if not all_labels:
         print("No Challenge 2017 records with labels found.")
-        return {}
+        return ()
 
     logits_np = np.array(all_logits)
     labels_np = np.array(all_labels)
@@ -483,7 +474,40 @@ def evaluate_challenge2017(
     valid_mask = ~np.isnan(probs)
     probs_valid = probs[valid_mask]
     labels_valid = labels_np[valid_mask]
-    preds = (probs_valid >= 0.5).astype(np.int64)
+
+    return labels_valid, probs_valid, n_skipped, n_short
+
+
+def evaluate_challenge2017(
+    config_path: str = CONFIG_PATH,
+    checkpoint_path: Optional[str] = None,
+    scaler_path: Optional[str] = None,
+    save_plots: bool = True,
+    artifacts_dir: Optional[str] = None,
+) -> dict:
+    """OOD evaluation on PhysioNet Challenge 2017 (ambulatory AliveCor ECG).
+
+    Records are 30-61s at 300 Hz. CNN works fine (10s windows).
+    HRV has limited context (0-1 valid timesteps out of 5) — masking handles this.
+    """
+    config = load_config(config_path)
+    paths_cfg = config.get("paths", {})
+    eval_cfg = config.get("evaluation", {})
+    threshold = float(eval_cfg.get("threshold", 0.5))
+
+    scaler_path = scaler_path or paths_cfg.get(
+        "phase2_scaler", paths_cfg.get("scaler", "models/artifacts/scaler.pkl"))
+
+    if artifacts_dir is None:
+        artifacts_dir = str(Path(scaler_path).parent / "c2017_eval")
+    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
+
+    result = _run_c2017_inference(config_path, checkpoint_path, scaler_path)
+    if not result:
+        return {}
+
+    labels_valid, probs_valid, n_skipped, n_short = result
+    preds = (probs_valid >= threshold).astype(np.int64)
 
     from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 
@@ -500,15 +524,16 @@ def evaluate_challenge2017(
     sensitivity = tp / (tp + fn) if (tp + fn) > 0 else float("nan")
     specificity = tn / (tn + fp) if (tn + fp) > 0 else float("nan")
 
-    n_af = int(np.sum(labels_np == 1))
-    n_nsr = int(np.sum(labels_np == 0))
+    n_af = int(np.sum(labels_valid == 1))
+    n_nsr = int(np.sum(labels_valid == 0))
     print()
     print("=" * 55)
     print("  OOD Evaluation (PhysioNet Challenge 2017)")
     print("=" * 55)
-    print(f"  Records:    {len(labels_np)} ({n_af} AF, {n_nsr} NSR)")
+    print(f"  Records:    {len(labels_valid)} ({n_af} AF, {n_nsr} NSR)")
     print(f"  Skipped:    {n_skipped}")
     print(f"  Short:      {n_short} (<300s, limited HRV context)")
+    print(f"  Threshold:  {threshold:.2f}")
     print()
     print(f"  {'Metric':<14} {'C2017 OOD':>10}")
     print(f"  {'-'*14} {'-'*10}")
@@ -537,7 +562,145 @@ def evaluate_challenge2017(
 
     return {
         "auroc": auroc, "f1": f1, "sensitivity": sensitivity, "specificity": specificity,
-        "n_records": len(labels_np), "n_skipped": n_skipped, "n_short": n_short,
+        "n_records": len(labels_valid), "n_skipped": n_skipped, "n_short": n_short,
+    }
+
+
+def analyze_thresholds(
+    config_path: str = CONFIG_PATH,
+    checkpoint_path: Optional[str] = None,
+    scaler_path: Optional[str] = None,
+    sensitivity_target: Optional[float] = None,
+    artifacts_dir: Optional[str] = None,
+) -> dict:
+    """Sweep classification thresholds on C2017 OOD data.
+
+    Finds: (a) optimal threshold where sensitivity >= target with max specificity,
+           (b) Youden's J point (argmax sens+spec-1).
+    """
+    config = load_config(config_path)
+    eval_cfg = config.get("evaluation", {})
+    paths_cfg = config.get("paths", {})
+
+    if sensitivity_target is None:
+        sensitivity_target = float(eval_cfg.get("sensitivity_target", 0.80))
+
+    scaler_path_resolved = scaler_path or paths_cfg.get(
+        "phase2_scaler", paths_cfg.get("scaler", "models/artifacts/scaler.pkl"))
+    if artifacts_dir is None:
+        artifacts_dir = str(Path(scaler_path_resolved).parent / "c2017_eval")
+    Path(artifacts_dir).mkdir(parents=True, exist_ok=True)
+
+    result = _run_c2017_inference(config_path, checkpoint_path, scaler_path)
+    if not result:
+        return {}
+
+    labels, probs, n_skipped, n_short = result
+    return _analyze_thresholds_from_data(
+        labels, probs, sensitivity_target, artifacts_dir,
+    )
+
+
+def _analyze_thresholds_from_data(
+    labels: np.ndarray,
+    probs: np.ndarray,
+    sensitivity_target: float = 0.80,
+    artifacts_dir: Optional[str] = None,
+) -> dict:
+    """Core threshold analysis on pre-computed labels/probs (testable without model)."""
+    from sklearn.metrics import confusion_matrix
+
+    thresholds = np.arange(0.05, 0.96, 0.01)
+    sens_list = []
+    spec_list = []
+
+    for t in thresholds:
+        preds = (probs >= t).astype(np.int64)
+        cm = confusion_matrix(labels, preds, labels=[0, 1])
+        tn, fp, fn, tp = cm.ravel()
+        sens = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        spec = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        sens_list.append(sens)
+        spec_list.append(spec)
+
+    sens_arr = np.array(sens_list)
+    spec_arr = np.array(spec_list)
+
+    # Youden's J = argmax(sens + spec - 1)
+    j_scores = sens_arr + spec_arr - 1.0
+    youden_idx = int(np.argmax(j_scores))
+    youden_threshold = float(thresholds[youden_idx])
+    youden_sens = float(sens_arr[youden_idx])
+    youden_spec = float(spec_arr[youden_idx])
+
+    # Optimal: max specificity where sensitivity >= target
+    mask = sens_arr >= sensitivity_target
+    if mask.any():
+        candidates = np.where(mask)[0]
+        best_idx = candidates[np.argmax(spec_arr[candidates])]
+        optimal_threshold = float(thresholds[best_idx])
+        optimal_sens = float(sens_arr[best_idx])
+        optimal_spec = float(spec_arr[best_idx])
+    else:
+        optimal_threshold = float(thresholds[0])
+        optimal_sens = float(sens_arr[0])
+        optimal_spec = float(spec_arr[0])
+
+    # Print results
+    print()
+    print("=" * 65)
+    print("  Threshold Analysis (C2017 OOD)")
+    print("=" * 65)
+    print(f"  Sensitivity target: {sensitivity_target:.2f}")
+    print()
+    print(f"  {'Point':<25} {'Threshold':>10} {'Sens':>8} {'Spec':>8}")
+    print(f"  {'-'*25} {'-'*10} {'-'*8} {'-'*8}")
+    print(f"  {'Youden J (balanced)':<25} {youden_threshold:>10.2f} {youden_sens:>8.4f} {youden_spec:>8.4f}")
+    print(f"  {'Optimal (sens≥target)':<25} {optimal_threshold:>10.2f} {optimal_sens:>8.4f} {optimal_spec:>8.4f}")
+    print(f"  {'Default (0.50)':<25} {'0.50':>10}", end="")
+    idx50 = np.argmin(np.abs(thresholds - 0.50))
+    print(f" {sens_arr[idx50]:>8.4f} {spec_arr[idx50]:>8.4f}")
+    print("=" * 65)
+
+    # Plot
+    if artifacts_dir is not None:
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+
+            fig, ax1 = plt.subplots(figsize=(8, 5))
+            ax1.plot(thresholds, sens_arr, "b-", label="Sensitivity", linewidth=2)
+            ax1.plot(thresholds, spec_arr, "r-", label="Specificity", linewidth=2)
+            ax1.axvline(youden_threshold, color="green", linestyle="--", alpha=0.7,
+                        label=f"Youden J = {youden_threshold:.2f}")
+            ax1.axvline(optimal_threshold, color="purple", linestyle="--", alpha=0.7,
+                        label=f"Optimal (sens≥{sensitivity_target:.0%}) = {optimal_threshold:.2f}")
+            ax1.axhline(sensitivity_target, color="gray", linestyle=":", alpha=0.5)
+            ax1.set_xlabel("Classification Threshold")
+            ax1.set_ylabel("Rate")
+            ax1.set_title("Threshold Analysis (C2017 OOD)")
+            ax1.legend(loc="center right")
+            ax1.set_xlim(0.0, 1.0)
+            ax1.set_ylim(0.0, 1.05)
+            ax1.grid(True, alpha=0.3)
+            plot_path = Path(artifacts_dir) / "threshold_analysis.png"
+            fig.savefig(plot_path, dpi=150, bbox_inches="tight")
+            plt.close(fig)
+            print(f"  Saved plot to {plot_path}")
+        except ImportError:
+            pass
+
+    return {
+        "thresholds": thresholds,
+        "sensitivities": sens_arr,
+        "specificities": spec_arr,
+        "youden_threshold": youden_threshold,
+        "youden_sensitivity": youden_sens,
+        "youden_specificity": youden_spec,
+        "optimal_threshold": optimal_threshold,
+        "optimal_sensitivity": optimal_sens,
+        "optimal_specificity": optimal_spec,
     }
 
 
@@ -553,9 +716,19 @@ def main():
                         help="Path to mimic3_holdout.json — restrict evaluation to unseen holdout subjects")
     parser.add_argument("--challenge2017", action="store_true",
                         help="OOD evaluation on PhysioNet Challenge 2017 (ambulatory AliveCor ECG)")
+    parser.add_argument("--threshold-analysis", action="store_true",
+                        help="Sweep thresholds on C2017 OOD data to find optimal operating point")
+    parser.add_argument("--sensitivity-target", type=float, default=None,
+                        help="Minimum sensitivity for optimal threshold (default: from config)")
     args = parser.parse_args()
 
-    if args.challenge2017:
+    if args.threshold_analysis:
+        analyze_thresholds(
+            config_path=args.config,
+            checkpoint_path=args.checkpoint,
+            sensitivity_target=args.sensitivity_target,
+        )
+    elif args.challenge2017:
         evaluate_challenge2017(
             config_path=args.config,
             checkpoint_path=args.checkpoint,

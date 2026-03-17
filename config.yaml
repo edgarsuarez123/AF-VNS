@@ -77,6 +77,11 @@ model:
   hrv_n_features: 7
   head_hidden_dim: 64  # intermediate head dimension for two-phase transfer learning
 
+# Evaluation settings
+evaluation:
+  threshold: 0.5          # classification threshold (update after threshold analysis)
+  sensitivity_target: 0.80  # min sensitivity for optimal threshold search
+
 # On-the-fly waveform augmentation (training only)
 augmentation:
   enabled: true
