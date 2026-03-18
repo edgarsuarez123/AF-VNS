@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # PhysioNet open-access URL (no credentials required)
 ZIP_URL = "https://physionet.org/files/challenge-2017/1.0.0/training2017.zip"
-OUT_DIR = Path("data/raw/challenge2017")
+OUT_DIR = Path("data/raw/AF avns/challenge2017")
 
 
 def _download_with_progress(url: str, dest: Path) -> None:

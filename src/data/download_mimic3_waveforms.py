@@ -89,9 +89,9 @@ def main():
     parser.add_argument("--password", default=os.environ.get("PHYSIONET_PASS"), help="PhysioNet password (or set PHYSIONET_PASS env var)")
     parser.add_argument("--n-af", type=int, default=30, help="Number of AF patients to download")
     parser.add_argument("--n-control", type=int, default=30, help="Number of non-AF patients to download")
-    parser.add_argument("--diagnoses-csv", default="data/raw/mimic3/DIAGNOSES_ICD.csv",
+    parser.add_argument("--diagnoses-csv", default="data/raw/AF avns/mimic3/DIAGNOSES_ICD.csv",
                         help="Path to DIAGNOSES_ICD.csv")
-    parser.add_argument("--out-dir", default="data/raw/mimic3", help="Output directory for waveforms")
+    parser.add_argument("--out-dir", default="data/raw/AF avns/mimic3", help="Output directory for waveforms")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for patient selection")
     args = parser.parse_args()
 

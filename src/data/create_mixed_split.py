@@ -19,7 +19,7 @@ if __name__ == "__main__":
     if str(_root) not in sys.path:
         sys.path.insert(0, str(_root))
 
-MIMIC_DIR = Path("data/raw/mimic3")
+MIMIC_DIR = Path("data/raw/AF avns/mimic3")
 SPLIT_PATH = Path("models/artifacts/split.json")
 HOLDOUT_PATH = Path("models/artifacts/mimic3_holdout.json")
 

@@ -18,8 +18,8 @@ paths:
 
 # Data paths and windows (Step 2; FR-1.2, FR-2.2)
 data:
-  raw_dir: data/raw
-  mimic3_subdir: data/raw/mimic3
+  raw_dir: data/raw/AF avns
+  mimic3_subdir: data/raw/AF avns/mimic3
   split_path: models/artifacts/split.json
   splits_dir: data/splits  # optional: materialize_split.py creates train/val/test symlinks here
   waveform_sec: 10

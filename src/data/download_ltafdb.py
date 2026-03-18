@@ -23,7 +23,7 @@ import numpy as np
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-OUT_DIR = Path("data/raw/ltafdb")
+OUT_DIR = Path("data/raw/AF avns/ltafdb")
 MIN_DURATION_SEC = 30  # minimum AF segment duration
 
 
