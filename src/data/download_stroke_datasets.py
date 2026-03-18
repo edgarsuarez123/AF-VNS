@@ -24,7 +24,7 @@ STROKE_RAW_DIR = Path("data/raw/stroke avns")
 
 DATASETS = {
     "cves": {
-        "db_dir": "cves/1.0.0",
+        "db_dir": "cves",
         "out_subdir": "cves",
         "description": "Cerebral Vasoregulation in Elderly with Stroke (120 subjects)",
         "ecg_prefixes": [
@@ -35,7 +35,7 @@ DATASETS = {
         ],
     },
     "shareedb": {
-        "db_dir": "shareedb/1.0.0",
+        "db_dir": "shareedb",
         "out_subdir": "shareedb",
         "description": "SHAREE — 139 24-hour Holter ECG (128 Hz, hypertensive patients)",
         "ecg_prefixes": None,  # download all records
