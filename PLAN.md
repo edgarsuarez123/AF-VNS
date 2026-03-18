@@ -18,9 +18,9 @@ AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777 → **0.7432 (C2017 OO
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| 43 | Add `analyze_thresholds()` to evaluate.py + `_run_c2017_inference()` helper | Pending | |
-| 44 | Make threshold configurable across all eval functions (config.yaml) | Pending | |
-| 45 | Tests for threshold analysis + run analysis | Pending | |
+| 43 | Add `analyze_thresholds()` to evaluate.py + `_run_c2017_inference()` helper | Done | 2026-03-17 |
+| 44 | Make threshold configurable across all eval functions (config.yaml) | Done | 2026-03-17 |
+| 45 | Tests for threshold analysis + run analysis | Done | 2026-03-17 — 7/7 tests pass |
 | 46 | Add pNN50 and CoV to hrv_time.py | Pending | |
 | 47 | Update FEATURE_ORDER in pipeline.py (7→9) | Pending | |
 | 48 | Update config.yaml hrv_n_features 7→9 + verify refs | Pending | |
