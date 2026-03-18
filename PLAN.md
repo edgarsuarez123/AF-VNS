@@ -43,3 +43,12 @@ AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777 → **0.7432 (C2017 OO
 - Round 9 complete: AUROC=0.7432, Sens=0.9159, Spec=0.3286
 - Phase 2 checkpoint: models/checkpoints/phase2_model.pth
 - Start with Step 43 (threshold analysis)
+
+---
+
+## Session Task — Create branch `feature/stroke-avns`
+
+### Steps
+1. Check base branch availability (`main` vs `master`) — done 2026-03-18 17:33
+2. Create `feature/stroke-avns` from the base branch — done 2026-03-18
+3. Verify checkout points to the new branch — done 2026-03-18
