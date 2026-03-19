@@ -103,7 +103,7 @@ points for Phase 2. Use whichever gives better cerevasc val AUROC. Document in p
 | 6 | Write download_cerevasc.py (pending Class 2 credentials) | Pending | |
 | 7 | Implement parse_cerevasc_dir() once data is available | Pending | |
 | 8 | Write StrokeDataset in stroke_dataloaders.py (rolling window, population label) | Done | 2026-03-19 |
-| 9 | Write stroke_precompute_cache.py (Phase 1 cache from MIMIC-3 stroke) | Pending | |
+| 9 | Write stroke_precompute_cache.py (Phase 1 cache from MIMIC-3 stroke) | Done | 2026-03-19 |
 | 10 | Write stroke_head.py — StrokeResponderHead (binary BCE) | Pending | |
 | 11 | Write stroke_ensemble.py — StrokeHybridEnsemble with pluggable head | Pending | |
 | 12 | Write stroke_train.py Phase 1 (MIMIC-3 stroke, StrokeResponderHead) | Pending | |
@@ -129,8 +129,9 @@ all existing tests. AF checkpoints may be loaded **read-only** as backbone init 
 
 ## Resume From Here
 
-**Current state (2026-03-19) — Step 9 next:**
+**Current state (2026-03-19) — Step 10 next:**
 - Steps 2–5 complete: config_stroke.yaml, stroke_parsers.py, 8/8 tests passing
 - Step 8 complete: stroke_dataloaders.py (StrokeDataset + get_stroke_dataloaders), 6/6 tests passing
+- Step 9 complete: stroke_precompute_cache.py (build_stroke_cache + main), 6/6 tests passing
 - cerevasc ✗ blocked on Class 2 credentials — request at physionet.org/content/cerevasc/
-- Step 9 next: stroke_precompute_cache.py (Phase 1 cache from MIMIC-3 stroke)
+- Step 10 next: stroke_head.py — StrokeResponderHead (binary BCE)
