@@ -1,0 +1,89 @@
+# RS-Personalized AI-Driven Adaptive Stimulation — Stroke AVNS
+# Inherits all AF pipeline values; stroke-specific overrides listed below.
+# AF config.yaml is NEVER modified.
+
+paths:
+  scaler: models/artifacts/scaler.pkl
+  checkpoint: models/checkpoints/best_model.pth
+  split: models/artifacts/split.json
+  cache_dir: models/artifacts/cache
+  phase1_split: models/artifacts/stroke_phase1_split.json
+  phase2_split: models/artifacts/stroke_phase2_split.json
+  phase1_cache_dir: models/artifacts/cache_stroke_phase1
+  phase2_cache_dir: models/artifacts/cache_stroke_phase2
+  phase1_scaler: models/artifacts/stroke_phase1_scaler.pkl
+  phase2_scaler: models/artifacts/stroke_phase2_scaler.pkl
+  phase1_checkpoint: models/checkpoints/stroke_phase1_model.pth
+  phase2_checkpoint: models/checkpoints/stroke_phase2_model.pth
+
+data:
+  raw_dir: data/raw/stroke avns
+  mimic3_stroke_subdir: data/raw/stroke avns/mimic3_stroke
+  sharee_subdir: data/raw/stroke avns/shareedb
+  cves_subdir: data/raw/stroke avns/cves
+  # Keep same waveform/HRV windows as AF pipeline so backbone weights transfer cleanly
+  waveform_sec: 10
+  hrv_window_sec: 300
+  target_fs: 250
+  stride_sec: 300
+  mimic_stride_sec: 150
+
+lsl:
+  expected_hz: 250
+
+hrv:
+  window_sec: [30, 300]
+  subwindow_sec: 60
+
+wavelet:
+  family: "cmor"
+  scale_range: [1, 64]
+
+artifact:
+  amplitude_mad_multiple: 30
+  rr_deviation_percent: 60
+  rr_fraction_threshold: 0.30
+
+watchdog:
+  max_duration_minutes: 5
+  max_intensity: 1.0
+
+training:
+  learning_rate: 1.0e-3
+  batch_size: 32
+  max_epochs: 100
+  label_smoothing: 0.1
+
+model:
+  in_channels: 1
+  cnn_embed_dim: 128
+  rnn_hidden_size: 64
+  rnn_num_layers: 1
+  transformer_d_model: 64
+  transformer_nhead: 4
+  transformer_num_encoder_layers: 1
+  transformer_dim_feedforward: 128
+  hrv_seq_len: 5
+  hrv_n_features: 7
+  head_hidden_dim: 64
+
+evaluation:
+  threshold: 0.5
+  sensitivity_target: 0.80
+
+augmentation:
+  enabled: true
+  gaussian_snr_range: [20, 40]
+  amplitude_scale_range: [0.8, 1.2]
+  baseline_freq_range: [0.1, 0.5]
+  baseline_amp_range: [0.0, 0.1]
+  dropout_prob: 0.2
+  dropout_duration_range: [0.05, 0.3]
+  powerline_prob: 0.3
+  powerline_amp_range: [0.0, 0.05]
+
+# Stroke-specific settings
+stroke:
+  conditions: [bifold, cardiac_gated, open_loop]
+  n_conditions: 3
+  epoch_duration_sec: 300

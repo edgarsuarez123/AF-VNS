@@ -1208,3 +1208,16 @@ TR-2.3  PCA / channel strip → pca_reduction.py, tests
 Update this file as new components are implemented and when key design
 decisions (e.g. artifact thresholds, watchdog limits) are finalized after
 validation.
+
+## 2026-03-19 — Stroke Pipeline: First Feature Implementation
+
+Step 2 — config_stroke.yaml created (stroke path overrides + stroke: section)
+Step 3 — src/data/stroke_parsers.py: StrokeRecordDict schema + parse_mimic3_stroke_dir + parse_sharee_dir + parse_cerevasc_dir stub
+Step 4 — parse_mimic3_stroke_dir: reuses _select_ecg_channel, _resample_to_target_fs; reads .label files; skips short records
+Step 5 — parse_sharee_dir: no label file (external label_map); defaults to 0 if not in map
+Step 14 — tests/test_stroke_parsers.py: 7 unit tests + 1 integration test, all 8 passing
+         Smoke test: 300 records, 150 stroke / 150 control, fs=250 Hz
+         pytest.ini created to register integration mark
+
+Next: Step 8 — StrokeDataset in stroke_dataloaders.py
+
