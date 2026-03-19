@@ -46,9 +46,18 @@ AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777 → **0.7432 (C2017 OO
 
 ---
 
-## Session Task — Create branch `feature/stroke-avns`
+## Session Task — Stroke AVNS Data Downloads
 
-### Steps
-1. Check base branch availability (`main` vs `master`) — done 2026-03-18 17:33
-2. Create `feature/stroke-avns` from the base branch — done 2026-03-18
-3. Verify checkout points to the new branch — done 2026-03-18
+### Directory Reorg
+1. Created `data/raw/AF avns/` and `data/raw/stroke avns/` — done 2026-03-18
+2. Moved afdb, nsrdb, mimic3, ltafdb, challenge2017 under `AF avns/` — done 2026-03-18
+3. Updated config.yaml raw_dir + mimic3_subdir — done 2026-03-18
+4. Updated hardcoded paths in download scripts — done 2026-03-18
+
+### Stroke Downloads
+5. Created `download_stroke_datasets.py` (cves + shareedb via wfdb) — done 2026-03-18
+6. Created `download_mimic3_stroke_waveforms.py` (ICD9 430-438) — done 2026-03-18
+7. Launched cves download (120 subjects, ECG-only subdirs) — running background
+8. Launched shareedb download (139 24h Holter ECGs) — running background
+9. MIMIC-III stroke download — blocked on PHYSIONET_USER/PHYSIONET_PASS env vars
+10. Run pytest to verify AF pipeline still resolves — pending
