@@ -105,7 +105,18 @@ cycles and respiratory modulation regardless of pathology.
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
 | S-13 | `src/features/phase_labels.py` — generate diastolic phase labels from ECG (R-peak + T-end detection → per-frame labels at 5Hz) | **Done** | 2026-03-20 |
-| S-14 | `src/features/edr.py` — ECG-Derived Respiration: extract respiratory signal, detect inhale/exhale phases, generate per-frame labels at 5Hz | Pending | |
+| S-14 | `src/features/edr.py` — ECG-Derived Respiration: extract respiratory signal, detect inhale/exhale phases, generate per-frame labels at 5Hz | **In Progress** | |
+
+#### S-14 Sub-steps
+
+| # | Action | Status |
+|---|--------|--------|
+| 14a | Add `edr:` config section to `config_stroke.yaml` | Pending |
+| 14b | Implement `extract_edr()` — nk.ecg_rsp + rsp_findpeaks | Pending |
+| 14c | Implement `generate_exhalation_labels()` — orchestrator with validation | Pending |
+| 14d | Run existing tests — confirm no regressions | Pending |
+| 14e | Smoke test — 60s synthetic ECG → verify shape and exhale fraction | Pending |
+| 14f | Git commit + update progress.txt | Pending |
 | S-15 | Tests for phase_labels.py + edr.py (synthetic + real CVES records) | Pending | |
 | S-16 | `src/training/phase_precompute.py` — precompute phase labels + ECG windows for all datasets; write cache with 2s windows and 5Hz frame labels | Pending | |
 | S-17 | Tests for phase_precompute.py | Pending | |

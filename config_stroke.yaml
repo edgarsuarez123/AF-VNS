@@ -92,6 +92,14 @@ phase_detection:
   delineate_method: "dwt"      # neurokit2 delineation method
   denoise_before_delineate: true
 
+# ECG-Derived Respiration settings
+edr:
+  method: "vangent2019"          # nk.ecg_rsp method (0.1-0.4 Hz bandpass)
+  min_resp_rate_bpm: 6.0         # Below 6 breaths/min → reject
+  max_resp_rate_bpm: 30.0        # Above 30 breaths/min → reject
+  min_resp_cycles: 2             # Need at least 2 full respiratory cycles
+  denoise_before_edr: true       # CWT denoise before R-peak detection
+
 # Stroke-specific settings
 stroke:
   conditions: [bifold, cardiac_gated, open_loop]
