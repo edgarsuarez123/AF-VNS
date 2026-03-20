@@ -117,7 +117,7 @@ cycles and respiratory modulation regardless of pathology.
 | 14d | Run existing tests — 136 pass, 1 flaky (unrelated) | Done |
 | 14e | Smoke test — 300 frames, 12 cycles, 13.5 bpm, 42.9% exhale | Done |
 | 14f | Git commit + update progress.txt | Done |
-| S-15 | Tests for phase_labels.py + edr.py (synthetic + real CVES records) | Pending | |
+| S-15 | Tests for phase_labels.py + edr.py (synthetic + real CVES records) | **Done** | 2026-03-20 |
 | S-16 | `src/training/phase_precompute.py` — precompute phase labels + ECG windows for all datasets; write cache with 2s windows and 5Hz frame labels | Pending | |
 | S-17 | Tests for phase_precompute.py | Pending | |
 
@@ -199,11 +199,12 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-13 complete, S-14 next:**
+**Current state (2026-03-20) — S-15 complete:**
 - Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
 - HRV feature pipeline already computes LF/HF, SampEn, DFA-α1
 - **S-13 complete**: phase_labels.py — 62.3% diastole on synthetic, 0% fallback
 - **S-14 complete**: edr.py — 42.9% exhale fraction, 12 resp cycles on synthetic
-- **Next: Step S-15**: Tests for phase_labels.py + edr.py
+- **S-15 complete**: 45 tests (43 unit + 2 integration), 181/181 passing
+- **Next: Step S-16**: phase_precompute.py — precompute phase labels + ECG windows

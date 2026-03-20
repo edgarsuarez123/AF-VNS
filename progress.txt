@@ -1368,3 +1368,20 @@ What must be built new:
   - Latency benchmark (<200ms)
 
 Next: Step S-13 — phase_labels.py (diastolic phase label generation from ECG)
+
+--- S-15: Tests for phase_labels.py + edr.py (2026-03-20) ---
+
+Created tests/test_phase_detection.py — 45 tests covering both modules:
+  - get_rpeak_indices: 4 tests (dtype, count, ordering, DC signal)
+  - get_twave_offsets: 7 tests (shape, dtype, ordering, bounds, noise, single beat)
+  - generate_phase_labels: 14 tests (keys, shapes, values, both phases, HR range,
+    quality, too-short, no-rpeaks, HR bounds, min_beats, denoise-off, reproducible)
+  - extract_edr: 6 tests (length, dtype, peaks/troughs, bounds, sorting, short signal)
+  - generate_exhalation_labels: 12 tests (keys, shapes, values, both phases, resp rate,
+    cycles, too-short, few-cycles, low-rate, denoise-off, exhale convention, reproducible)
+  - CVES integration: 2 tests (real ECG data, ECG channel auto-detection)
+
+Results: 181 passed, 1 skipped, 0 failed (full suite including all prior tests).
+Integration tests pass against real CVES data (head-up-tilt, ECG channel 1 @ 500Hz).
+
+Next: Step S-16 — phase_precompute.py (precompute phase labels + ECG windows for all datasets)
