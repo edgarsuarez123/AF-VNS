@@ -1219,5 +1219,14 @@ Step 14 — tests/test_stroke_parsers.py: 7 unit tests + 1 integration test, all
          Smoke test: 300 records, 150 stroke / 150 control, fs=250 Hz
          pytest.ini created to register integration mark
 
-Next: Step 8 — StrokeDataset in stroke_dataloaders.py
+Step 8  — stroke_dataloaders.py: StrokeDataset (thin PhysioDataset subclass) + get_stroke_dataloaders(); 6/6 tests passing
+Step 9  — stroke_precompute_cache.py: build_stroke_cache() + main(); phase-aware paths; parallel worker reuse; 6/6 tests passing
+Step 10 — stroke_head.py: StrokeResponderHead (binary BCE, optional hidden layer)
+Step 11 — stroke_ensemble.py: StrokeHybridEnsemble (reuses CNN/GRU/Transformer), freeze_backbone/unfreeze_backbone, build_stroke_model(); 10/10 tests passing
+Step 7  — parse_cerevasc_dir() implemented (CVES already downloaded — no credentials needed)
+         CVES label map: walking/ subject ID suffix S=stroke(1), A=control(0); 31 stroke / 49 control subjects
+         stroke_precompute_cache.py Phase 2 enabled: loads CVES records (was blocking with warning before)
+         test_stroke_parsers.py: 14/14 tests passing (6 new CVES unit tests + integration)
+
+Next: Step 12 — stroke_train.py Phase 1 (MIMIC-3 stroke, full backbone + StrokeResponderHead)
 

@@ -100,8 +100,8 @@ points for Phase 2. Use whichever gives better cerevasc val AUROC. Document in p
 | 3 | Write StrokeRecordDict schema + stroke_parsers.py skeleton | Done | 2026-03-19 |
 | 4 | Implement parse_mimic3_stroke_dir() — reuse _select_ecg_channel, _resample_to_target_fs | Done | 2026-03-19 |
 | 5 | Implement parse_sharee_dir() — inspect SHAREE channel headers first (Italian Holter lead names) | Done | 2026-03-19 |
-| 6 | Write download_cerevasc.py (pending Class 2 credentials) | Pending | |
-| 7 | Implement parse_cerevasc_dir() once data is available | Pending | |
+| 6 | Write download_cerevasc.py (pending Class 2 credentials) | N/A — CVES already downloaded via cves PhysioNet db | |
+| 7 | Implement parse_cerevasc_dir() once data is available | Done | 2026-03-19 |
 | 8 | Write StrokeDataset in stroke_dataloaders.py (rolling window, population label) | Done | 2026-03-19 |
 | 9 | Write stroke_precompute_cache.py (Phase 1 cache from MIMIC-3 stroke) | Done | 2026-03-19 |
 | 10 | Write stroke_head.py — StrokeResponderHead (binary BCE) | Done | 2026-03-19 |
@@ -131,8 +131,11 @@ all existing tests. AF checkpoints may be loaded **read-only** as backbone init 
 
 **Current state (2026-03-19) — Step 12 next:**
 - Steps 2–5 complete: config_stroke.yaml, stroke_parsers.py, 8/8 tests passing
+- Step 7 complete: parse_cerevasc_dir() implemented (CVES was already downloaded — no credentials needed)
+  - Labels derived from walking/ subject IDs (S=stroke, A=control): 31 stroke, 49 control subjects
+  - stroke_precompute_cache.py Phase 2 now loads CVES records (was blocked/erroring before)
+  - 14/14 parser tests passing (including integration)
 - Step 8 complete: stroke_dataloaders.py, 6/6 tests passing
 - Step 9 complete: stroke_precompute_cache.py, 6/6 tests passing
-- Steps 10–11 complete: stroke_head.py + stroke_ensemble.py (StrokeResponderHead, StrokeHybridEnsemble, build_stroke_model), 10/10 tests passing
-- cerevasc ✗ blocked on Class 2 credentials — request at physionet.org/content/cerevasc/
-- Step 12 next: stroke_train.py Phase 1 (MIMIC-3 stroke, StrokeResponderHead)
+- Steps 10–11 complete: stroke_head.py + stroke_ensemble.py, 10/10 tests passing
+- Step 12 next: stroke_train.py Phase 1 (MIMIC-3 stroke)

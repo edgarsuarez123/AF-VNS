@@ -29,6 +29,34 @@ logger = logging.getLogger(__name__)
 
 StrokeRecordDict = Dict[str, Any]
 
+# ---------------------------------------------------------------------------
+# CVES (Cerebral Vasoregulation in Elderly with Stroke) label maps
+# Derived from walking/ protocol subject IDs on PhysioNet:
+#   S####S → stroke (1),  S####A → control (0)
+# Numeric IDs are zero-stripped (e.g. "0044" → "44") to match stem extraction.
+# Hardcoded to avoid runtime network dependency.
+# ---------------------------------------------------------------------------
+CVES_STROKE_IDS = {
+    "30", "44", "64", "67", "68", "78", "121", "132", "154", "157",
+    "160", "163", "164", "166", "169", "175", "183", "185", "187", "194",
+    "197", "199", "213", "221", "225", "277", "324", "331", "363", "371", "376",
+}
+
+CVES_CONTROL_IDS = {
+    "165", "172", "176", "178", "184", "200", "203", "204", "205", "207",
+    "208", "210", "212", "214", "215", "218", "228", "231", "232", "239",
+    "240", "242", "243", "246", "247", "248", "295", "305", "322", "332",
+    "334", "336", "337", "340", "343", "351", "353", "354", "358", "364",
+    "374", "378", "379", "380", "388", "389", "397", "399", "402",
+}
+
+CVES_PROTOCOLS = [
+    "sit-stand",
+    "head-up-tilt",
+    "sit-stand-balance",
+    "transcranial-doppler",
+]
+
 
 def parse_mimic3_stroke_dir(data_dir: str, config_path: str) -> List[StrokeRecordDict]:
     """Parse MIMIC-III stroke cohort directory.
@@ -222,17 +250,119 @@ def parse_sharee_dir(
 
 
 def parse_cerevasc_dir(data_dir: str, config_path: str) -> List[StrokeRecordDict]:
-    """Parse CereVasc dataset (PhysioNet, requires Class 2 credentials).
+    """Parse CVES (Cerebral Vasoregulation in Elderly with Stroke) dataset.
 
-    This dataset is not yet available locally. Access requires PhysioNet Class 2
-    credentialing at: https://physionet.org/content/cerevasc/
+    Dataset is publicly available on PhysioNet (db: cves) — no credentials required.
+    Labels are derived from walking/ protocol subject IDs: S-suffix=stroke(1), A-suffix=control(0).
+    Subjects with no label entry are skipped.
 
-    Raises:
-        NotImplementedError: Always — until credentials are obtained and data is downloaded.
+    ECG channel selected via _select_ecg_channel(). TCD ECG is in uV and is scaled to mV.
+    subject_id = "cves_{numeric_id}" (same for all conditions of a subject — ensures
+    create_split() keeps all a subject's records in the same split, preventing leakage).
+
+    Args:
+        data_dir:    Path to cves/ directory (contains data/{sit-stand,head-up-tilt,...}).
+        config_path: Path to config YAML (reads data.target_fs, data.waveform_sec).
+
+    Returns:
+        List of StrokeRecordDict, one per WFDB record file across all 4 protocols.
     """
-    raise NotImplementedError(
-        "parse_cerevasc_dir() is not yet implemented. "
-        "The CereVasc dataset requires PhysioNet Class 2 credentials. "
-        "Request access at https://physionet.org/content/cerevasc/ and then "
-        "download with src/data/download_cerevasc.py once approved."
-    )
+    try:
+        import wfdb
+    except ImportError:
+        raise ImportError("wfdb is required")
+
+    config = load_config(config_path)
+    data_cfg = config.get("data", {})
+    target_fs: float = float(data_cfg.get("target_fs", 0))
+    waveform_sec: float = float(data_cfg.get("waveform_sec", 10))
+
+    base = Path(data_dir)
+    if not base.is_dir():
+        logger.warning("cves_dir not found: %s", data_dir)
+        return []
+
+    records: List[StrokeRecordDict] = []
+    seen: set = set()
+
+    for protocol in CVES_PROTOCOLS:
+        proto_dir = base / "data" / protocol
+        if not proto_dir.is_dir():
+            logger.debug("CVES protocol dir missing: %s", proto_dir)
+            continue
+
+        for hea_path in sorted(proto_dir.glob("*.hea")):
+            stem = hea_path.stem  # e.g. "s0044-sit-stand"
+
+            # Extract zero-stripped numeric subject ID for label lookup
+            raw_num = stem.lstrip("s").split("-")[0]      # e.g. "0044"
+            numeric_id = raw_num.lstrip("0") or "0"       # e.g. "44"
+
+            if numeric_id in CVES_STROKE_IDS:
+                label = 1
+            elif numeric_id in CVES_CONTROL_IDS:
+                label = 0
+            else:
+                logger.debug("CVES: no label for %s (numeric=%s) — skipping", stem, numeric_id)
+                continue
+
+            # Use subject-level ID so all conditions for same subject land in same split
+            subject_id = f"cves_{raw_num}"
+
+            key = (subject_id, stem)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            try:
+                record = wfdb.rdrecord(str(proto_dir / stem))
+            except Exception as e:
+                logger.warning("Failed to read CVES record %s: %s", stem, e)
+                continue
+            if record is None:
+                continue
+
+            signal = record.p_signal if record.p_signal is not None else record.d_signal
+            if signal is None:
+                continue
+
+            signal = np.asarray(signal, dtype=np.float64)
+
+            # Select best ECG channel; capture its unit for uV→mV scaling
+            if signal.ndim == 2 and signal.shape[1] > 1:
+                ch_idx = _select_ecg_channel(record.sig_name, record.units)
+                unit = (record.units[ch_idx] or "").strip() if record.units else ""
+                signal = signal[:, ch_idx]
+            else:
+                unit = (record.units[0] or "").strip() if record.units else ""
+                signal = signal.ravel()
+
+            # TCD ECG is recorded in uV — scale to mV for consistency
+            if unit.lower() in ("uv", "\u03bcv"):
+                signal = signal * 0.001
+
+            signal = np.nan_to_num(signal, nan=0.0)
+
+            fs = float(record.fs)
+
+            if target_fs > 0 and abs(fs - target_fs) >= 0.1:
+                signal = _resample_to_target_fs(signal, fs, target_fs)
+                fs = target_fs
+
+            min_samples = int(waveform_sec * fs)
+            if len(signal) < min_samples:
+                logger.debug("Skipping CVES %s — signal too short (%d samples)", stem, len(signal))
+                continue
+
+            records.append({
+                "subject_id": subject_id,
+                "signal": signal,
+                "fs": fs,
+                "label": label,
+                "session_id": None,
+                "epoch_type": None,
+                "condition": None,
+            })
+
+    logger.info("Parsed %d records from cves (dir: %s)", len(records), data_dir)
+    return records

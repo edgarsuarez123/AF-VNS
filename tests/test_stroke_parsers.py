@@ -166,13 +166,125 @@ def test_parse_sharee_dir_default_label_zero():
 
 
 # ---------------------------------------------------------------------------
-# Unit tests — parse_cerevasc_dir (stub)
+# Unit tests — parse_cerevasc_dir
 # ---------------------------------------------------------------------------
 
-def test_parse_cerevasc_raises_not_implemented():
-    """parse_cerevasc_dir() raises NotImplementedError (credential blocker)."""
-    with pytest.raises(NotImplementedError):
-        parse_cerevasc_dir("data/raw/stroke avns/cves", "config_stroke.yaml")
+def _write_cves_record(
+    proto_dir: Path,
+    stem: str,
+    n_samples: int = 5000,
+    fs: int = 500,
+    sig_name: str = "ecg",
+    unit: str = "mV",
+) -> None:
+    """Write a minimal WFDB record into a CVES protocol subdirectory."""
+    rng = np.random.default_rng(99)
+    sig = (rng.standard_normal((n_samples, 1)) * 0.5).astype(np.float64)
+    wfdb.wrsamp(
+        stem,
+        fs=fs,
+        units=[unit],
+        sig_name=[sig_name],
+        p_signal=sig,
+        write_dir=str(proto_dir),
+    )
+
+
+def _make_cves_dir(tmp_dir: Path) -> Path:
+    """Build a minimal synthetic CVES directory structure with 3 subjects:
+    - s0044: stroke (ID 44 in CVES_STROKE_IDS)
+    - s0165: control (ID 165 in CVES_CONTROL_IDS)
+    - s0999: unmatched (no label — should be skipped)
+    """
+    ss_dir = tmp_dir / "data" / "sit-stand"
+    ss_dir.mkdir(parents=True)
+    _write_cves_record(ss_dir, "s0044-sit-stand")
+    _write_cves_record(ss_dir, "s0165-sit-stand")
+    _write_cves_record(ss_dir, "s0999-sit-stand")
+    return tmp_dir
+
+
+def test_parse_cerevasc_returns_list():
+    """parse_cerevasc_dir returns a list (not raises)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        result = parse_cerevasc_dir(str(cves_dir), cfg)
+        assert isinstance(result, list)
+
+
+def test_parse_cerevasc_skips_unmatched():
+    """Subjects with no label entry (s0999) are skipped; only labeled subjects returned."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        assert len(records) == 2
+        ids = {r["subject_id"] for r in records}
+        assert "cves_0999" not in ids, "Unmatched subject should be skipped"
+
+
+def test_parse_cerevasc_labels_binary():
+    """All returned labels are exactly 0 or 1."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        for r in records:
+            assert r["label"] in (0, 1), f"Non-binary label {r['label']}"
+
+
+def test_parse_cerevasc_schema():
+    """All required StrokeRecordDict keys present in every record."""
+    required = {"subject_id", "signal", "fs", "label", "session_id", "epoch_type", "condition"}
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        assert len(records) > 0
+        for r in records:
+            assert required.issubset(r.keys()), f"Missing keys: {required - set(r.keys())}"
+
+
+def test_parse_cerevasc_subject_id_format():
+    """subject_id follows cves_{numeric} pattern for all records."""
+    import re
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        for r in records:
+            assert re.match(r"^cves_\d+$", r["subject_id"]), \
+                f"subject_id '{r['subject_id']}' doesn't match cves_\\d+"
+
+
+def test_parse_cerevasc_stroke_label_correct():
+    """s0044 (stroke) gets label=1, s0165 (control) gets label=0."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        by_id = {r["subject_id"]: r["label"] for r in records}
+        assert by_id.get("cves_0044") == 1, "s0044 should be stroke (label=1)"
+        assert by_id.get("cves_0165") == 0, "s0165 should be control (label=0)"
+
+
+@pytest.mark.integration
+def test_parse_cerevasc_integration():
+    """Integration: parse real CVES dir, check count and label distribution."""
+    data_dir = "data/raw/stroke avns/cves"
+    config_path = "config_stroke.yaml"
+    if not Path(data_dir).is_dir():
+        pytest.skip("CVES data not found — skipping integration test")
+    records = parse_cerevasc_dir(data_dir, config_path)
+    assert len(records) >= 50, f"Expected ≥50 records, got {len(records)}"
+    labels = [r["label"] for r in records]
+    assert set(labels).issubset({0, 1})
+    stroke = sum(labels)
+    ctrl = len(labels) - stroke
+    subj_ids = set(r["subject_id"] for r in records)
+    print(f"\nCVES: {len(records)} records, {stroke} stroke, {ctrl} control, "
+          f"{len(subj_ids)} unique subjects, fs={records[0]['fs']}")
 
 
 # ---------------------------------------------------------------------------

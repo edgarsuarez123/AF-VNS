@@ -26,7 +26,12 @@ if __name__ == "__main__":
         sys.path.insert(0, str(_root))
 
 from src.data.splitter import create_split, load_split
-from src.data.stroke_parsers import StrokeRecordDict, parse_mimic3_stroke_dir, parse_sharee_dir
+from src.data.stroke_parsers import (
+    StrokeRecordDict,
+    parse_cerevasc_dir,
+    parse_mimic3_stroke_dir,
+    parse_sharee_dir,
+)
 from src.features.pipeline import waveform_10s_denoised, waveform_to_hrv_sequence
 from src.features.scaler import fit_scaler, load_scaler, transform
 
@@ -293,11 +298,9 @@ def main(
         scaler_path = paths_cfg.get("phase1_scaler", "models/artifacts/stroke_phase1_scaler.pkl")
         split_path = paths_cfg.get("phase1_split", "models/artifacts/stroke_phase1_split.json")
     elif phase == 2:
-        logger.warning(
-            "Phase 2 requires CereVasc data (PhysioNet Class 2 credentials not yet obtained). "
-            "Request access at https://physionet.org/content/cerevasc/ then re-run with --phase 2."
-        )
-        return
+        cache_dir = Path(paths_cfg.get("phase2_cache_dir", "models/artifacts/cache_stroke_phase2"))
+        scaler_path = paths_cfg.get("phase2_scaler", "models/artifacts/stroke_phase2_scaler.pkl")
+        split_path = paths_cfg.get("phase2_split", "models/artifacts/stroke_phase2_split.json")
     else:  # phase == 0: all available datasets
         cache_dir = Path(paths_cfg.get("cache_dir", "models/artifacts/cache_stroke"))
         scaler_path = paths_cfg.get("scaler", "models/artifacts/stroke_scaler.pkl")
@@ -311,6 +314,12 @@ def main(
         mimic_records = parse_mimic3_stroke_dir(mimic_dir, config_path)
         logger.info("Loaded %d MIMIC-3 stroke records", len(mimic_records))
         records.extend(mimic_records)
+
+    if phase == 2:
+        cves_dir = data_cfg.get("cves_subdir", "data/raw/stroke avns/cves")
+        cves_records = parse_cerevasc_dir(cves_dir, config_path)
+        logger.info("Loaded %d CVES records for Phase 2", len(cves_records))
+        records.extend(cves_records)
 
     if phase == 0:  # SHAREE: include in combined (phase-0) run only
         sharee_dir = data_cfg.get("sharee_subdir", "data/raw/stroke avns/shareedb")
