@@ -223,6 +223,10 @@ cycles and respiratory modulation regardless of pathology.
   per-task accuracy metrics. 12 tests passing. 199 total tests, 0 regressions.
 - **S-22/S-23/S-24 complete**: AutonomicState (4-feature HRV extractor) + StimRecommender
   (rule-based, NaN-safe). Added norm_hf_power to hrv_freq.py. 16 tests, 215 total passing.
-- **S-25 RUNNING**: precompute_phase_err.log — caching 528 records (228 CVES + 300 MIMIC-3).
-  Check: `Get-Content precompute_phase_err.log -Tail 5`
-- **Next**: S-26 (train phase detector on real data) once S-25 finishes, then S-27–S-31
+- **S-25 DONE**: Cache precompute complete — 480 records → 2,576,904 windows
+  - Train: 1,819,893 | Val: 395,566 | Test: 361,445
+  - 48 records skipped (insufficient phase labels)
+- **S-26 RUNNING**: phase_train.py training on cached data
+  - Epoch 9/100 complete, training in progress (~2 min/epoch, ~3h ETA)
+  - GPU active (6GB usage), checkpoint being saved to models/checkpoints/phase_detector.pth
+- **Next**: Monitor S-26 completion, then S-27 (phase_evaluate.py)
