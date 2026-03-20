@@ -104,7 +104,7 @@ cycles and respiratory modulation regardless of pathology.
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| S-13 | `src/features/phase_labels.py` — generate diastolic phase labels from ECG (R-peak + T-end detection → per-frame labels at 5Hz) | **In Progress** | |
+| S-13 | `src/features/phase_labels.py` — generate diastolic phase labels from ECG (R-peak + T-end detection → per-frame labels at 5Hz) | **Done** | 2026-03-20 |
 | S-14 | `src/features/edr.py` — ECG-Derived Respiration: extract respiratory signal, detect inhale/exhale phases, generate per-frame labels at 5Hz | Pending | |
 | S-15 | Tests for phase_labels.py + edr.py (synthetic + real CVES records) | Pending | |
 | S-16 | `src/training/phase_precompute.py` — precompute phase labels + ECG windows for all datasets; write cache with 2s windows and 5Hz frame labels | Pending | |
@@ -114,15 +114,15 @@ cycles and respiratory modulation regardless of pathology.
 
 | # | Action | Status |
 |---|--------|--------|
-| 13a | Add `phase_detection:` config to `config_stroke.yaml` (frame_rate_hz, fallback_fraction, min_beats, HR bounds, delineate_method) | Pending |
-| 13b | Implement `get_rpeak_indices()` — thin nk.ecg_peaks() wrapper returning sample indices | Pending |
-| 13c | Implement `get_twave_offsets()` — nk.ecg_delineate() + 40% RR fallback for NaN entries | Pending |
-| 13d | Implement `_build_sample_phase_array()` — map R-peaks + T-ends to per-sample 0/1/NaN | Pending |
-| 13e | Implement `_downsample_to_frames()` — majority-vote reduction to 5Hz frame labels | Pending |
-| 13f | Implement `generate_phase_labels()` — orchestrator calling 13b-13e with validation + error handling | Pending |
-| 13g | Run existing tests — confirm no regressions | Pending |
-| 13h | Smoke test — synthetic ECG → verify output shape and label distribution | Pending |
-| 13i | Git commit + update progress.txt | Pending |
+| 13a | Add `phase_detection:` config to `config_stroke.yaml` | Done |
+| 13b | Implement `get_rpeak_indices()` | Done |
+| 13c | Implement `get_twave_offsets()` + 40% RR fallback | Done |
+| 13d | Implement `_build_sample_phase_array()` | Done |
+| 13e | Implement `_downsample_to_frames()` | Done |
+| 13f | Implement `generate_phase_labels()` | Done |
+| 13g | Run existing tests — 136 pass, 0 fail | Done |
+| 13h | Smoke test — 150 frames, 72.1bpm, 62.3% diastole, 0% fallback | Done |
+| 13i | Git commit + update progress.txt | Done |
 
 ### Phase Detection Model
 
@@ -188,9 +188,10 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-13 in progress:**
+**Current state (2026-03-20) — S-13 complete, S-14 next:**
 - Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
 - HRV feature pipeline already computes LF/HF, SampEn, DFA-α1
-- **Working on Step S-13**: phase_labels.py — diastolic phase label generation
+- **S-13 complete**: phase_labels.py — 62.3% diastole on synthetic, 0% fallback, 136 tests pass
+- **Next: Step S-14**: edr.py — ECG-Derived Respiration for exhalation labels

@@ -2,7 +2,48 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-19
+Last updated: 2026-03-20
+
+--------------------------------------------------------------------------------
+S-13. DIASTOLIC PHASE LABEL GENERATION (2026-03-20)
+--------------------------------------------------------------------------------
+
+Created src/features/phase_labels.py — generates ground truth diastolic phase
+labels at 5Hz (200ms frames) from ECG signals for the Phase Detector CNN.
+
+Functions implemented:
+- get_rpeak_indices(): wraps nk.ecg_peaks(), returns sample indices (int64)
+- get_twave_offsets(): nk.ecg_delineate(method="dwt") + 40% RR fallback for
+  NaN entries. Clamps offsets to prevent systole/diastole overlap.
+- _build_sample_phase_array(): maps R-peaks + T-ends to per-sample 0/1/NaN
+- _downsample_to_frames(): majority-vote reduction to 5Hz frame labels
+- generate_phase_labels(): orchestrator with config loading, validation, HR
+  bounds checking, and NaN-based graceful degradation
+
+Config: Added phase_detection section to config_stroke.yaml with frame_rate_hz,
+fallback_fraction, min_beats, HR bounds, delineation method.
+
+Smoke test results (30s synthetic ECG, 72bpm):
+- Output shape: (150,) — correct (30s * 5Hz)
+- Beats detected: 35
+- Mean HR: 72.1 bpm
+- Fallback fraction: 0.00 (all T-wave ends detected by neurokit2)
+- Diastole fraction: 0.623 (physiologically correct — diastole is ~55-65%)
+- Mean quality: 0.972
+- NaN frames: 4/150 (only pre-first-beat region)
+- Short signal (0.8s): correctly returns all-NaN labels
+
+What worked: neurokit2 DWT delineation detected all T-wave ends on synthetic
+data with zero fallback needed. Diastole fraction matches physiology textbook
+values. Quality metric correctly reflects confidence.
+
+What to watch: Real clinical ECG (CVES ICU, noisy MIMIC-3) will likely have
+higher fallback rates. Will assess during precompute (S-25).
+
+Existing tests: 136 passed, 1 skipped, 0 failures — no regressions.
+
+Also: Renamed PLAN.md → AF_PLAN.md. STROKE_PLAN.md is now the sole plan file
+for the feature/stroke-avns branch. Updated CLAUDE.md with branch-plan convention.
 
 --------------------------------------------------------------------------------
 1. PROJECT GOAL & CONTEXT
