@@ -82,6 +82,16 @@ augmentation:
   powerline_prob: 0.3
   powerline_amp_range: [0.0, 0.05]
 
+# Phase detection settings (Aim 2 — diastolic + exhalation phase)
+phase_detection:
+  frame_rate_hz: 5.0           # Output frame rate (200ms per frame)
+  fallback_fraction: 0.40      # T-end fallback: R + fraction * RR when delineation fails
+  min_beats: 2                 # Minimum R-peaks needed; else return all-NaN
+  min_hr_bpm: 40.0             # HR below this → reject
+  max_hr_bpm: 200.0            # HR above this → reject
+  delineate_method: "dwt"      # neurokit2 delineation method
+  denoise_before_delineate: true
+
 # Stroke-specific settings
 stroke:
   conditions: [bifold, cardiac_gated, open_loop]

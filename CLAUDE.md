@@ -19,14 +19,25 @@ I'm a computer engineering student and entrepreneur. I start the U.S. Air Force 
 
 I connect remotely via phone. Sessions can drop at any time. You must operate with maximum autonomy and resilience.
 
+### Branch-Specific Plan Files — ALWAYS FOLLOW THIS
+
+Each git branch has its own plan file. **Never update the wrong branch's plan.**
+
+| Branch | Plan File |
+|--------|-----------|
+| `master` (AF work) | `AF_PLAN.md` |
+| `feature/stroke-avns` | `STROKE_PLAN.md` |
+
+Check your current branch at session start and only read/update that branch's plan file.
+
 ### Session Resilience Rules — ALWAYS FOLLOW THESE
 
-- At the start of every task, create or update `PLAN.md` in the project root
-- Break every task into numbered steps in PLAN.md
+- At the start of every task, update the **current branch's plan file** (see table above)
+- Break every task into numbered steps in the plan file
 - Mark each step complete with a timestamp as you finish it: `- [x] 1. Step name — done 06:12`
 - Commit to git after every completed step with a clear descriptive message
 - Before any large change, commit the current state first as a checkpoint
-- If you hit a blocker, document it in PLAN.md and move to the next step
+- If you hit a blocker, document it in the plan file and move to the next step
 - Never stop working because of a minor uncertainty — make a reasonable decision, document it, and continue
 - At the end of every session update PLAN.md with a "Resume From Here" section
 - Update `progress.txt` after each completed step — not just at the end
