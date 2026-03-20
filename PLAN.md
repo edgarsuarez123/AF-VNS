@@ -1,63 +1,195 @@
-# AF VNS — Round 10: Threshold Tuning + Better Data + Better Features + Partial Unfreeze
+# Stroke AVNS — Aim 2 Phase Detection Pipeline
 
-## Context
+## Grant Context (Aim 2)
 
-Round 9 achieved C2017 OOD AUROC=0.7432 (gap=0.0068 to NFR-2.1 target of 0.75).
-Sensitivity is clinically strong (91.6%) but specificity is poor (32.9%) — the model
-is confidently predicting AF on many NSR records. Four improvements ordered by risk/reward:
+The grant describes Aim 2 as: a hybrid CNN/RNN system that processes 250Hz HRV
+time-series and multi-frequency impedance data continuously. The system must:
 
-1. **Option 4** — Threshold analysis (instant, no retraining)
-2. **Options 1+3** — Add MIMIC controls to Phase 2 + add pNN50/CoV features (single cache rebuild)
-3. **Option 2** — Partial CNN unfreezing in Phase 2 (retrain Phase 2 only)
+1. **Detect diastolic phase** — R-R interval trajectory identifies diastole in real time
+2. **Detect exhalation phase** — thoracic impedance identifies exhalation (no impedance
+   hardware yet → use ECG-Derived Respiration as proxy)
+3. **Assess autonomic state** — frequency-domain HRV (LF/HF ratio, normalized HF power)
+   and nonlinear indices (SampEn, DFA-α1) evaluate baseline autonomic state
+4. **Adaptive stim output** — dynamically adjust amplitude (0-10mA), frequency (1-100Hz),
+   pulse width (50-500µs) at 5Hz update rate
 
-AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777 → **0.7432 (C2017 OOD)**
+**Go/no-go milestone:** >85% classification accuracy for diastolic phase AND exhalation
+phase detection, with total closed-loop system latency <200ms. (NFR-1.1 and NFR-2.1)
+
+---
+
+## Course Correction (2026-03-19)
+
+Steps 2-12 built a **stroke vs. control binary classifier**. This was the wrong task.
+Stroke does not have a direct ECG signature like AF does — the model never learned
+(Phase 1 val_auroc=0.57, Phase 2 in-dist AUROC=0.60, OOD AUROC=0.41).
+
+The grant's ML task is **real-time physiological phase detection on stroke patients**,
+not detecting whether someone had a stroke. The stroke patients are the population,
+not the classification target.
+
+### What is reusable
+- ECG parsers (CVES, MIMIC-3, SHaRe) — data loading works
+- HRV feature extraction pipeline (LF/HF, SampEn, DFA-α1) — already built
+- CNN architecture — repurpose for phase detection on short windows
+- Training loop, caching, evaluation framework — structure stays
+- config_stroke.yaml — extend with phase detection settings
+
+### What is NOT reusable
+- StrokeHybridEnsemble / StrokeResponderHead — wrong output (binary stroke/control)
+- stroke_train.py / stroke_evaluate.py — wrong task and labels
+- Precomputed caches — wrong windowing and labels
+
+---
+
+## New Pipeline: Phase Detection
+
+### Architecture
+
+```
+ECG (250Hz) ─────┬── Phase Detector CNN ──── diastole logit (5Hz)
+                  │                      └── exhalation logit (5Hz)
+                  │
+                  └── HRV Window (60s) ──── Autonomic State Module
+                                            ├── LF/HF ratio
+                                            ├── normalized HF power
+                                            ├── SampEn
+                                            └── DFA-α1
+                                            ↓
+                                        Stim Parameter Recommender
+                                            ├── amplitude (0-10mA)
+                                            ├── frequency (1-100Hz)
+                                            └── pulse_width (50-500µs)
+```
+
+**Phase Detector:** Lightweight 1D CNN on 2s ECG context (500 samples @ 250Hz).
+Outputs diastole + exhalation probability at every 200ms frame (5Hz update rate).
+Must run in <200ms including feature extraction.
+
+**Autonomic State Module:** Sliding-window HRV features (existing pipeline).
+Updates every 60s. Feeds the stim parameter recommender (control algorithm, not ML).
+
+### Ground Truth Label Generation
+
+**Diastolic phase labels:**
+- R-peak detection via neurokit2 `nk.ecg_peaks()` or Pan-Tompkins
+- T-wave end detection via `nk.ecg_delineate()`
+- Diastole = T-wave end to next R-peak onset
+- Label each 200ms frame as diastole=1 or systole=0
+
+**Exhalation phase labels (ECG-Derived Respiration):**
+- No impedance hardware → derive respiration from ECG
+- neurokit2 `nk.ecg_rsp()` extracts respiratory signal from R-peak amplitude modulation
+  and respiratory sinus arrhythmia (RSA)
+- Detect respiratory peaks/troughs → label exhale=1, inhale=0
+- EDR accuracy vs. reference is typically 80-90% — this is the ceiling for our model
+
+### Datasets
+
+| Dataset | Records | Use | Notes |
+|---------|---------|-----|-------|
+| CVES | 228 (74 stroke, 154 control) | Primary — target population doing autonomic tests | Sit-stand, tilt protocols → varied HR/breathing |
+| MIMIC-3 stroke | 300 (150/150) | Volume — ICU ECGs | Noisier, but more data |
+| SHaRe | 133 (17 event, 116 control) | OOD evaluation | 24h Holter ECGs |
+
+All three contain ECG from which diastolic phase and EDR can be derived.
+The stroke/control label is irrelevant for phase detection — every ECG has cardiac
+cycles and respiratory modulation regardless of pathology.
 
 ---
 
 ## Steps
 
+### Label Generation & Data Prep
+
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| 43 | Add `analyze_thresholds()` to evaluate.py + `_run_c2017_inference()` helper | Done | 2026-03-17 |
-| 44 | Make threshold configurable across all eval functions (config.yaml) | Done | 2026-03-17 |
-| 45 | Tests for threshold analysis + run analysis | Done | 2026-03-17 — 7/7 tests pass |
-| 46 | Add pNN50 and CoV to hrv_time.py | Pending | |
-| 47 | Update FEATURE_ORDER in pipeline.py (7→9) | Pending | |
-| 48 | Update config.yaml hrv_n_features 7→9 + verify refs | Pending | |
-| 49 | Tests for new HRV features | Pending | |
-| 50 | Update test fixtures from 7→9 features | Pending | |
-| 51 | Add MIMIC controls to Phase 2 splitter | Pending | |
-| 52 | Add `collect_mimic_labels()` to dataset_parsers.py | Pending | |
-| 53 | Update precompute_cache.py for split-based Phase 2 filtering + tests | Pending | |
-| 54 | Cache rebuild + retrain Phase 1 & 2 + evaluate (background) | Pending | |
-| 55 | Restructure CNN into named blocks (early_layers, last_conv_block) | Pending | |
-| 56 | Modify Phase 2 freezing for partial unfreeze + discriminative LR | Pending | |
-| 57 | Tests for partial unfreezing | Pending | |
-| 58 | Retrain Phase 2 + evaluate | Pending | |
+| S-13 | `src/features/phase_labels.py` — generate diastolic phase labels from ECG (R-peak + T-end detection → per-frame labels at 5Hz) | Pending | |
+| S-14 | `src/features/edr.py` — ECG-Derived Respiration: extract respiratory signal, detect inhale/exhale phases, generate per-frame labels at 5Hz | Pending | |
+| S-15 | Tests for phase_labels.py + edr.py (synthetic + real CVES records) | Pending | |
+| S-16 | `src/training/phase_precompute.py` — precompute phase labels + ECG windows for all datasets; write cache with 2s windows and 5Hz frame labels | Pending | |
+| S-17 | Tests for phase_precompute.py | Pending | |
+
+### Phase Detection Model
+
+| Step | Description | Status | Completed At |
+|------|-------------|--------|--------------|
+| S-18 | `src/models/phase_detector.py` — lightweight 1D CNN: 2s ECG input (500 samples) → 2 logits (diastole, exhalation) per 200ms frame | Pending | |
+| S-19 | `config_stroke.yaml` — add phase detection section (window_sec, stride, frame_rate_hz, model dims) | Pending | |
+| S-20 | `src/training/phase_train.py` — training loop for phase detector (multi-task BCE loss, 5Hz frame-level labels) | Pending | |
+| S-21 | Tests for phase_detector.py + phase_train.py | Pending | |
+
+### Autonomic State + Stim Recommender
+
+| Step | Description | Status | Completed At |
+|------|-------------|--------|--------------|
+| S-22 | `src/models/autonomic_state.py` — sliding-window HRV feature extractor producing autonomic state vector (LF/HF, nHF, SampEn, DFA-α1) | Pending | |
+| S-23 | `src/models/stim_recommender.py` — maps autonomic state → stim params (amplitude, frequency, pulse_width); rule-based initially, ML later | Pending | |
+| S-24 | Tests for autonomic_state.py + stim_recommender.py | Pending | |
+
+### Training, Evaluation & Latency
+
+| Step | Description | Status | Completed At |
+|------|-------------|--------|--------------|
+| S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | Pending | |
+| S-26 | Train phase detector on CVES + MIMIC-3 combined | Pending | |
+| S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | Pending | |
+| S-28 | Evaluate on CVES test split — target: >85% accuracy both phases | Pending | |
+| S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
+| S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
+| S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
+
+### Previous Steps (Stroke vs. Control — completed but superseded)
+
+| Step | Description | Status | Notes |
+|------|-------------|--------|-------|
+| S-2 | config_stroke.yaml | Done | Reusable — extend with phase detection config |
+| S-3–5 | stroke_parsers.py (MIMIC-3, SHaRe, CVES) | Done | Reusable — ECG loading still needed |
+| S-7 | parse_cerevasc_dir() | Done | Reusable |
+| S-8 | stroke_dataloaders.py | Done | Superseded — new windowing needed |
+| S-9 | stroke_precompute_cache.py | Done | Superseded — new label generation |
+| S-10–11 | StrokeResponderHead, StrokeHybridEnsemble | Done | Superseded — wrong output head |
+| S-12 | stroke_train.py + tests | Done | Superseded — wrong task |
+| — | stroke_evaluate.py | Done | Superseded — wrong metrics |
+| — | SHAREE_EVENT_PATIENTS corrected | Done | Still useful for OOD eval |
 
 ---
 
 ## Resume From Here
 
-**Current state (2026-03-17) — Round 10 STARTING:**
-- Round 9 complete: AUROC=0.7432, Sens=0.9159, Spec=0.3286
-- Phase 2 checkpoint: models/checkpoints/phase2_model.pth
-- Start with Step 43 (threshold analysis)
+**Current state (2026-03-19) — PIVOT to phase detection:**
+- Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
+  results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
+- ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
+- HRV feature pipeline already computes LF/HF, SampEn, DFA-α1
+- **Start with Step S-13**: phase label generation (diastolic phase from R-peaks + T-end)
 
 ---
 
-## Session Task — Stroke AVNS Data Downloads
+## AF Pipeline (Round 10 — paused, resume later)
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 43–45 | Threshold analysis | Done (2026-03-17) |
+| 46–50 | pNN50/CoV features + test fixtures | Pending |
+| 51–54 | MIMIC controls in Phase 2 + cache rebuild | Pending |
+| 55–58 | Partial CNN unfreeze + retrain | Pending |
+
+AF AUROC trajectory: 0.6022 → 0.6333 → 0.6747 → 0.6777 → **0.7432 (C2017 OOD)**
+
+---
+
+## Session Task — Stroke AVNS Data Downloads (completed 2026-03-18)
 
 ### Directory Reorg
-1. Created `data/raw/AF avns/` and `data/raw/stroke avns/` — done 2026-03-18
-2. Moved afdb, nsrdb, mimic3, ltafdb, challenge2017 under `AF avns/` — done 2026-03-18
-3. Updated config.yaml raw_dir + mimic3_subdir — done 2026-03-18
-4. Updated hardcoded paths in download scripts — done 2026-03-18
+1. Created `data/raw/AF avns/` and `data/raw/stroke avns/` — done
+2. Moved afdb, nsrdb, mimic3, ltafdb, challenge2017 under `AF avns/` — done
+3. Updated config.yaml raw_dir + mimic3_subdir — done
+4. Updated hardcoded paths in download scripts — done
 
 ### Stroke Downloads
-5. Created `download_stroke_datasets.py` (cves + shareedb via wfdb) — done 2026-03-18
-6. Created `download_mimic3_stroke_waveforms.py` (ICD9 430-438) — done 2026-03-18
-7. Launched cves download (120 subjects, ECG-only subdirs) — running background
-8. Launched shareedb download (139 24h Holter ECGs) — running background
-9. MIMIC-III stroke download — blocked on PHYSIONET_USER/PHYSIONET_PASS env vars
-10. Run pytest to verify AF pipeline still resolves — pending
+5. Created `download_stroke_datasets.py` (cves + shareedb via wfdb) — done
+6. Created `download_mimic3_stroke_waveforms.py` (ICD9 430-438) — done
+7. CVES download complete — 228 records (74 stroke, 154 control)
+8. SHaRe download complete — 133 records (17 event, 116 control)
+9. MIMIC-III stroke download complete — 300 records (150/150)

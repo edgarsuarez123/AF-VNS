@@ -2,7 +2,7 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-15
+Last updated: 2026-03-19
 
 --------------------------------------------------------------------------------
 1. PROJECT GOAL & CONTEXT
@@ -1228,5 +1228,62 @@ Step 7  — parse_cerevasc_dir() implemented (CVES already downloaded — no cre
          stroke_precompute_cache.py Phase 2 enabled: loads CVES records (was blocking with warning before)
          test_stroke_parsers.py: 14/14 tests passing (6 new CVES unit tests + integration)
 
-Next: Step 12 — stroke_train.py Phase 1 (MIMIC-3 stroke, full backbone + StrokeResponderHead)
+Step 12 — stroke_train.py: Phase 1/2 training entry point for StrokeHybridEnsemble
+         Imports infra from train.py (PrecomputedDataset, run_validation_from_cache, etc.) — no duplication
+         Phase 1: full model on MIMIC-3 cache; Phase 2: frozen backbone, head-only on CVES cache
+         6/6 tests passing; full suite 136/136 passing
 
+Step 12b — Precompute + train + evaluate stroke vs. control pipeline end-to-end:
+         Phase 1 cache (MIMIC-3): 315 train / 67 val / 66 test windows — done
+         Phase 2 cache (CVES): 862 train / 194 val / 160 test windows — done
+         Phase 1 training: best val_auroc=0.5687 (near random, early stop epoch 21)
+         Phase 2 training: best val_auroc=0.5460 (frozen backbone = frozen noise)
+         stroke_evaluate.py: cache-based eval + OOD eval (SHaRe on-the-fly inference)
+         SHAREE_EVENT_PATIENTS corrected to 5-digit record IDs from PhysioNet info.txt
+         (11 MI + 3 stroke + 3 syncope = 17 event patients)
+
+         Preliminary results:
+           CVES in-dist test: AUROC=0.5965, Sens=0.4364, Spec=0.8857
+           SHaRe OOD:         AUROC=0.4065, Sens=0.0000, Spec=1.0000
+
+         ROOT CAUSE: Stroke has no direct ECG signature like AF. The model was
+         trying to classify stroke vs. control from ECG/HRV — wrong task for
+         the grant. Phase 1 backbone learned nothing (MIMIC-3 ICU stroke vs.
+         control ECGs are nearly indistinguishable). Phase 2 froze this useless
+         backbone and tried to fine-tune a head on noise. OOD collapsed to
+         always predicting control.
+
+--- 3.2 Stroke Pipeline: PIVOT to Phase Detection (2026-03-19) ---
+
+DECISION: The grant's Aim 2 ML task is NOT "classify stroke vs. control."
+It is real-time physiological phase detection ON stroke patients:
+
+  1. Diastolic phase detection — from R-R intervals / ECG waveform
+  2. Exhalation phase detection — from thoracic impedance (future hardware)
+     → use ECG-Derived Respiration (EDR) as proxy until impedance data available
+  3. Autonomic state assessment — LF/HF, normalized HF, SampEn, DFA-α1
+  4. Adaptive stim parameter adjustment — amplitude, frequency, pulse width at 5Hz
+
+Go/no-go milestone: >85% classification accuracy for diastolic AND exhalation
+phase detection, with system latency <200ms.
+
+The stroke patients are the POPULATION (the system operates on them), not the
+CLASSIFICATION TARGET. Every ECG has cardiac cycles and respiratory modulation
+regardless of pathology — phase detection is feasible on any ECG dataset.
+
+What is reusable from stroke vs. control pipeline:
+  - ECG parsers (CVES, MIMIC-3, SHaRe) — data loading works
+  - HRV feature extraction (LF/HF, SampEn, DFA-α1) — already built
+  - CNN architecture — repurpose for short-window phase detection
+  - config_stroke.yaml — extend with phase detection settings
+  - Training loop framework — structure stays
+
+What must be built new:
+  - Ground truth label generation (diastole from R-peaks+T-end, exhalation from EDR)
+  - Phase detection model (1D CNN, 2s context → 5Hz frame output)
+  - New windowing (2s overlapping windows, not 10s/300s chunks)
+  - Multi-task training (diastole + exhalation BCE)
+  - Phase-specific evaluation (accuracy, not AUROC)
+  - Latency benchmark (<200ms)
+
+Next: Step S-13 — phase_labels.py (diastolic phase label generation from ECG)
