@@ -128,6 +128,22 @@ phase_training:
   patience: 15
   grad_clip: 1.0
 
+# Autonomic state module — 60s sliding-window HRV assessment
+autonomic_state:
+  window_sec: 60
+  features: [lf_hf_ratio, norm_hf_power, sampen, dfa_alpha1]
+  fs_resample: 4.0
+
+# Stim parameter recommender — rule-based initially
+stim_recommender:
+  amplitude_range: [0.0, 10.0]     # mA
+  frequency_range: [1.0, 100.0]    # Hz
+  pulse_width_range: [50, 500]     # µs
+  lf_hf_high: 2.0                  # >2.0 → sympathetic dominant → reduce stim
+  norm_hf_low: 0.3                 # <0.3 → poor vagal tone → increase stim
+  sampen_high: 2.0                 # >2.0 → high irregularity → reduce stim
+  dfa_normal_range: [0.5, 1.5]     # healthy range for DFA-α1
+
 # Stroke-specific settings
 stroke:
   conditions: [bifold, cardiac_gated, open_loop]

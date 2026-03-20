@@ -5,6 +5,44 @@ Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
 Last updated: 2026-03-20
 
 --------------------------------------------------------------------------------
+S-25. PRECOMPUTE PHASE LABELS — CVES + MIMIC-3 (2026-03-20)
+--------------------------------------------------------------------------------
+
+Launched stroke_precompute_cache.py as detached background process via PowerShell
+Start-Process. Job is running as of 2026-03-20.
+
+Data verified present:
+- CVES: data/raw/stroke avns/cves/ — 258 .hea files across 4 protocol subdirs
+  (head-up-tilt, sit-stand, sit-stand-balance, transcranial-doppler). Parser
+  finds 228 records (some subjects have multiple protocols).
+- MIMIC-3 stroke: data/raw/stroke avns/mimic3_stroke/ — 300 .hea files.
+- Total: 528 records to process.
+
+Cache output: models/artifacts/cache_phase_detect/
+  Will contain: train_ecg.npy, val_ecg.npy, test_ecg.npy (and diastole/exhalation/
+  quality arrays), plus phase_cache_meta.json.
+
+Log files:
+- stdout: precompute_phase.log (tqdm progress bar)
+- stderr: precompute_phase_err.log (INFO messages + neurokit2 warnings)
+
+Status at launch (10s in):
+- Loaded 228 CVES records — parsers working
+- Loaded 300 MIMIC-3 stroke records
+- Progress bar: 1% (5/528 records), ~13,677 windows so far
+- Rate: ~4.4 s/rec → estimated total ~38 min
+- Warnings: neurokit2 ChainedAssignmentError from pandas CoW in epochs_create.py
+  (third-party library internal issue — does not affect label correctness)
+
+Split: 70/15/15 subject split will be created at models/artifacts/phase_detect_split.json
+       if it doesn't exist yet.
+
+To check progress: Get-Content "C:\Users\Edgar\AF VNS\precompute_phase_err.log" -Tail 5
+To verify completion: ls models/artifacts/cache_phase_detect/
+
+Next step: When cache finishes, run S-26 (phase detector training).
+
+--------------------------------------------------------------------------------
 S-13. DIASTOLIC PHASE LABEL GENERATION (2026-03-20)
 --------------------------------------------------------------------------------
 

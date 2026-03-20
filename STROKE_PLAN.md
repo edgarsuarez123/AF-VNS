@@ -165,7 +165,7 @@ cycles and respiratory modulation regardless of pathology.
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | Pending | |
+| S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | **Running** | Started 2026-03-20 — logs: precompute_phase.log / precompute_phase_err.log |
 | S-26 | Train phase detector on CVES + MIMIC-3 combined | Pending | |
 | S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | Pending | |
 | S-28 | Evaluate on CVES test split — target: >85% accuracy both phases | Pending | |
@@ -208,7 +208,7 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-20/S-21 complete:**
+**Current state (2026-03-20) — S-25 precompute running:**
 - Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
@@ -221,5 +221,6 @@ cycles and respiratory modulation regardless of pathology.
 - **S-18/S-19 complete**: PhaseDetector CNN (7,570 params) + config section. Output (B,10,2).
 - **S-20/S-21 complete**: phase_train.py with multi-task BCE + NaN masking, per-task pos_weight,
   per-task accuracy metrics. 12 tests passing. 199 total tests, 0 regressions.
-- **Next: Step S-22**: autonomic_state.py — sliding-window HRV feature extractor
-  (or S-25: precompute phase labels on real data, then S-26: train)
+- **S-25 RUNNING**: precompute_phase_err.log — caching 528 records (228 CVES + 300 MIMIC-3).
+  At 5 recs/s, estimated ~38 min. Check: `Get-Content precompute_phase_err.log -Tail 5`
+- **Next after S-25 finishes**: S-26 (train phase detector), then S-22/S-23/S-24 (autonomic state)

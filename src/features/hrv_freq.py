@@ -22,7 +22,7 @@ def compute_hrv_freq(
     Returns NaNs if insufficient length.
     """
     rr = np.asarray(rr_intervals, dtype=np.float64).ravel()
-    out: Dict[str, float] = {"lf": np.nan, "hf": np.nan, "lf_hf_ratio": np.nan}
+    out: Dict[str, float] = {"lf": np.nan, "hf": np.nan, "lf_hf_ratio": np.nan, "norm_hf_power": np.nan}
     if len(rr) < MIN_SAMPLES:
         return out
 
@@ -43,4 +43,6 @@ def compute_hrv_freq(
     out["lf"] = float(lf_power)
     out["hf"] = float(hf_power)
     out["lf_hf_ratio"] = float(lf_power / hf_power) if hf_power > 0 else np.nan
+    total = lf_power + hf_power
+    out["norm_hf_power"] = float(hf_power / total) if total > 0 else np.nan
     return out
