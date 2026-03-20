@@ -1439,3 +1439,31 @@ Smoke test: output (4,10,2), 7570 params, backward pass OK, input validation wor
 Results: 187 passed, 1 skipped, 0 failed.
 
 Next: Step S-20 — phase_train.py (training loop with multi-task BCE + NaN masking)
+
+--------------------------------------------------------------------------------
+S-20/S-21. PHASE TRAIN + TESTS (2026-03-20)
+--------------------------------------------------------------------------------
+
+Added training loop for PhaseDetector CNN and 12 tests.
+
+S-20: Created src/training/phase_train.py:
+  - PhaseDetectorDataset: loads ecg (N,500), diastole/exhalation/quality (N,10)
+    from phase cache via mmap. Returns (1,500) ECG + (10,) labels per sample.
+  - compute_phase_pos_weights(): per-task pos_weight from non-NaN labels, clamped 10
+  - multitask_bce_loss(): NaN-masked BCE for diastole + exhalation, equal weight avg
+  - run_phase_validation(): per-task accuracy (threshold 0.5), NaN excluded
+  - main(): argparse, cache verification, DataLoaders, AdamW + ReduceLROnPlateau,
+    early stopping on avg_acc, checkpoint saves {state_dict, epoch, val_*_acc}
+  - Config additions: paths.phase_detect_checkpoint, phase_training: section
+    (lr=1e-3, batch_size=64, max_epochs=100, patience=15, grad_clip=1.0)
+
+S-21: Created tests/test_phase_train.py (12 tests):
+  - TestPhaseDetectorDataset: length, shapes, NaN preserved
+  - TestMultitaskBCELoss: NaN masking, all-NaN returns 0, backward pass
+  - TestPosWeight: per-task different weights, clamp at 10.0
+  - TestPhaseValidation: perfect accuracy with constant logits
+  - TestPhaseTrainSmoke: one epoch runs, checkpoint saved, checkpoint keys
+
+Results: 199 passed, 1 skipped, 0 failed.
+
+Next: Step S-25 — precompute phase labels on real CVES + MIMIC-3 data

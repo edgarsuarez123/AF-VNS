@@ -150,8 +150,8 @@ cycles and respiratory modulation regardless of pathology.
 |------|-------------|--------|--------------|
 | S-18 | `src/models/phase_detector.py` — PhaseDetector CNN: 3 Conv1d+BN+ReLU blocks (1→16→32→48, strides 5/2/2), AdaptiveAvgPool1d(10), 1×1 conv head → (B,10,2). ~7.5K params. | **Done** | 2026-03-20 |
 | S-19 | `config_stroke.yaml` — add `phase_model:` section (channels, kernels, strides, n_frames, n_tasks, dropout) | **Done** | 2026-03-20 |
-| S-20 | `src/training/phase_train.py` — training loop for phase detector (multi-task BCE loss with NaN masking, 5Hz frame-level labels) | Pending | |
-| S-21 | Tests for phase_detector.py + phase_train.py (12 tests: shapes, gradients, latency, config) | Pending | |
+| S-20 | `src/training/phase_train.py` — training loop for phase detector (multi-task BCE loss with NaN masking, 5Hz frame-level labels) + config additions (phase_training section, checkpoint path) | **Done** | 2026-03-20 |
+| S-21 | Tests for phase_train.py (12 tests: dataset, loss NaN masking, pos_weight, validation accuracy, smoke) | **Done** | 2026-03-20 |
 
 ### Autonomic State + Stim Recommender
 
@@ -208,7 +208,7 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-18/S-19 complete:**
+**Current state (2026-03-20) — S-20/S-21 complete:**
 - Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
@@ -218,6 +218,8 @@ cycles and respiratory modulation regardless of pathology.
 - **S-15 complete**: 45 tests (43 unit + 2 integration)
 - **S-16/S-17 complete**: Rewrote stroke_precompute_cache.py for phase detection (2s windows,
   5Hz labels), 12 tests passing. Config section `phase_precompute:` added.
-- **S-18/S-19 complete**: PhaseDetector CNN (7,570 params) + config section. Output (B,10,2),
-  187 tests passing, 0 regressions.
-- **Next: Step S-20**: phase_train.py — training loop with multi-task BCE + NaN masking
+- **S-18/S-19 complete**: PhaseDetector CNN (7,570 params) + config section. Output (B,10,2).
+- **S-20/S-21 complete**: phase_train.py with multi-task BCE + NaN masking, per-task pos_weight,
+  per-task accuracy metrics. 12 tests passing. 199 total tests, 0 regressions.
+- **Next: Step S-22**: autonomic_state.py — sliding-window HRV feature extractor
+  (or S-25: precompute phase labels on real data, then S-26: train)
