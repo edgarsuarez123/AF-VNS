@@ -46,6 +46,46 @@ Also: Renamed PLAN.md → AF_PLAN.md. STROKE_PLAN.md is now the sole plan file
 for the feature/stroke-avns branch. Updated CLAUDE.md with branch-plan convention.
 
 --------------------------------------------------------------------------------
+S-14. ECG-DERIVED RESPIRATION — EXHALATION LABELS (2026-03-20)
+--------------------------------------------------------------------------------
+
+Created src/features/edr.py — generates exhalation phase labels at 5Hz from
+ECG via ECG-Derived Respiration (EDR). No impedance hardware available, so
+EDR serves as respiratory proxy (80-90% accuracy ceiling vs real respirometry).
+
+Pipeline: nk.ecg_peaks → nk.signal_rate → nk.ecg_rsp (vangent2019 bandpass
+0.1-0.4 Hz) → nk.rsp_findpeaks → nk.rsp_phase → invert (exhale=1, inhale=0)
+→ majority-vote downsample to 5Hz frames.
+
+Functions implemented:
+- extract_edr(): wraps full neurokit2 pipeline, returns (edr_signal, peaks, troughs)
+- generate_exhalation_labels(): orchestrator with config, validation, resp rate check
+- Reuses get_rpeak_indices() from phase_labels.py (no code duplication)
+
+Config: Added edr section to config_stroke.yaml with method, resp rate bounds,
+min cycles, denoise flag.
+
+Smoke test results (60s synthetic ECG, 72bpm, 15 breaths/min target):
+- Output shape: (300,) — correct (60s * 5Hz)
+- Respiratory cycles: 12
+- Estimated resp rate: 13.5 bpm (reasonable — EDR slightly underestimates)
+- Exhale fraction: 0.429 (physiologically plausible — exhale ~40-55%)
+- Mean quality: 0.847 (82% of samples have known phase)
+- NaN frames: 46/300 (edges before first/after last respiratory cycle)
+- Short signal (5s): correctly returns all-NaN
+
+What worked: Full neurokit2 EDR pipeline functions correctly on synthetic data.
+Respiratory rate detection reasonable. Quality metric properly reflects NaN regions.
+
+What to watch: EDR is inherently noisier than diastolic phase detection (R-peaks
+are sharp, respiratory modulation is subtle). Real clinical ECG will have lower
+quality scores. Resp rate estimation may be off on ICU data (MIMIC-3) where
+patients are on ventilators. Will assess during precompute (S-25).
+
+Existing tests: 136 passed, 1 skipped, 1 flaky failure (test_stroke_train
+passes when run individually — unrelated to S-14).
+
+--------------------------------------------------------------------------------
 1. PROJECT GOAL & CONTEXT
 --------------------------------------------------------------------------------
 

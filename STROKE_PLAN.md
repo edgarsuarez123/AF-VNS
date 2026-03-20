@@ -105,18 +105,18 @@ cycles and respiratory modulation regardless of pathology.
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
 | S-13 | `src/features/phase_labels.py` — generate diastolic phase labels from ECG (R-peak + T-end detection → per-frame labels at 5Hz) | **Done** | 2026-03-20 |
-| S-14 | `src/features/edr.py` — ECG-Derived Respiration: extract respiratory signal, detect inhale/exhale phases, generate per-frame labels at 5Hz | **In Progress** | |
+| S-14 | `src/features/edr.py` — ECG-Derived Respiration: extract respiratory signal, detect inhale/exhale phases, generate per-frame labels at 5Hz | **Done** | 2026-03-20 |
 
 #### S-14 Sub-steps
 
 | # | Action | Status |
 |---|--------|--------|
-| 14a | Add `edr:` config section to `config_stroke.yaml` | Pending |
-| 14b | Implement `extract_edr()` — nk.ecg_rsp + rsp_findpeaks | Pending |
-| 14c | Implement `generate_exhalation_labels()` — orchestrator with validation | Pending |
-| 14d | Run existing tests — confirm no regressions | Pending |
-| 14e | Smoke test — 60s synthetic ECG → verify shape and exhale fraction | Pending |
-| 14f | Git commit + update progress.txt | Pending |
+| 14a | Add `edr:` config section to `config_stroke.yaml` | Done |
+| 14b | Implement `extract_edr()` — nk.ecg_rsp + rsp_findpeaks | Done |
+| 14c | Implement `generate_exhalation_labels()` — orchestrator | Done |
+| 14d | Run existing tests — 136 pass, 1 flaky (unrelated) | Done |
+| 14e | Smoke test — 300 frames, 12 cycles, 13.5 bpm, 42.9% exhale | Done |
+| 14f | Git commit + update progress.txt | Done |
 | S-15 | Tests for phase_labels.py + edr.py (synthetic + real CVES records) | Pending | |
 | S-16 | `src/training/phase_precompute.py` — precompute phase labels + ECG windows for all datasets; write cache with 2s windows and 5Hz frame labels | Pending | |
 | S-17 | Tests for phase_precompute.py | Pending | |
@@ -204,5 +204,6 @@ cycles and respiratory modulation regardless of pathology.
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
 - HRV feature pipeline already computes LF/HF, SampEn, DFA-α1
-- **S-13 complete**: phase_labels.py — 62.3% diastole on synthetic, 0% fallback, 136 tests pass
-- **Next: Step S-14**: edr.py — ECG-Derived Respiration for exhalation labels
+- **S-13 complete**: phase_labels.py — 62.3% diastole on synthetic, 0% fallback
+- **S-14 complete**: edr.py — 42.9% exhale fraction, 12 resp cycles on synthetic
+- **Next: Step S-15**: Tests for phase_labels.py + edr.py
