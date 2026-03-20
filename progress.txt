@@ -1413,3 +1413,29 @@ Cache output per split: {split}_ecg.npy (N,500), {split}_diastole.npy (N,10),
 Results: 186 passed, 1 skipped, 0 failed (1 flaky stroke_train test passes in isolation).
 
 Next: Step S-18 — phase_detector.py (lightweight 1D CNN model)
+
+--------------------------------------------------------------------------------
+S-18/S-19. PHASE DETECTOR CNN + CONFIG (2026-03-20)
+--------------------------------------------------------------------------------
+
+Added PhaseDetector CNN model and phase_model config section.
+
+S-19: Added phase_model: section to config_stroke.yaml with channels, kernels,
+strides, dropout, n_frames, n_tasks.
+
+S-18: Created src/models/phase_detector.py:
+  - PhaseDetectorConfig (frozen dataclass): channels=(16,32,48), kernels=(7,5,3),
+    strides=(5,2,2), dropout=0.1, n_frames=10, n_tasks=2, input_samples=500
+  - PhaseDetector(nn.Module): 3 Conv1d+BN+ReLU blocks (no padding, bias=False),
+    AdaptiveAvgPool1d(10), Dropout, 1x1 Conv1d head
+  - Dimension flow: (B,1,500) → backbone → (B,48,23) → pool → (B,48,10) →
+    head → (B,2,10) → permute → (B,10,2)
+  - forward() validates ndim=3, channels=1, samples=500
+  - param_count() → 7,570 total parameters
+  - build_phase_detector(config_path, checkpoint_path, device) factory function
+    reuses load_config from build_model.py
+
+Smoke test: output (4,10,2), 7570 params, backward pass OK, input validation works.
+Results: 187 passed, 1 skipped, 0 failed.
+
+Next: Step S-20 — phase_train.py (training loop with multi-task BCE + NaN masking)

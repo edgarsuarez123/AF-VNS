@@ -66,6 +66,15 @@ ECG (250Hz) ─────┬── Phase Detector CNN ──── diastole lo
 Outputs diastole + exhalation probability at every 200ms frame (5Hz update rate).
 Must run in <200ms including feature extraction.
 
+Architecture (PhaseDetector, ~7.5K params):
+```
+(B,1,500) → Conv1d(1→16,k=7,s=5)+BN+ReLU → (B,16,100)
+          → Conv1d(16→32,k=5,s=2)+BN+ReLU → (B,32,50)
+          → Conv1d(32→48,k=3,s=2)+BN+ReLU → (B,48,25)
+          → AdaptiveAvgPool1d(10)          → (B,48,10)
+          → Dropout(0.1) → Conv1d(48→2,k=1) → permute → (B,10,2)
+```
+
 **Autonomic State Module:** Sliding-window HRV features (existing pipeline).
 Updates every 60s. Feeds the stim parameter recommender (control algorithm, not ML).
 
@@ -139,10 +148,10 @@ cycles and respiratory modulation regardless of pathology.
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| S-18 | `src/models/phase_detector.py` — lightweight 1D CNN: 2s ECG input (500 samples) → 2 logits (diastole, exhalation) per 200ms frame | Pending | |
-| S-19 | `config_stroke.yaml` — add phase detection model section (window_sec, stride, model dims) | Pending | |
-| S-20 | `src/training/phase_train.py` — training loop for phase detector (multi-task BCE loss, 5Hz frame-level labels) | Pending | |
-| S-21 | Tests for phase_detector.py + phase_train.py | Pending | |
+| S-18 | `src/models/phase_detector.py` — PhaseDetector CNN: 3 Conv1d+BN+ReLU blocks (1→16→32→48, strides 5/2/2), AdaptiveAvgPool1d(10), 1×1 conv head → (B,10,2). ~7.5K params. | **Done** | 2026-03-20 |
+| S-19 | `config_stroke.yaml` — add `phase_model:` section (channels, kernels, strides, n_frames, n_tasks, dropout) | **Done** | 2026-03-20 |
+| S-20 | `src/training/phase_train.py` — training loop for phase detector (multi-task BCE loss with NaN masking, 5Hz frame-level labels) | Pending | |
+| S-21 | Tests for phase_detector.py + phase_train.py (12 tests: shapes, gradients, latency, config) | Pending | |
 
 ### Autonomic State + Stim Recommender
 
@@ -199,7 +208,7 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-16/S-17 complete:**
+**Current state (2026-03-20) — S-18/S-19 complete:**
 - Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
@@ -209,4 +218,6 @@ cycles and respiratory modulation regardless of pathology.
 - **S-15 complete**: 45 tests (43 unit + 2 integration)
 - **S-16/S-17 complete**: Rewrote stroke_precompute_cache.py for phase detection (2s windows,
   5Hz labels), 12 tests passing. Config section `phase_precompute:` added.
-- **Next: Step S-18**: phase_detector.py — lightweight 1D CNN model
+- **S-18/S-19 complete**: PhaseDetector CNN (7,570 params) + config section. Output (B,10,2),
+  187 tests passing, 0 regressions.
+- **Next: Step S-20**: phase_train.py — training loop with multi-task BCE + NaN masking
