@@ -110,6 +110,15 @@ phase_precompute:
   ood_cache_dir: models/artifacts/cache_phase_detect_ood
   split_path: models/artifacts/phase_detect_split.json
 
+# Phase detection CNN model (PhaseDetector, ~7.5K params)
+phase_model:
+  channels: [16, 32, 48]
+  kernels: [7, 5, 3]
+  strides: [5, 2, 2]
+  dropout: 0.1
+  n_frames: 10                     # 2s × 5Hz
+  n_tasks: 2                       # diastole + exhalation
+
 # Stroke-specific settings
 stroke:
   conditions: [bifold, cardiac_gated, open_loop]
