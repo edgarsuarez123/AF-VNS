@@ -15,6 +15,7 @@ paths:
   phase2_scaler: models/artifacts/stroke_phase2_scaler.pkl
   phase1_checkpoint: models/checkpoints/stroke_phase1_model.pth
   phase2_checkpoint: models/checkpoints/stroke_phase2_model.pth
+  phase_detect_checkpoint: models/checkpoints/phase_detector.pth
 
 data:
   raw_dir: data/raw/stroke avns
@@ -118,6 +119,14 @@ phase_model:
   dropout: 0.1
   n_frames: 10                     # 2s × 5Hz
   n_tasks: 2                       # diastole + exhalation
+
+# Phase detector training hyperparameters
+phase_training:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
 
 # Stroke-specific settings
 stroke:
