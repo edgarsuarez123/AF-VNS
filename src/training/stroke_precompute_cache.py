@@ -46,11 +46,14 @@ MAX_SHORT_LEN_CAP = 3600  # 12s at 300 Hz — same cap as AF pipeline
 N_FEATURES = 7
 CHUNK_SIZE = 8
 
-# SHAREE: 17 event-patient record names from SHAREE paper Table 1.
-# Verify against actual filenames in data/raw/stroke avns/shareedb/ — adjust if needed.
+# SHAREE: 17 event-patient record IDs from PhysioNet shareedb/info.txt (vascular event column).
+# 11 myocardial infarction, 3 stroke, 3 syncope — all treated as event=1 for OOD evaluation.
+# Source: https://physionet.org/physiobank/database/shareedb/info.txt
 SHAREE_EVENT_PATIENTS = {
-    "01", "08", "10", "19", "23", "30", "33", "38", "47", "52",
-    "61", "65", "75", "82", "93", "105", "117",
+    "02033", "02059", "02108", "02121", "02148", "02184", "02185",
+    "02289", "02304", "02373", "02412",  # MI
+    "02119", "02294", "02348",           # stroke
+    "02218", "02339", "02403",           # syncope
 }
 
 
