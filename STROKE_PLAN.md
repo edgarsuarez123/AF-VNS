@@ -157,9 +157,9 @@ cycles and respiratory modulation regardless of pathology.
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| S-22 | `src/models/autonomic_state.py` — sliding-window HRV feature extractor producing autonomic state vector (LF/HF, nHF, SampEn, DFA-α1) | Pending | |
-| S-23 | `src/models/stim_recommender.py` — maps autonomic state → stim params (amplitude, frequency, pulse_width); rule-based initially, ML later | Pending | |
-| S-24 | Tests for autonomic_state.py + stim_recommender.py | Pending | |
+| S-22 | `src/models/autonomic_state.py` — sliding-window HRV feature extractor producing autonomic state vector (LF/HF, nHF, SampEn, DFA-α1) | **Done** | 2026-03-20 |
+| S-23 | `src/models/stim_recommender.py` — maps autonomic state → stim params (amplitude, frequency, pulse_width); rule-based initially, ML later | **Done** | 2026-03-20 |
+| S-24 | Tests for autonomic_state.py + stim_recommender.py (16 tests: nHF, compute, NaN, rules, clipping, factories) | **Done** | 2026-03-20 |
 
 ### Training, Evaluation & Latency
 
@@ -208,7 +208,7 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-25 precompute running:**
+**Current state (2026-03-20) — S-22/S-23/S-24 complete, S-25 running:**
 - Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
   results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
 - ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
@@ -221,6 +221,8 @@ cycles and respiratory modulation regardless of pathology.
 - **S-18/S-19 complete**: PhaseDetector CNN (7,570 params) + config section. Output (B,10,2).
 - **S-20/S-21 complete**: phase_train.py with multi-task BCE + NaN masking, per-task pos_weight,
   per-task accuracy metrics. 12 tests passing. 199 total tests, 0 regressions.
+- **S-22/S-23/S-24 complete**: AutonomicState (4-feature HRV extractor) + StimRecommender
+  (rule-based, NaN-safe). Added norm_hf_power to hrv_freq.py. 16 tests, 215 total passing.
 - **S-25 RUNNING**: precompute_phase_err.log — caching 528 records (228 CVES + 300 MIMIC-3).
-  At 5 recs/s, estimated ~38 min. Check: `Get-Content precompute_phase_err.log -Tail 5`
-- **Next after S-25 finishes**: S-26 (train phase detector), then S-22/S-23/S-24 (autonomic state)
+  Check: `Get-Content precompute_phase_err.log -Tail 5`
+- **Next**: S-26 (train phase detector on real data) once S-25 finishes, then S-27–S-31

@@ -1505,3 +1505,41 @@ S-21: Created tests/test_phase_train.py (12 tests):
 Results: 199 passed, 1 skipped, 0 failed.
 
 Next: Step S-25 — precompute phase labels on real CVES + MIMIC-3 data
+
+--------------------------------------------------------------------------------
+S-22/S-23/S-24. AUTONOMIC STATE + STIM RECOMMENDER + TESTS (2026-03-20)
+--------------------------------------------------------------------------------
+
+Added autonomic state module, stim parameter recommender, and tests.
+
+hrv_freq.py: Added norm_hf_power = HF/(LF+HF) to compute_hrv_freq() return dict.
+
+S-22: Created src/models/autonomic_state.py:
+  - AutonomicStateConfig (frozen dataclass): window_sec=60, 4 features, fs_resample=4.0
+  - AutonomicState: wraps compute_hrv_freq() + compute_hrv_nonlinear()
+    - compute(rr_intervals) → {lf_hf_ratio, norm_hf_power, sampen, dfa_alpha1}
+    - compute_from_ecg(ecg, fs) → same (with denoising + peak detection)
+    - as_vector(state) → (4,) float32 array
+  - build_autonomic_state(config_path) factory
+
+S-23: Created src/models/stim_recommender.py:
+  - StimConfig (frozen dataclass): hardware limits + rule thresholds
+  - StimRecommender: rule-based mapping autonomic state → stim params
+    - Base: 5mA, 25Hz, 250µs (midpoint)
+    - High LF/HF → reduce amplitude (sympathetic caution)
+    - Low nHF → increase frequency (boost vagal stimulation)
+    - High SampEn → reduce amplitude + widen pulse (chaotic safety)
+    - DFA-α1 outside [0.5, 1.5] → reduce amplitude
+    - All NaN → conservative defaults (1mA, 10Hz, 50µs)
+  - build_stim_recommender(config_path) factory
+
+S-24: 16 tests (8 autonomic_state + 8 stim_recommender):
+  - norm_hf_power: added, range [0,1], NaN for short RR
+  - AutonomicState: compute from RR, ECG, as_vector shape, NaN handling, factory
+  - StimRecommender: output keys, clipping, rules behavior, NaN safety, extremes, factory
+
+Config: Added autonomic_state: and stim_recommender: sections to config_stroke.yaml.
+
+Results: 215 passed, 1 skipped, 0 failed.
+
+Next: S-26 (train phase detector) once S-25 cache finishes, then S-27–S-31
