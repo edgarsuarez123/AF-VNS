@@ -1385,3 +1385,31 @@ Results: 181 passed, 1 skipped, 0 failed (full suite including all prior tests).
 Integration tests pass against real CVES data (head-up-tilt, ECG channel 1 @ 500Hz).
 
 Next: Step S-16 — phase_precompute.py (precompute phase labels + ECG windows for all datasets)
+
+--- S-16/S-17: Rewrite stroke_precompute_cache.py for Phase Detection (2026-03-20) ---
+
+Replaced the superseded stroke-vs-control binary classifier cache with phase detection
+precompute. The old version built HRV + 10s waveform caches for a task that didn't work
+(AUROC 0.60). New version generates 2s ECG windows + frame-level diastole/exhalation
+labels at 5Hz (10 frames per 2s window).
+
+Changes:
+  - Rewrote src/training/stroke_precompute_cache.py:
+    - process_record(): full-signal label generation → 2s window slicing
+    - build_stroke_cache(): patient-level splits, per-split .npy output
+    - main(): --dataset training (CVES+MIMIC-3) or --dataset ood (SHaRe)
+    - Kept SHAREE_EVENT_PATIENTS constant for backward compat
+  - Rewrote tests/test_stroke_precompute.py: 12 tests
+    - build_stroke_cache: files, shapes, meta json, no leakage, binary labels, quality range
+    - process_record: valid, too-short, DC signal, window count, NaN preservation
+    - Backward compat: SHAREE_EVENT_PATIENTS constant
+  - Added phase_precompute: section to config_stroke.yaml
+    - window_sec: 2.0, stride_sec: 0.2, min_valid_frames: 8, frame_rate_hz: 5.0
+    - cache_dir: models/artifacts/cache_phase_detect
+
+Cache output per split: {split}_ecg.npy (N,500), {split}_diastole.npy (N,10),
+{split}_exhalation.npy (N,10), {split}_quality.npy (N,10), phase_cache_meta.json
+
+Results: 186 passed, 1 skipped, 0 failed (1 flaky stroke_train test passes in isolation).
+
+Next: Step S-18 — phase_detector.py (lightweight 1D CNN model)

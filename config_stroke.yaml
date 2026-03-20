@@ -100,6 +100,16 @@ edr:
   min_resp_cycles: 2             # Need at least 2 full respiratory cycles
   denoise_before_edr: true       # CWT denoise before R-peak detection
 
+# Phase detection precompute (2s windows, 5Hz frame labels)
+phase_precompute:
+  window_sec: 2.0                    # CNN input window (500 samples @ 250Hz)
+  stride_sec: 0.2                    # 1-frame stride for dense overlap
+  min_valid_frames: 8                # skip windows with <8/10 non-NaN frames
+  frame_rate_hz: 5.0                 # must match phase_detection.frame_rate_hz
+  cache_dir: models/artifacts/cache_phase_detect
+  ood_cache_dir: models/artifacts/cache_phase_detect_ood
+  split_path: models/artifacts/phase_detect_split.json
+
 # Stroke-specific settings
 stroke:
   conditions: [bifold, cardiac_gated, open_loop]
