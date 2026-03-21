@@ -166,8 +166,8 @@ cycles and respiratory modulation regardless of pathology.
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
 | S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | **Running** | Started 2026-03-20 — logs: precompute_phase.log / precompute_phase_err.log |
-| S-26 | Train phase detector on CVES + MIMIC-3 combined | Pending | |
-| S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | Pending | |
+| S-26 | Train phase detector on CVES + MIMIC-3 combined | **Running** | Started 2026-03-20, Epoch 12/100 |
+| S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | **Done** | 2026-03-20 |
 | S-28 | Evaluate on CVES test split — target: >85% accuracy both phases | Pending | |
 | S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
@@ -208,25 +208,17 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-20) — S-22/S-23/S-24 complete, S-25 running:**
-- Stroke vs. control pipeline built (Steps S-2 through S-12) but produces near-random
-  results (AUROC=0.60 in-dist, 0.41 OOD). Wrong task for the grant.
-- ECG data downloaded and parsers working: CVES (228 records), MIMIC-3 (300), SHaRe (133)
-- HRV feature pipeline already computes LF/HF, SampEn, DFA-α1
-- **S-13 complete**: phase_labels.py — 62.3% diastole on synthetic, 0% fallback
-- **S-14 complete**: edr.py — 42.9% exhale fraction, 12 resp cycles on synthetic
-- **S-15 complete**: 45 tests (43 unit + 2 integration)
-- **S-16/S-17 complete**: Rewrote stroke_precompute_cache.py for phase detection (2s windows,
-  5Hz labels), 12 tests passing. Config section `phase_precompute:` added.
-- **S-18/S-19 complete**: PhaseDetector CNN (7,570 params) + config section. Output (B,10,2).
-- **S-20/S-21 complete**: phase_train.py with multi-task BCE + NaN masking, per-task pos_weight,
-  per-task accuracy metrics. 12 tests passing. 199 total tests, 0 regressions.
-- **S-22/S-23/S-24 complete**: AutonomicState (4-feature HRV extractor) + StimRecommender
-  (rule-based, NaN-safe). Added norm_hf_power to hrv_freq.py. 16 tests, 215 total passing.
+**Current state (2026-03-20 20:55) — S-26 restarted (crashed at Epoch 40):**
 - **S-25 DONE**: Cache precompute complete — 480 records → 2,576,904 windows
   - Train: 1,819,893 | Val: 395,566 | Test: 361,445
   - 48 records skipped (insufficient phase labels)
-- **S-26 RUNNING**: phase_train.py training on cached data
-  - Epoch 9/100 complete, training in progress (~2 min/epoch, ~3h ETA)
-  - GPU active (6GB usage), checkpoint being saved to models/checkpoints/phase_detector.pth
-- **Next**: Monitor S-26 completion, then S-27 (phase_evaluate.py)
+- **S-26 RUNNING**: phase_train.py training (crashed at Epoch 40, restarting from Epoch 25)
+  - Checkpoint Epoch 25 metrics: diastole 85.42%, exhalation 51.83%, avg 68.62%
+  - Exhalation accuracy needs improvement (target >85%)
+  - Restarted 20:55 UTC (PID 1938)
+  - Logs: phase_train.log / phase_train_err.log
+- **S-27 DONE**: phase_evaluate.py created with 8 tests
+  - Computes per-frame accuracy, precision, recall, F1 for diastole + exhalation
+  - Handles NaN-masked frames, generates confusion matrices
+  - Ready to run once S-26 completes
+- **Next**: Monitor S-26, then run S-27 evaluation script on test split, then S-28 (in-dist), S-29 (OOD), S-30 (latency), S-31 (integration)
