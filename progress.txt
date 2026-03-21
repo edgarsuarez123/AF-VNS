@@ -1551,3 +1551,14 @@ S-28 (2026-03-21): Diagnostic evaluation complete
   - Diagnosis: exhalation broken on BOTH sources -> 2s window too short (respiratory cycle 3-5s)
   - Fix: building 5s window CVES cache (6 workers) -> will retrain phase_detector_5s.pth
   - Code: fixed 3 bugs in phase_evaluate.py, added --dataset cves/mimic, --model-section, --config-section
+
+S-28 FINAL (2026-03-21): 5s window training complete — exhalation still broken
+  - 5s model: diastole 79.86%, exhalation 53.90% (worse overall than 2s)
+  - ROOT CAUSE: EDR method (RSA/vangent2019) is unreliable during autonomic stress tests
+    - CVES subjects do sit-stand + tilt protocols -> RSA disappears under stress
+    - Stroke patients may have impaired autonomic control -> weak RSA
+    - Window length was not the problem
+  - RECOMMENDATION: Try QRS amplitude modulation EDR (mechanical, not neural)
+    - Not affected by autonomic state, works during stress tests
+    - Or: accept limitation, document that exhalation needs impedance hardware (Phase 2)
+  - Diastole is solid at 83-85% -> meets NFR-1.1 for cardiac phase

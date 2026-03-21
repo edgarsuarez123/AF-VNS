@@ -168,10 +168,20 @@ cycles and respiratory modulation regardless of pathology.
 | S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | **Done** | 2026-03-20 |
 | S-26 | Train phase detector on CVES + MIMIC-3 combined | **Done** | 2026-03-20 — early stop Epoch 50, best avg_acc=68.64% |
 | S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | **Done** | 2026-03-20 |
-| S-28 | Evaluate + diagnose exhalation bottleneck | **Running** | 2026-03-21 — see sub-steps below |
-| S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
+| S-28 | Evaluate + diagnose exhalation bottleneck | **Done** | 2026-03-21 — see sub-steps below |
+| S-29 | OOD evaluation on SHaRe — report generalization | Pending | Blocked until exhalation is fixed |
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
+
+### Exhalation Fix — Reference Signal Track
+
+| Step | Description | Status |
+|------|-------------|--------|
+| S-32 | Extract `thermst`/`flow_rate`/`resp` channel from CVES in `parse_cerevasc_dir()` — return alongside ECG signal | Pending |
+| S-33 | `src/features/resp_labels.py` — generate exhalation labels from reference respiratory signal (peak detection on thermistor/flow_rate) instead of EDR | Pending |
+| S-34 | Update `stroke_precompute_cache.py` — use reference resp signal for exhalation labels when available (CVES), fall back to EDR for MIMIC-3/SHaRe | Pending |
+| S-35 | Rebuild CVES cache with reference labels, retrain phase detector | Pending |
+| S-36 | Evaluate — exhalation accuracy is now a real number (model vs. measured breathing) | Pending |
 
 ### Previous Steps (Stroke vs. Control — completed but superseded)
 
@@ -217,18 +227,20 @@ cycles and respiratory modulation regardless of pathology.
 | 28e | Evaluate combined test split: diastole 83.58%, exhalation 51.98% | Done |
 | 28f | Build CVES-only + MIMIC-only caches | Running |
 | 28g | Per-source evaluation (CVES vs MIMIC exhalation accuracy) | Pending |
-| 28h | CVES-only retrain (if diagnosis confirms MIMIC noise) | Pending |
-| 28i | Longer 5s window (if CVES-only retrain insufficient) | Pending |
+| 28h | CVES-only retrain (if diagnosis confirms MIMIC noise) | Skipped — both sources broken |
+| 28i | Build 5s CVES cache (6 workers) + launch 5s retrain | Done — diastole 79.86%, exhalation 53.90% |
+| 28j | Root cause confirmed: EDR (RSA method) fails during autonomic stress tests | Done |
+| 28k | Found CVES has thermistor + flow_rate + resp reference channels — currently discarded by parser | Done |
 
 ---
 
 ## Resume From Here
 
-**Current state (2026-03-21 11:05) — S-28 diagnostic in progress:**
-- **S-26 DONE**: Training finished — early stop Epoch 50, best avg_acc=68.64%
-  - Diastole: 85.42% (val), 83.58% (test)
-  - Exhalation: 51.83% (val), 51.98% (test) — **near random chance**
-- **S-28 IN PROGRESS**: Fixed evaluation bugs, added per-source CLI
-  - Building CVES-only and MIMIC-only caches (background)
-  - Next: run per-source eval to confirm MIMIC noise hypothesis
-  - Then: CVES-only retrain → if insufficient, try 5s window
+**Current state (2026-03-21) — S-28 complete, S-32 next:**
+- **S-26/S-28 DONE**: Exhalation root cause identified
+  - 2s model: diastole 83.58%, exhalation 51.98% (random chance)
+  - 5s model: diastole 79.86%, exhalation 53.90% (window length not the issue)
+  - Per-source: CVES exhalation 54%, MIMIC exhalation 52% — both broken
+  - **Root cause: EDR (RSA method) fails during autonomic stress tests. CVES sit-stand/tilt protocols suppress RSA → labels are noise → evaluation is circular (no ground truth)**
+- **DISCOVERY**: CVES `.dat` files contain `thermst`, `flow_rate`, `resp` channels — real measured breathing signals — currently discarded by parser
+- **Next (S-32)**: Modify `parse_cerevasc_dir()` to extract respiratory reference channel alongside ECG, then build new labels + retrain
