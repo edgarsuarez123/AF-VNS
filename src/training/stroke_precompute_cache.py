@@ -428,8 +428,26 @@ def main(
         sharee_records = parse_sharee_dir(sharee_dir, label_map, config_path)
         logger.info("Loaded %d SHaRe records", len(sharee_records))
         records.extend(sharee_records)
+    elif dataset == "cves":
+        cache_dir = Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect")).parent / "cache_phase_detect_cves"
+        split_path = str(cache_dir / "phase_detect_cves_split.json")
+
+        cves_dir = data_cfg.get("cves_subdir", "data/raw/stroke avns/cves")
+        cves_records = parse_cerevasc_dir(cves_dir, config_path)
+        logger.info("Loaded %d CVES records", len(cves_records))
+        records.extend(cves_records)
+
+    elif dataset == "mimic":
+        cache_dir = Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect")).parent / "cache_phase_detect_mimic"
+        split_path = str(cache_dir / "phase_detect_mimic_split.json")
+
+        mimic_dir = data_cfg.get("mimic3_stroke_subdir", "data/raw/stroke avns/mimic3_stroke")
+        mimic_records = parse_mimic3_stroke_dir(mimic_dir, config_path)
+        logger.info("Loaded %d MIMIC-3 stroke records", len(mimic_records))
+        records.extend(mimic_records)
+
     else:
-        raise ValueError(f"Unknown dataset: {dataset!r}. Use 'training' or 'ood'.")
+        raise ValueError(f"Unknown dataset: {dataset!r}. Use 'training', 'ood', 'cves', or 'mimic'.")
 
     if not records:
         logger.error("No records loaded for dataset=%s. Check data paths.", dataset)
@@ -459,7 +477,7 @@ if __name__ == "__main__":
     p.add_argument("--config", default=CONFIG_PATH, help="Path to config_stroke.yaml")
     p.add_argument("--workers", type=int, default=1,
                    help="Worker processes (0 = all cores). Default 1 = single-threaded.")
-    p.add_argument("--dataset", choices=["training", "ood"], default="training",
-                   help="training=CVES+MIMIC-3, ood=SHaRe only")
+    p.add_argument("--dataset", choices=["training", "ood", "cves", "mimic"], default="training",
+                   help="training=CVES+MIMIC-3, ood=SHaRe, cves=CVES only, mimic=MIMIC-3 only")
     args = p.parse_args()
     main(config_path=args.config, workers=args.workers, dataset=args.dataset)

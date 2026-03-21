@@ -167,6 +167,8 @@ def main():
     parser.add_argument("--config", default=CONFIG_PATH, help="Config YAML path")
     parser.add_argument("--max-epochs", type=int, default=None, help="Override max epochs")
     parser.add_argument("--checkpoint", default=None, help="Resume from checkpoint")
+    parser.add_argument("--cache-dir", default=None, help="Override cache directory from config")
+    parser.add_argument("--checkpoint-out", default=None, help="Override checkpoint output path")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -174,8 +176,8 @@ def main():
     precompute_cfg = config.get("phase_precompute", {})
     train_cfg = config.get("phase_training", {})
 
-    cache_dir = Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect"))
-    checkpoint_path = paths_cfg.get("phase_detect_checkpoint", "models/checkpoints/phase_detector.pth")
+    cache_dir = Path(args.cache_dir) if args.cache_dir else Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect"))
+    checkpoint_path = args.checkpoint_out or paths_cfg.get("phase_detect_checkpoint", "models/checkpoints/phase_detector.pth")
     lr = float(train_cfg.get("learning_rate", 1e-3))
     batch_size = int(train_cfg.get("batch_size", 64))
     max_epochs = args.max_epochs if args.max_epochs is not None else int(train_cfg.get("max_epochs", 100))

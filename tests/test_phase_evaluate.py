@@ -23,22 +23,22 @@ def _make_fake_cache(tmp_dir: Path, split: str = "test", n_windows: int = 100):
 
     # ECG: (n_windows, 1, 500)
     ecg = np.random.randn(n_windows, 1, 500).astype(np.float32)
-    np.save(cache_dir / f"ecg_{split}.npy", ecg)
+    np.save(cache_dir / f"{split}_ecg.npy", ecg)
 
     # Labels: (n_windows, 10) — frame-level diastole/exhalation
     # Insert some NaN for realistic scenario
     diastole = np.random.choice([0, 1], size=(n_windows, 10)).astype(np.float32)
     diastole[0:5, :] = np.nan  # Some windows have no labels
-    np.save(cache_dir / f"diastole_{split}.npy", diastole)
+    np.save(cache_dir / f"{split}_diastole.npy", diastole)
 
     exhalation = np.random.choice([0, 1], size=(n_windows, 10)).astype(np.float32)
     exhalation[5:10, :] = np.nan
-    np.save(cache_dir / f"exhalation_{split}.npy", exhalation)
+    np.save(cache_dir / f"{split}_exhalation.npy", exhalation)
 
     # Quality mask
     quality = np.ones((n_windows, 10), dtype=bool)
     quality[0:5, :] = False
-    np.save(cache_dir / f"quality_{split}.npy", quality)
+    np.save(cache_dir / f"{split}_quality.npy", quality)
 
     return cache_dir
 

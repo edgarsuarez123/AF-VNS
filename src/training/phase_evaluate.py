@@ -35,10 +35,10 @@ def _load_phase_cache(cache_dir: Path, split: str) -> tuple:
     Returns:
         (ecg_np, diastole_np, exhalation_np, quality_np) where each is (N, *) or (N, 10) for frames.
     """
-    ecg_file = cache_dir / f"ecg_{split}.npy"
-    diastole_file = cache_dir / f"diastole_{split}.npy"
-    exhalation_file = cache_dir / f"exhalation_{split}.npy"
-    quality_file = cache_dir / f"quality_{split}.npy"
+    ecg_file = cache_dir / f"{split}_ecg.npy"
+    diastole_file = cache_dir / f"{split}_diastole.npy"
+    exhalation_file = cache_dir / f"{split}_exhalation.npy"
+    quality_file = cache_dir / f"{split}_quality.npy"
 
     if not ecg_file.exists():
         raise FileNotFoundError(f"ECG cache not found: {ecg_file}")
@@ -148,29 +148,14 @@ def evaluate_phase_detector(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    # Load model
-    from src.models.phase_detector import PhaseDetector, PhaseDetectorConfig
-    from src.training.build_model import load_config as _load_config
+    # Load model (build_phase_detector handles config mapping + checkpoint unwrapping)
+    from src.models.phase_detector import build_phase_detector
 
-    cfg = _load_config(config_path)
-    phase_model_cfg = cfg.get("phase_model", {})
-    model_cfg = PhaseDetectorConfig(
-        n_channels_in=int(phase_model_cfg.get("n_channels_in", 1)),
-        conv_channels=tuple(phase_model_cfg.get("conv_channels", [16, 32, 48])),
-        conv_kernels=tuple(phase_model_cfg.get("conv_kernels", [7, 5, 3])),
-        conv_strides=tuple(phase_model_cfg.get("conv_strides", [5, 2, 2])),
-        n_frames=int(phase_model_cfg.get("n_frames", 10)),
-        n_tasks=int(phase_model_cfg.get("n_tasks", 2)),
-        dropout=float(phase_model_cfg.get("dropout", 0.1)),
+    model = build_phase_detector(
+        config_path=config_path,
+        checkpoint_path=checkpoint_path,
+        device=str(device),
     )
-    model = PhaseDetector(model_cfg).to(device)
-
-    if Path(checkpoint_path).exists():
-        ckpt = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(ckpt)
-        logger.info(f"Loaded checkpoint from {checkpoint_path}")
-    else:
-        logger.warning(f"Checkpoint not found: {checkpoint_path}")
 
     model.eval()
 
@@ -308,19 +293,40 @@ def main():
     parser.add_argument("--split", default="test", choices=["train", "val", "test"],
                         help="Cache split to evaluate")
     parser.add_argument("--no-plots", action="store_true", help="Do not save confusion matrix plots")
-    parser.add_argument("--share", action="store_true",
-                        help="Evaluate on SHaRe OOD split (requires separate precompute cache)")
+    parser.add_argument("--cache-dir", default=None,
+                        help="Override cache directory from config")
+    parser.add_argument("--source-breakdown", action="store_true",
+                        help="Evaluate on CVES and MIMIC caches separately (requires per-source caches)")
     args = parser.parse_args()
 
-    if args.share:
-        # OOD evaluation would need separate SHaRe cache
-        logger.error("SHaRe OOD evaluation not yet implemented (requires separate precompute)")
+    if args.source_breakdown:
+        config = load_config(args.config)
+        base_dir = Path(config.get("phase_precompute", {}).get(
+            "cache_dir", "models/artifacts/cache_phase_detect"
+        )).parent
+
+        for source in ["cves", "mimic"]:
+            source_cache = base_dir / f"cache_phase_detect_{source}"
+            if not source_cache.exists():
+                print(f"\n  {source.upper()} cache not found at {source_cache}, skipping")
+                continue
+            print(f"\n{'=' * 70}")
+            print(f"  Source: {source.upper()}")
+            print(f"{'=' * 70}")
+            evaluate_phase_detector(
+                config_path=args.config,
+                checkpoint_path=args.checkpoint,
+                split=args.split,
+                cache_dir=source_cache,
+                save_plots=not args.no_plots,
+            )
         return
 
     evaluate_phase_detector(
         config_path=args.config,
         checkpoint_path=args.checkpoint,
         split=args.split,
+        cache_dir=Path(args.cache_dir) if args.cache_dir else None,
         save_plots=not args.no_plots,
     )
 
