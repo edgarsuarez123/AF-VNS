@@ -149,3 +149,29 @@ stroke:
   conditions: [bifold, cardiac_gated, open_loop]
   n_conditions: 3
   epoch_duration_sec: 300
+
+# 5s window variant — longer context for exhalation detection
+phase_precompute_5s:
+  window_sec: 5.0
+  stride_sec: 0.5
+  min_valid_frames: 20        # 25 frames × 80%
+  frame_rate_hz: 5.0
+  cache_dir: models/artifacts/cache_phase_detect_cves_5s
+  split_path: models/artifacts/phase_detect_cves_5s_split.json
+
+phase_model_5s:
+  channels: [16, 32, 48]
+  kernels: [7, 5, 3]
+  strides: [5, 2, 2]
+  dropout: 0.1
+  n_frames: 25                # 5s × 5Hz
+  n_tasks: 2
+  input_samples: 1250         # 5s × 250Hz
+
+phase_training_5s:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  checkpoint_path: models/checkpoints/phase_detector_5s.pth

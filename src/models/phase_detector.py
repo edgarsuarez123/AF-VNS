@@ -97,6 +97,7 @@ def build_phase_detector(
     config_path: str = "config_stroke.yaml",
     checkpoint_path: Optional[str] = None,
     device: Optional[str] = None,
+    model_section: str = "phase_model",
 ) -> PhaseDetector:
     """Build PhaseDetector from config; optionally load checkpoint.
 
@@ -111,7 +112,7 @@ def build_phase_detector(
     from ..training.build_model import load_config
 
     config = load_config(config_path)
-    m = config.get("phase_model", {})
+    m = config.get(model_section, config.get("phase_model", {}))
 
     cfg = PhaseDetectorConfig(
         channels=tuple(m.get("channels", [16, 32, 48])),
@@ -120,6 +121,7 @@ def build_phase_detector(
         dropout=float(m.get("dropout", 0.1)),
         n_frames=int(m.get("n_frames", 10)),
         n_tasks=int(m.get("n_tasks", 2)),
+        input_samples=int(m.get("input_samples", 500)),
     )
     model = PhaseDetector(cfg)
 

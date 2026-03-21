@@ -165,10 +165,10 @@ cycles and respiratory modulation regardless of pathology.
 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
-| S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | **Running** | Started 2026-03-20 — logs: precompute_phase.log / precompute_phase_err.log |
-| S-26 | Train phase detector on CVES + MIMIC-3 combined | **Running** | Started 2026-03-20, Epoch 12/100 |
+| S-25 | Precompute phase labels for CVES + MIMIC-3 (background) | **Done** | 2026-03-20 |
+| S-26 | Train phase detector on CVES + MIMIC-3 combined | **Done** | 2026-03-20 — early stop Epoch 50, best avg_acc=68.64% |
 | S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | **Done** | 2026-03-20 |
-| S-28 | Evaluate on CVES test split — target: >85% accuracy both phases | Pending | |
+| S-28 | Evaluate + diagnose exhalation bottleneck | **Running** | 2026-03-21 — see sub-steps below |
 | S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
@@ -206,19 +206,29 @@ cycles and respiratory modulation regardless of pathology.
 
 ---
 
+## S-28 Sub-steps — Diagnose & Fix Exhalation
+
+| # | Action | Status |
+|---|--------|--------|
+| 28a | Fix 3 bugs in phase_evaluate.py (naming, config fields, checkpoint loading) | Done |
+| 28b | Add --dataset cves/mimic to stroke_precompute_cache.py | Done |
+| 28c | Add --cache-dir, --source-breakdown to phase_evaluate.py | Done |
+| 28d | Add --cache-dir, --checkpoint-out to phase_train.py | Done |
+| 28e | Evaluate combined test split: diastole 83.58%, exhalation 51.98% | Done |
+| 28f | Build CVES-only + MIMIC-only caches | Running |
+| 28g | Per-source evaluation (CVES vs MIMIC exhalation accuracy) | Pending |
+| 28h | CVES-only retrain (if diagnosis confirms MIMIC noise) | Pending |
+| 28i | Longer 5s window (if CVES-only retrain insufficient) | Pending |
+
+---
+
 ## Resume From Here
 
-**Current state (2026-03-20 20:55) — S-26 restarted (crashed at Epoch 40):**
-- **S-25 DONE**: Cache precompute complete — 480 records → 2,576,904 windows
-  - Train: 1,819,893 | Val: 395,566 | Test: 361,445
-  - 48 records skipped (insufficient phase labels)
-- **S-26 RUNNING**: phase_train.py training (crashed at Epoch 40, restarting from Epoch 25)
-  - Checkpoint Epoch 25 metrics: diastole 85.42%, exhalation 51.83%, avg 68.62%
-  - Exhalation accuracy needs improvement (target >85%)
-  - Restarted 20:55 UTC (PID 1938)
-  - Logs: phase_train.log / phase_train_err.log
-- **S-27 DONE**: phase_evaluate.py created with 8 tests
-  - Computes per-frame accuracy, precision, recall, F1 for diastole + exhalation
-  - Handles NaN-masked frames, generates confusion matrices
-  - Ready to run once S-26 completes
-- **Next**: Monitor S-26, then run S-27 evaluation script on test split, then S-28 (in-dist), S-29 (OOD), S-30 (latency), S-31 (integration)
+**Current state (2026-03-21 11:05) — S-28 diagnostic in progress:**
+- **S-26 DONE**: Training finished — early stop Epoch 50, best avg_acc=68.64%
+  - Diastole: 85.42% (val), 83.58% (test)
+  - Exhalation: 51.83% (val), 51.98% (test) — **near random chance**
+- **S-28 IN PROGRESS**: Fixed evaluation bugs, added per-source CLI
+  - Building CVES-only and MIMIC-only caches (background)
+  - Next: run per-source eval to confirm MIMIC noise hypothesis
+  - Then: CVES-only retrain → if insufficient, try 5s window

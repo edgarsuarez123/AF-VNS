@@ -382,18 +382,22 @@ def main(
     config_path: str = CONFIG_PATH,
     workers: int = 1,
     dataset: str = "training",
+    config_section: str = "phase_precompute",
 ):
     """CLI entry: build phase detection cache.
 
     dataset="training" → CVES + MIMIC-3, 70/15/15 split
     dataset="ood"      → SHaRe only, all test (no split)
+    dataset="cves"     → CVES only
+    dataset="mimic"    → MIMIC-3 stroke only
+    config_section     → config key for window params (e.g. "phase_precompute_5s")
     """
     if not os.path.isabs(config_path):
         config_path = str(Path(config_path).resolve())
 
     config = _load_config(config_path)
     data_cfg = config.get("data", {})
-    precompute_cfg = config.get("phase_precompute", {})
+    precompute_cfg = config.get(config_section, config.get("phase_precompute", {}))
 
     window_sec = float(precompute_cfg.get("window_sec", 2.0))
     stride_sec = float(precompute_cfg.get("stride_sec", 0.2))
@@ -429,8 +433,9 @@ def main(
         logger.info("Loaded %d SHaRe records", len(sharee_records))
         records.extend(sharee_records)
     elif dataset == "cves":
-        cache_dir = Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect")).parent / "cache_phase_detect_cves"
-        split_path = str(cache_dir / "phase_detect_cves_split.json")
+        default_cache = Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect_cves"))
+        cache_dir = default_cache if "cache_dir" in precompute_cfg else default_cache.parent / "cache_phase_detect_cves"
+        split_path = precompute_cfg.get("split_path", str(cache_dir / "phase_detect_cves_split.json"))
 
         cves_dir = data_cfg.get("cves_subdir", "data/raw/stroke avns/cves")
         cves_records = parse_cerevasc_dir(cves_dir, config_path)
@@ -479,5 +484,8 @@ if __name__ == "__main__":
                    help="Worker processes (0 = all cores). Default 1 = single-threaded.")
     p.add_argument("--dataset", choices=["training", "ood", "cves", "mimic"], default="training",
                    help="training=CVES+MIMIC-3, ood=SHaRe, cves=CVES only, mimic=MIMIC-3 only")
+    p.add_argument("--config-section", default="phase_precompute",
+                   help="Config section for window params (e.g. phase_precompute_5s)")
     args = p.parse_args()
-    main(config_path=args.config, workers=args.workers, dataset=args.dataset)
+    main(config_path=args.config, workers=args.workers, dataset=args.dataset,
+         config_section=args.config_section)

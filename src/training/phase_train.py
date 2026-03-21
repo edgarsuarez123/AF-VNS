@@ -169,12 +169,16 @@ def main():
     parser.add_argument("--checkpoint", default=None, help="Resume from checkpoint")
     parser.add_argument("--cache-dir", default=None, help="Override cache directory from config")
     parser.add_argument("--checkpoint-out", default=None, help="Override checkpoint output path")
+    parser.add_argument("--model-section", default="phase_model",
+                        help="Config section for model architecture (e.g. phase_model_5s)")
+    parser.add_argument("--train-section", default="phase_training",
+                        help="Config section for training params (e.g. phase_training_5s)")
     args = parser.parse_args()
 
     config = load_config(args.config)
     paths_cfg = config.get("paths", {})
     precompute_cfg = config.get("phase_precompute", {})
-    train_cfg = config.get("phase_training", {})
+    train_cfg = config.get(args.train_section, config.get("phase_training", {}))
 
     cache_dir = Path(args.cache_dir) if args.cache_dir else Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect"))
     checkpoint_path = args.checkpoint_out or paths_cfg.get("phase_detect_checkpoint", "models/checkpoints/phase_detector.pth")
@@ -221,6 +225,7 @@ def main():
         config_path=args.config,
         checkpoint_path=args.checkpoint,
         device=str(device),
+        model_section=args.model_section,
     )
     logger.info("PhaseDetector: %d params", model.param_count())
 

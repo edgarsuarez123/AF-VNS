@@ -119,6 +119,7 @@ def evaluate_phase_detector(
     cache_dir: Optional[Path] = None,
     save_plots: bool = True,
     artifacts_dir: Optional[str] = None,
+    model_section: str = "phase_model",
 ) -> dict:
     """Evaluate phase detector on a split (test or val).
 
@@ -155,6 +156,7 @@ def evaluate_phase_detector(
         config_path=config_path,
         checkpoint_path=checkpoint_path,
         device=str(device),
+        model_section=model_section,
     )
 
     model.eval()
@@ -295,6 +297,8 @@ def main():
     parser.add_argument("--no-plots", action="store_true", help="Do not save confusion matrix plots")
     parser.add_argument("--cache-dir", default=None,
                         help="Override cache directory from config")
+    parser.add_argument("--model-section", default="phase_model",
+                        help="Config section for model architecture (e.g. phase_model_5s)")
     parser.add_argument("--source-breakdown", action="store_true",
                         help="Evaluate on CVES and MIMIC caches separately (requires per-source caches)")
     args = parser.parse_args()
@@ -319,6 +323,7 @@ def main():
                 split=args.split,
                 cache_dir=source_cache,
                 save_plots=not args.no_plots,
+                model_section=args.model_section,
             )
         return
 
@@ -328,6 +333,7 @@ def main():
         split=args.split,
         cache_dir=Path(args.cache_dir) if args.cache_dir else None,
         save_plots=not args.no_plots,
+        model_section=args.model_section,
     )
 
 

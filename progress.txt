@@ -1543,3 +1543,11 @@ Config: Added autonomic_state: and stim_recommender: sections to config_stroke.y
 Results: 215 passed, 1 skipped, 0 failed.
 
 Next: S-26 (train phase detector) once S-25 cache finishes, then S-27–S-31
+
+S-28 (2026-03-21): Diagnostic evaluation complete
+  - Combined test: diastole 83.58%, exhalation 51.98%
+  - CVES test: diastole 83.12%, exhalation 54.36%
+  - MIMIC test: diastole 80.94%, exhalation 51.77%
+  - Diagnosis: exhalation broken on BOTH sources -> 2s window too short (respiratory cycle 3-5s)
+  - Fix: building 5s window CVES cache (6 workers) -> will retrain phase_detector_5s.pth
+  - Code: fixed 3 bugs in phase_evaluate.py, added --dataset cves/mimic, --model-section, --config-section
