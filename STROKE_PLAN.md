@@ -173,6 +173,22 @@ cycles and respiratory modulation regardless of pathology.
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
 
+### Exhalation Fix — EDR Method Analysis & Decision
+
+**Why the current method failed:** `edr.py` uses neurokit2 `ecg_rsp(method="vangent2019")` which extracts respiration from Respiratory Sinus Arrhythmia (RSA) — the fact that HR speeds up on inhale and slows on exhale. RSA requires an intact, resting autonomic nervous system. CVES subjects perform sit-stand and tilt-table stress tests where RSA is suppressed. Stroke patients may also have impaired autonomic control. Result: EDR labels are noise and the evaluation is circular (no independent ground truth).
+
+**Alternative EDR methods considered:**
+
+| Method | How It Works | Works During Stress | Single Lead | Why Rejected / Status |
+|--------|-------------|--------------------|-----------|-----------------------|
+| **RSA / vangent2019** (current) | Bandpass HR variability at 0.1–0.4 Hz | **No** — RSA disappears under stress | Yes | Fails on CVES protocols |
+| **QRS Amplitude Modulation** | Chest expansion moves electrodes → QRS peak heights oscillate with breathing | Marginal — movement artifacts confound it | Yes | Worth trying if ref signal unavailable |
+| **QRS Axis Rotation** | Diaphragm movement rotates cardiac axis → track QRS angle | Yes | **No** — needs multi-lead | Not applicable (single-lead data) |
+| **Fusion / combination** | Weighted combination of RSA + amplitude methods | Better than either alone | Yes | Higher complexity, still no ground truth |
+| **Reference signal (thermst / flow_rate)** | Actual measured nasal thermistor / airflow from CVES hardware | **Yes — hardware truth** | N/A | **Selected — S-32** |
+
+**Decision:** Use CVES reference respiratory channels (`thermst` or `flow_rate`) as ground truth labels. Fall back to QRS amplitude EDR for MIMIC-3/SHaRe where no reference exists. RSA-based EDR is abandoned for CVES.
+
 ### Exhalation Fix — Reference Signal Track
 
 | Step | Description | Status |
