@@ -2,13 +2,15 @@
 Stroke AVNS — dataset parsers.
 
 StrokeRecordDict schema:
-    subject_id  str
-    signal      np.ndarray  1D float64
-    fs          float
-    label       int         1=stroke/event, 0=control/no-event
-    session_id  str | None  e.g. "ses01_bifold" — None for population datasets
-    epoch_type  str | None  "baseline"|"stim"|"recovery" — None for population data
-    condition   str | None  "bifold"|"cardiac_gated"|"open_loop" — None for population data
+    subject_id    str
+    signal        np.ndarray  1D float64 (ECG)
+    fs            float
+    label         int           1=stroke/event, 0=control/no-event
+    session_id    str | None    e.g. "ses01_bifold" — None for population datasets
+    epoch_type    str | None    "baseline"|"stim"|"recovery" — None for population data
+    condition     str | None    "bifold"|"cardiac_gated"|"open_loop" — None for population data
+    resp_signal   np.ndarray | None   1D float64 respiratory reference (CVES only)
+    resp_channel  str | None          "flow_rate" / "thermst" / "resp" / None
 
 Nothing in the AF pipeline is imported or modified here.
 """
@@ -28,6 +30,18 @@ from src.data.dataset_parsers import (
 logger = logging.getLogger(__name__)
 
 StrokeRecordDict = Dict[str, Any]
+
+# Respiratory channel priority for CVES reference signal extraction
+_RESP_PRIORITY = ["flow_rate", "thermst", "resp"]
+
+
+def _select_resp_channel(sig_names: list):
+    """Return (index, name) of best respiratory channel by priority, or (None, None)."""
+    names_lower = [n.strip().lower() for n in sig_names]
+    for name in _RESP_PRIORITY:
+        if name in names_lower:
+            return names_lower.index(name), name
+    return None, None
 
 # ---------------------------------------------------------------------------
 # CVES (Cerebral Vasoregulation in Elderly with Stroke) label maps
@@ -150,6 +164,8 @@ def parse_mimic3_stroke_dir(data_dir: str, config_path: str) -> List[StrokeRecor
             "session_id": None,
             "epoch_type": None,
             "condition": None,
+            "resp_signal": None,
+            "resp_channel": None,
         })
 
     logger.info("Parsed %d records from mimic3_stroke (dir: %s)", len(records), data_dir)
@@ -243,6 +259,8 @@ def parse_sharee_dir(
             "session_id": None,
             "epoch_type": None,
             "condition": None,
+            "resp_signal": None,
+            "resp_channel": None,
         })
 
     logger.info("Parsed %d records from shareedb (dir: %s)", len(records), data_dir)
@@ -326,16 +344,25 @@ def parse_cerevasc_dir(data_dir: str, config_path: str) -> List[StrokeRecordDict
             if signal is None:
                 continue
 
-            signal = np.asarray(signal, dtype=np.float64)
+            signal_all = np.asarray(signal, dtype=np.float64)
+
+            # Extract respiratory reference channel BEFORE collapsing to ECG
+            resp_signal: Optional[np.ndarray] = None
+            resp_channel: Optional[str] = None
+            if signal_all.ndim == 2 and signal_all.shape[1] > 1 and record.sig_name:
+                resp_idx, resp_channel = _select_resp_channel(record.sig_name)
+                if resp_idx is not None:
+                    resp_signal = signal_all[:, resp_idx].copy()
+                    resp_signal = np.nan_to_num(resp_signal, nan=0.0)
 
             # Select best ECG channel; capture its unit for uV→mV scaling
-            if signal.ndim == 2 and signal.shape[1] > 1:
+            if signal_all.ndim == 2 and signal_all.shape[1] > 1:
                 ch_idx = _select_ecg_channel(record.sig_name, record.units)
                 unit = (record.units[ch_idx] or "").strip() if record.units else ""
-                signal = signal[:, ch_idx]
+                signal = signal_all[:, ch_idx]
             else:
                 unit = (record.units[0] or "").strip() if record.units else ""
-                signal = signal.ravel()
+                signal = signal_all.ravel()
 
             # TCD ECG is recorded in uV — scale to mV for consistency
             if unit.lower() in ("uv", "\u03bcv"):
@@ -347,6 +374,8 @@ def parse_cerevasc_dir(data_dir: str, config_path: str) -> List[StrokeRecordDict
 
             if target_fs > 0 and abs(fs - target_fs) >= 0.1:
                 signal = _resample_to_target_fs(signal, fs, target_fs)
+                if resp_signal is not None:
+                    resp_signal = _resample_to_target_fs(resp_signal, float(record.fs), target_fs)
                 fs = target_fs
 
             min_samples = int(waveform_sec * fs)
@@ -362,6 +391,8 @@ def parse_cerevasc_dir(data_dir: str, config_path: str) -> List[StrokeRecordDict
                 "session_id": None,
                 "epoch_type": None,
                 "condition": None,
+                "resp_signal": resp_signal,
+                "resp_channel": resp_channel,
             })
 
     logger.info("Parsed %d records from cves (dir: %s)", len(records), data_dir)

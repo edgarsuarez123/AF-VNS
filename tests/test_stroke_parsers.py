@@ -21,6 +21,7 @@ from src.data.stroke_parsers import (
     parse_cerevasc_dir,
     parse_mimic3_stroke_dir,
     parse_sharee_dir,
+    _select_resp_channel,
 )
 
 
@@ -304,3 +305,192 @@ def test_parse_mimic3_stroke_integration():
     assert set(labels).issubset({0, 1}), "All labels must be binary"
     print(f"\nmimic3_stroke: {len(records)} records — "
           f"stroke={sum(labels)}, control={len(labels)-sum(labels)}")
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — _select_resp_channel
+# ---------------------------------------------------------------------------
+
+def test_select_resp_channel_flow_rate_priority():
+    """flow_rate is preferred over thermst."""
+    idx, name = _select_resp_channel(["marker", "ecg", "thermst", "flow_rate"])
+    assert idx == 3
+    assert name == "flow_rate"
+
+
+def test_select_resp_channel_thermst_fallback():
+    """thermst is used when flow_rate is absent."""
+    idx, name = _select_resp_channel(["marker", "ecg", "thermst"])
+    assert idx == 2
+    assert name == "thermst"
+
+
+def test_select_resp_channel_resp_fallback():
+    """resp is used when flow_rate and thermst are absent."""
+    idx, name = _select_resp_channel(["ecg", "resp"])
+    assert idx == 1
+    assert name == "resp"
+
+
+def test_select_resp_channel_none():
+    """Returns (None, None) when no respiratory channel exists."""
+    idx, name = _select_resp_channel(["ecg", "abp", "marker"])
+    assert idx is None
+    assert name is None
+
+
+def test_select_resp_channel_case_insensitive():
+    """Channel name matching is case-insensitive."""
+    idx, name = _select_resp_channel(["ECG", "Flow_Rate", "Thermst"])
+    assert idx == 1
+    assert name == "flow_rate"
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — CVES respiratory channel extraction
+# ---------------------------------------------------------------------------
+
+def _write_cves_multichannel_record(
+    proto_dir: Path,
+    stem: str,
+    n_samples: int = 5000,
+    fs: int = 500,
+    sig_names=None,
+    units=None,
+) -> None:
+    """Write a multi-channel WFDB record mimicking CVES hardware output."""
+    if sig_names is None:
+        sig_names = ["marker", "ecg", "abp", "thermst", "flow_rate"]
+    if units is None:
+        units = ["NU", "mV", "mmHg", "NU", "NU"]
+    n_ch = len(sig_names)
+    rng = np.random.default_rng(99)
+    sig = (rng.standard_normal((n_samples, n_ch)) * 0.5).astype(np.float64)
+    wfdb.wrsamp(
+        stem,
+        fs=fs,
+        units=units,
+        sig_name=sig_names,
+        p_signal=sig,
+        write_dir=str(proto_dir),
+    )
+
+
+def _make_cves_dir_multichannel(tmp_dir: Path) -> Path:
+    """CVES directory with multi-channel records (including flow_rate + thermst)."""
+    ss_dir = tmp_dir / "data" / "sit-stand"
+    ss_dir.mkdir(parents=True)
+    _write_cves_multichannel_record(ss_dir, "s0044-sit-stand")
+    _write_cves_multichannel_record(ss_dir, "s0165-sit-stand")
+    return tmp_dir
+
+
+def test_parse_cerevasc_resp_signal_present():
+    """Multi-channel CVES records return non-None resp_signal."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir_multichannel(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        assert len(records) == 2
+        for r in records:
+            assert r["resp_signal"] is not None, f"{r['subject_id']} missing resp_signal"
+            assert r["resp_channel"] == "flow_rate", "Should prefer flow_rate"
+
+
+def test_parse_cerevasc_resp_signal_shape():
+    """resp_signal is 1D and same length as ECG signal."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir_multichannel(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        for r in records:
+            assert r["resp_signal"].ndim == 1
+            assert len(r["resp_signal"]) == len(r["signal"]), \
+                "resp_signal and signal must have same length"
+
+
+def test_parse_cerevasc_resp_signal_resampled():
+    """resp_signal is resampled alongside ECG when target_fs differs."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir_multichannel(Path(tmp))
+        cfg = _make_stroke_config(Path(tmp), target_fs=250.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        for r in records:
+            assert r["resp_signal"] is not None
+            assert len(r["resp_signal"]) == len(r["signal"]), \
+                "After resampling, resp_signal and signal must have same length"
+
+
+def test_parse_cerevasc_resp_missing_single_channel():
+    """Single-channel ECG-only CVES records return resp_signal=None."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cves_dir = _make_cves_dir(Path(tmp))  # uses original single-channel fixture
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(cves_dir), cfg)
+        for r in records:
+            assert r["resp_signal"] is None
+            assert r["resp_channel"] is None
+
+
+def test_parse_cerevasc_thermst_only():
+    """When only thermst is available (no flow_rate), it is selected."""
+    with tempfile.TemporaryDirectory() as tmp:
+        ss_dir = Path(tmp) / "data" / "sit-stand"
+        ss_dir.mkdir(parents=True)
+        _write_cves_multichannel_record(
+            ss_dir, "s0044-sit-stand",
+            sig_names=["ecg", "thermst"],
+            units=["mV", "NU"],
+        )
+        cfg = _make_stroke_config(Path(tmp), target_fs=0.0)
+        records = parse_cerevasc_dir(str(Path(tmp)), cfg)
+        assert len(records) == 1
+        assert records[0]["resp_channel"] == "thermst"
+        assert records[0]["resp_signal"] is not None
+
+
+def test_parse_mimic3_resp_fields_none():
+    """MIMIC-3 records always have resp_signal=None, resp_channel=None."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        _write_wfdb_record(tmp_dir, "rec001", n_samples=5000, fs=125, label=1)
+        cfg = _make_stroke_config(tmp_dir)
+        records = parse_mimic3_stroke_dir(str(tmp_dir), cfg)
+        assert len(records) == 1
+        assert records[0]["resp_signal"] is None
+        assert records[0]["resp_channel"] is None
+
+
+def test_parse_sharee_resp_fields_none():
+    """SHaRe records always have resp_signal=None, resp_channel=None."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        rng = np.random.default_rng(42)
+        sig = (rng.standard_normal((5000, 1)) * 0.5).astype(np.float64)
+        wfdb.wrsamp(
+            "sharee_001",
+            fs=128,
+            units=["mV"],
+            sig_name=["III"],
+            p_signal=sig,
+            write_dir=str(tmp_dir),
+        )
+        cfg = _make_stroke_config(tmp_dir, target_fs=0.0, waveform_sec=10.0)
+        records = parse_sharee_dir(str(tmp_dir), label_map={}, config_path=cfg)
+        assert len(records) == 1
+        assert records[0]["resp_signal"] is None
+        assert records[0]["resp_channel"] is None
+
+
+@pytest.mark.integration
+def test_parse_cerevasc_integration_resp_channels():
+    """Integration: real CVES records should have resp_signal for most protocols."""
+    data_dir = "data/raw/stroke avns/cves"
+    config_path = "config_stroke.yaml"
+    if not Path(data_dir).is_dir():
+        pytest.skip("CVES data not found")
+    records = parse_cerevasc_dir(data_dir, config_path)
+    n_with_resp = sum(1 for r in records if r["resp_signal"] is not None)
+    n_total = len(records)
+    print(f"\nCVES resp channels: {n_with_resp}/{n_total} records have respiratory reference")
+    assert n_with_resp > 0, "Expected at least some records with respiratory reference"
