@@ -397,3 +397,86 @@ def parse_cerevasc_dir(data_dir: str, config_path: str) -> List[StrokeRecordDict
 
     logger.info("Parsed %d records from cves (dir: %s)", len(records), data_dir)
     return records
+
+
+# ---------------------------------------------------------------------------
+# FANTASIA (PhysioNet fantasia)
+# 40 healthy subjects (20 young f1y*, 20 elderly f1o*), watching Fantasia.
+# Channels: [0] RESP (respiration belt), [1] ECG — 250 Hz, ~2 hours each.
+# All label=0 (healthy controls — expands reference-labeled training pool).
+# ---------------------------------------------------------------------------
+
+def parse_fantasia_dir(
+    data_dir: str,
+    config_path: str,
+) -> List[StrokeRecordDict]:
+    """Parse FANTASIA PhysioNet records. Returns StrokeRecordDicts with
+    ECG + respiration belt reference signal."""
+    import wfdb
+
+    config = load_config(config_path)
+    data_cfg = config.get("data", {})
+    target_fs = int(data_cfg.get("target_fs", 250))
+    waveform_sec = int(data_cfg.get("waveform_sec", 10))
+
+    data_dir = Path(data_dir)
+    hea_files = sorted(data_dir.glob("*.hea"))
+    if not hea_files:
+        logger.warning("No .hea files found in fantasia dir: %s", data_dir)
+        return []
+
+    records = []
+    for hea in hea_files:
+        stem = hea.stem
+        record_path = str(hea.parent / stem)
+        try:
+            rec = wfdb.rdrecord(record_path)
+        except Exception as e:
+            logger.warning("FANTASIA: failed to read %s: %s", stem, e)
+            continue
+
+        sig_names = [n.strip().upper() for n in rec.sig_name]
+        fs = float(rec.fs)
+
+        # ECG is channel named 'ECG'; RESP is channel named 'RESP'
+        ecg_idx = next((i for i, n in enumerate(sig_names) if "ECG" in n), None)
+        resp_idx = next((i for i, n in enumerate(sig_names) if "RESP" in n), None)
+
+        if ecg_idx is None:
+            logger.warning("FANTASIA %s: no ECG channel in %s — skipping", stem, sig_names)
+            continue
+
+        signal_all = np.nan_to_num(rec.p_signal, nan=0.0)
+        ecg = signal_all[:, ecg_idx].astype(np.float64)
+        resp_signal = None
+        resp_channel = None
+
+        if resp_idx is not None:
+            resp_signal = signal_all[:, resp_idx].astype(np.float64)
+            resp_channel = "resp_belt"
+
+        # Resample ECG if needed
+        if fs != target_fs:
+            ecg = _resample_to_target_fs(ecg, fs, target_fs)
+            if resp_signal is not None:
+                resp_signal = _resample_to_target_fs(resp_signal, fs, target_fs)
+
+        min_len = waveform_sec * target_fs
+        if len(ecg) < min_len:
+            logger.debug("FANTASIA %s: signal too short (%d < %d) — skipping", stem, len(ecg), min_len)
+            continue
+
+        records.append({
+            "subject_id": f"fantasia_{stem}",
+            "signal": ecg,
+            "fs": float(target_fs),
+            "label": 0,  # all FANTASIA subjects are healthy controls
+            "session_id": None,
+            "epoch_type": None,
+            "condition": None,
+            "resp_signal": resp_signal,
+            "resp_channel": resp_channel,
+        })
+
+    logger.info("Parsed %d records from fantasia (dir: %s)", len(records), data_dir)
+    return records

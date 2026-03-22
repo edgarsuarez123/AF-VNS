@@ -28,6 +28,7 @@ if __name__ == "__main__":
 
 from src.data.splitter import create_split, load_split
 from src.data.stroke_parsers import (
+    parse_fantasia_dir,
     StrokeRecordDict,
     parse_cerevasc_dir,
     parse_mimic3_stroke_dir,
@@ -63,6 +64,7 @@ def process_record(
     stride_sec: float = 0.2,
     min_valid_frames: int = 8,
     frame_rate_hz: float = 5.0,
+    mask_edr_exhalation: bool = False,
 ) -> Optional[dict]:
     """Generate full-signal labels, then slice into 2s windows.
 
@@ -114,15 +116,26 @@ def process_record(
             exh_method = "reference_failed"
 
     if not exh_ok:
-        try:
-            exh_result = generate_exhalation_labels(
-                signal, fs, frame_rate_hz=frame_rate_hz, config_path=config_path,
-            )
-            exh_ok = exh_result["n_resp_cycles"] > 0
-            if exh_ok:
-                exh_method = "edr"
-        except Exception as e:
-            logger.warning("%s: EDR exhalation labeling failed: %s", sid, e)
+        if mask_edr_exhalation and resp_signal is None:
+            # No reference hardware signal — force NaN instead of EDR fallback.
+            # Only masks records with no resp channel (MIMIC); CVES reference-failed
+            # records (resp_signal is not None) still fall through to EDR below.
+            n_frames = len(signal) // frame_size
+            exh_result = {
+                "labels": np.full(n_frames, np.nan, dtype=np.float32),
+                "quality": np.zeros(n_frames, dtype=np.float32),
+            }
+            exh_method = "masked_edr"
+        else:
+            try:
+                exh_result = generate_exhalation_labels(
+                    signal, fs, frame_rate_hz=frame_rate_hz, config_path=config_path,
+                )
+                exh_ok = exh_result["n_resp_cycles"] > 0
+                if exh_ok:
+                    exh_method = "edr"
+            except Exception as e:
+                logger.warning("%s: EDR exhalation labeling failed: %s", sid, e)
 
     if not exh_ok:
         n_frames = len(signal) // frame_size
@@ -194,9 +207,9 @@ def process_record(
 
 def _process_record_wrapper(args):
     """Unpacks args for ProcessPoolExecutor (must be picklable top-level fn)."""
-    record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz = args
+    record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, mask_edr = args
     return process_record(
-        record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz,
+        record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, mask_edr,
     )
 
 
@@ -214,6 +227,7 @@ def build_stroke_cache(
     stride_sec: float = 0.2,
     min_valid_frames: int = 8,
     frame_rate_hz: float = 5.0,
+    mask_edr_exhalation: bool = False,
 ) -> dict:
     """Build phase detection cache from pre-loaded records.
 
@@ -265,12 +279,12 @@ def build_stroke_cache(
     n_skipped_records = 0
     total_windows = 0
     total_skipped_windows = 0
-    exh_method_counts = {"reference": 0, "edr": 0, "none": 0}
+    exh_method_counts = {"reference": 0, "edr": 0, "none": 0, "masked_edr": 0}
 
     # --- Process records ---
     if workers > 1:
         args_list = [
-            (rec, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz)
+            (rec, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, mask_edr_exhalation)
             for rec in records
         ]
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -320,7 +334,7 @@ def build_stroke_cache(
 
             result = process_record(
                 rec, config_path, window_sec, stride_sec,
-                min_valid_frames, frame_rate_hz,
+                min_valid_frames, frame_rate_hz, mask_edr_exhalation,
             )
             if result is None:
                 n_skipped_records += 1
@@ -413,6 +427,7 @@ def main(
     workers: int = 1,
     dataset: str = "training",
     config_section: str = "phase_precompute",
+    mask_edr_exhalation: bool = False,
 ):
     """CLI entry: build phase detection cache.
 
@@ -433,6 +448,11 @@ def main(
     stride_sec = float(precompute_cfg.get("stride_sec", 0.2))
     min_valid = int(precompute_cfg.get("min_valid_frames", 8))
     frame_rate_hz = float(precompute_cfg.get("frame_rate_hz", 5.0))
+    # CLI flag overrides config; config default is False (backward compat)
+    edr_cfg = config.get("edr", {})
+    mask_edr = mask_edr_exhalation or bool(edr_cfg.get("mask_edr_exhalation", False))
+    if mask_edr:
+        logger.info("mask_edr_exhalation=True — EDR-only records will have NaN exhalation labels")
 
     records: List[StrokeRecordDict] = []
 
@@ -451,6 +471,15 @@ def main(
         mimic_records = parse_mimic3_stroke_dir(mimic_dir, config_path)
         logger.info("Loaded %d MIMIC-3 stroke records", len(mimic_records))
         records.extend(mimic_records)
+
+        # Load FANTASIA (optional — included if directory exists)
+        fantasia_dir = data_cfg.get("fantasia_subdir", "data/raw/stroke avns/fantasia")
+        if Path(fantasia_dir).exists():
+            fantasia_records = parse_fantasia_dir(fantasia_dir, config_path)
+            logger.info("Loaded %d FANTASIA records", len(fantasia_records))
+            records.extend(fantasia_records)
+        else:
+            logger.info("FANTASIA dir not found (%s) — skipping", fantasia_dir)
 
     elif dataset == "ood":
         cache_dir = Path(precompute_cfg.get(
@@ -500,6 +529,7 @@ def main(
         stride_sec=stride_sec,
         min_valid_frames=min_valid,
         frame_rate_hz=frame_rate_hz,
+        mask_edr_exhalation=mask_edr,
     )
 
 
@@ -516,6 +546,8 @@ if __name__ == "__main__":
                    help="training=CVES+MIMIC-3, ood=SHaRe, cves=CVES only, mimic=MIMIC-3 only")
     p.add_argument("--config-section", default="phase_precompute",
                    help="Config section for window params (e.g. phase_precompute_5s)")
+    p.add_argument("--mask-edr-exhalation", action="store_true",
+                   help="Force NaN exhalation labels for records without a reference resp signal (MIMIC)")
     args = p.parse_args()
     main(config_path=args.config, workers=args.workers, dataset=args.dataset,
-         config_section=args.config_section)
+         config_section=args.config_section, mask_edr_exhalation=args.mask_edr_exhalation)

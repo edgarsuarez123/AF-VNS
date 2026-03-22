@@ -22,6 +22,7 @@ data:
   mimic3_stroke_subdir: data/raw/stroke avns/mimic3_stroke
   sharee_subdir: data/raw/stroke avns/shareedb
   cves_subdir: data/raw/stroke avns/cves
+  fantasia_subdir: data/raw/stroke avns/fantasia
   # Keep same waveform/HRV windows as AF pipeline so backbone weights transfer cleanly
   waveform_sec: 10
   hrv_window_sec: 300
@@ -100,6 +101,7 @@ edr:
   max_resp_rate_bpm: 30.0        # Above 30 breaths/min → reject
   min_resp_cycles: 2             # Need at least 2 full respiratory cycles
   denoise_before_edr: true       # CWT denoise before R-peak detection
+  mask_edr_exhalation: true      # Force NaN for records without reference resp signal (MIMIC)
 
 # Reference respiratory signal label generation (CVES thermistor / flow_rate)
 resp_labels:
