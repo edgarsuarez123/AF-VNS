@@ -101,6 +101,17 @@ edr:
   min_resp_cycles: 2             # Need at least 2 full respiratory cycles
   denoise_before_edr: true       # CWT denoise before R-peak detection
 
+# Reference respiratory signal label generation (CVES thermistor / flow_rate)
+resp_labels:
+  bandpass_low_hz: 0.08          # Just below 6 bpm
+  bandpass_high_hz: 0.6          # Just above 30 bpm
+  bandpass_order: 4
+  min_peak_distance_sec: 1.5     # Max ~40 breaths/min
+  min_resp_rate_bpm: 6.0
+  max_resp_rate_bpm: 30.0
+  min_resp_cycles: 2
+  thermst_invert: true           # thermst peaks = end of exhale → invert for inhale-peak convention
+
 # Phase detection precompute (2s windows, 5Hz frame labels)
 phase_precompute:
   window_sec: 2.0                    # CNN input window (500 samples @ 250Hz)
