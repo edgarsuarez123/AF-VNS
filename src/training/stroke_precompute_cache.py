@@ -35,6 +35,7 @@ from src.data.stroke_parsers import (
 )
 from src.features.edr import generate_exhalation_labels
 from src.features.phase_labels import generate_phase_labels
+from src.features.resp_labels import generate_exhalation_labels_from_reference
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -94,14 +95,36 @@ def process_record(
             "quality": np.zeros(n_frames, dtype=np.float32),
         }
 
-    try:
-        exh_result = generate_exhalation_labels(
-            signal, fs, frame_rate_hz=frame_rate_hz, config_path=config_path,
-        )
-        exh_ok = exh_result["n_resp_cycles"] > 0
-    except Exception as e:
-        logger.warning("%s: exhalation labeling failed: %s", sid, e)
-        exh_ok = False
+    # Exhalation labels: prefer reference respiratory signal when available
+    resp_signal = record.get("resp_signal")
+    resp_channel = record.get("resp_channel")
+    exh_method = "none"
+    exh_ok = False
+
+    if resp_signal is not None:
+        try:
+            exh_result = generate_exhalation_labels_from_reference(
+                resp_signal, fs, channel_name=resp_channel,
+                frame_rate_hz=frame_rate_hz, config_path=config_path,
+            )
+            exh_ok = exh_result["n_resp_cycles"] > 0
+            exh_method = "reference" if exh_ok else "reference_failed"
+        except Exception as e:
+            logger.warning("%s: reference resp labeling failed: %s", sid, e)
+            exh_method = "reference_failed"
+
+    if not exh_ok:
+        try:
+            exh_result = generate_exhalation_labels(
+                signal, fs, frame_rate_hz=frame_rate_hz, config_path=config_path,
+            )
+            exh_ok = exh_result["n_resp_cycles"] > 0
+            if exh_ok:
+                exh_method = "edr"
+        except Exception as e:
+            logger.warning("%s: EDR exhalation labeling failed: %s", sid, e)
+
+    if not exh_ok:
         n_frames = len(signal) // frame_size
         exh_result = {
             "labels": np.full(n_frames, np.nan, dtype=np.float32),
@@ -165,6 +188,7 @@ def process_record(
         "n_skipped": n_skipped,
         "diastole_ok": dia_ok,
         "exhalation_ok": exh_ok,
+        "exh_method": exh_method,
     }
 
 
@@ -241,6 +265,7 @@ def build_stroke_cache(
     n_skipped_records = 0
     total_windows = 0
     total_skipped_windows = 0
+    exh_method_counts = {"reference": 0, "edr": 0, "none": 0}
 
     # --- Process records ---
     if workers > 1:
@@ -279,6 +304,8 @@ def build_stroke_cache(
                 accum[split_name]["quality"].extend(result["quality"])
                 total_windows += result["n_windows"]
                 total_skipped_windows += result["n_skipped"]
+                m = result.get("exh_method", "none")
+                exh_method_counts[m] = exh_method_counts.get(m, 0) + 1
                 n_records += 1
                 pbar.set_postfix(recs=n_records, wins=total_windows)
             pbar.close()
@@ -305,6 +332,8 @@ def build_stroke_cache(
             accum[split_name]["quality"].extend(result["quality"])
             total_windows += result["n_windows"]
             total_skipped_windows += result["n_skipped"]
+            m = result.get("exh_method", "none")
+            exh_method_counts[m] = exh_method_counts.get(m, 0) + 1
             n_records += 1
             pbar.set_postfix(recs=n_records, wins=total_windows, split=split_name)
         pbar.close()
@@ -358,6 +387,7 @@ def build_stroke_cache(
         "n_records_processed": n_records,
         "n_records_skipped": n_skipped_records,
         "total_windows": total_windows,
+        "exh_method_counts": exh_method_counts,
     }
     with open(cache_dir / "phase_cache_meta.json", "w") as f:
         json.dump(meta, f, indent=2)

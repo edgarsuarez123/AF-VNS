@@ -74,6 +74,16 @@ def _make_config(tmp_dir: str) -> str:
             "min_resp_cycles": 2,
             "denoise_before_edr": False,
         },
+        "resp_labels": {
+            "bandpass_low_hz": 0.08,
+            "bandpass_high_hz": 0.6,
+            "bandpass_order": 4,
+            "min_peak_distance_sec": 1.5,
+            "min_resp_rate_bpm": 6.0,
+            "max_resp_rate_bpm": 30.0,
+            "min_resp_cycles": 2,
+            "thermst_invert": True,
+        },
         "wavelet": {"family": "cmor", "scale_range": [1, 64]},
     }
     path = str(Path(tmp_dir) / "config_stroke.yaml")
@@ -298,3 +308,69 @@ def test_sharee_event_patients_constant():
     """SHAREE_EVENT_PATIENTS constant still exists for backward compat."""
     assert len(SHAREE_EVENT_PATIENTS) == 17
     assert "02119" in SHAREE_EVENT_PATIENTS
+
+
+# ---------------------------------------------------------------------------
+# Tests: reference respiratory signal path (S-34)
+# ---------------------------------------------------------------------------
+
+def _make_sine_resp(fs: float = 250.0, duration_sec: float = 30.0, bpm: float = 15.0) -> np.ndarray:
+    """Synthetic respiratory signal at given breathing rate."""
+    t = np.arange(int(fs * duration_sec)) / fs
+    return np.sin(2 * np.pi * (bpm / 60.0) * t).astype(np.float64)
+
+
+class TestReferenceRespPath:
+
+    def test_process_record_uses_reference(self):
+        """Record with resp_signal uses reference method, not EDR."""
+        rec = _phase_records(n=1, duration_sec=30)[0]
+        rec["resp_signal"] = _make_sine_resp(fs=250.0, duration_sec=30.0, bpm=15.0)
+        rec["resp_channel"] = "flow_rate"
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = _make_config(tmp)
+            result = process_record(rec, cfg, window_sec=2.0, stride_sec=0.2)
+        assert result is not None
+        assert result["exh_method"] == "reference"
+
+    def test_process_record_falls_back_to_edr(self):
+        """Record without resp_signal falls back to EDR."""
+        rec = _phase_records(n=1, duration_sec=30)[0]
+        rec["resp_signal"] = None
+        rec["resp_channel"] = None
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = _make_config(tmp)
+            result = process_record(rec, cfg, window_sec=2.0, stride_sec=0.2)
+        assert result is not None
+        # EDR may or may not succeed on synthetic ECG, but method should not be "reference"
+        assert result["exh_method"] != "reference"
+
+    def test_process_record_no_resp_fields(self):
+        """Record with no resp_signal key at all works (backward compat)."""
+        rec = _phase_records(n=1, duration_sec=30)[0]
+        # Existing records without resp fields should still work
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = _make_config(tmp)
+            result = process_record(rec, cfg, window_sec=2.0, stride_sec=0.2)
+        assert result is not None
+        assert result["exh_method"] != "reference"
+
+    def test_cache_meta_has_method_counts(self):
+        """phase_cache_meta.json includes exh_method_counts."""
+        recs = _phase_records(n=6, duration_sec=30)
+        # Give half of them a resp_signal
+        for i in range(3):
+            recs[i]["resp_signal"] = _make_sine_resp(fs=250.0, duration_sec=30.0, bpm=15.0)
+            recs[i]["resp_channel"] = "flow_rate"
+        for i in range(3, 6):
+            recs[i]["resp_signal"] = None
+            recs[i]["resp_channel"] = None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            meta, cache_dir, _ = _run_cache(recs, tmp)
+            with open(cache_dir / "phase_cache_meta.json") as f:
+                saved = json.load(f)
+
+        assert "exh_method_counts" in saved, "Missing exh_method_counts in metadata"
+        counts = saved["exh_method_counts"]
+        assert counts.get("reference", 0) > 0, "Expected some reference method records"
