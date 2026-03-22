@@ -169,14 +169,46 @@ cycles and respiratory modulation regardless of pathology.
 | S-26 | Train phase detector on CVES + MIMIC-3 combined | **Done** | 2026-03-20 — early stop Epoch 50, best avg_acc=68.64% |
 | S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | **Done** | 2026-03-20 |
 | S-28 | Evaluate + diagnose exhalation bottleneck | **Done** | 2026-03-21 — see sub-steps below |
-| S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
 | S-39 | Per-source evaluation: CVES (ref labels) vs MIMIC (EDR) | **Done** | 2026-03-22 |
 | S-38 | 5s windows with reference labels — full respiratory cycle context | **Done** | 2026-03-22 |
 | S-40a | Large model [32,64,96] 29K params — capacity experiment | **Done** | 2026-03-22 |
 | S-40b | Weighted loss 0.7 exh — optimization experiment | **Done** | 2026-03-22 |
-| S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
-| S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
+| S-29 | OOD evaluation on SHaRe — report generalization | **Done** | 2026-03-22 — diastole 81.06% (-3.3% vs in-dist 84.34%) |
+| S-30 | Closed-loop event-to-stim latency benchmark — NFR-1.1 <200ms | **Done** | 2026-03-22 — 116ms worst-case p95 at 100ms stride (PASS) |
+| S-41 | NaN-mask MIMIC exhalation + FANTASIA reference data — retrain | In Progress | Started 2026-03-22 |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
+
+### S-29 — OOD Generalization Results (2026-03-22)
+
+Model trained on CVES + MIMIC-3 evaluated on held-out SHaRe Holter ECGs (never seen in training):
+
+| Task | In-Distribution (CVES test) | OOD (SHaRe) | Gap |
+|------|---------------------------|-------------|-----|
+| Diastole | 84.34% | 81.06% | −3.3% |
+| Exhalation | 56.28% | ~50% (EDR noise) | N/A |
+
+**Conclusion:** Diastole generalizes well to ambulatory Holter ECG. −3.3% gap is acceptable. Exhalation OOD result is not meaningful (SHaRe has no reference resp signal → EDR labels = noise).
+
+---
+
+### S-30 — Closed-Loop Event-to-Stim Latency (2026-03-22)
+
+NFR-1.1 requirement: <200ms total closed-loop system latency (physiological co-occurrence event → VNS trigger).
+
+**Pipeline:** ECG stream → 2s sliding window → resample + denoise + model forward + co-occurrence check → stim trigger
+
+**Worst-case event-to-stim latency = inference_stride_ms + per_call_processing_p95**
+
+| Config | Processing p95 | Stride | Worst-case | NFR-1.1 |
+|--------|---------------|--------|------------|---------|
+| stride=200ms (training default) | 16.2ms | 200ms | ~216ms | **FAIL** |
+| stride=100ms (deployment setting) | 16.2ms | 100ms | **116ms** | **PASS** |
+
+**Deployment setting:** `lsl.inference_stride_ms: 100` added to `config_stroke.yaml`.
+
+Model is a stateless CNN — stride can be changed freely in deployment without retraining.
+
+---
 
 ### Exhalation Fix — EDR Method Analysis & Decision
 

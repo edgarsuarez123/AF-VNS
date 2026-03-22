@@ -33,6 +33,7 @@ data:
 
 lsl:
   expected_hz: 250
+  inference_stride_ms: 100     # Closed-loop deployment stride; 100ms → worst-case 116ms (NFR-1.1 PASS)
 
 hrv:
   window_sec: [30, 300]

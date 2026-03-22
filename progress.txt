@@ -1609,3 +1609,22 @@ ABLATION COMPLETE (2026-03-22): ECG-only ceiling confirmed at ~56% exhalation
   - Neither window size, capacity, nor loss weighting can overcome label noise
   - Best model remains: reference labels, 2s windows, 7.5K base model
   - Next options: A) NaN-mask MIMIC exh, B) QRS-amplitude EDR, C) more data, D) Phase 2 hardware
+
+S-29 (2026-03-22): OOD generalization — SHaRe Holter ECGs (never in training)
+  - Diastole: 81.06% (in-dist 84.34%, gap = -3.3%)
+  - Exhalation: ~50% (expected — SHaRe has no reference resp signal, EDR = noise)
+  - Verdict: PASS. Diastole generalizes well to ambulatory Holter ECG.
+
+S-30 (2026-03-22): Closed-loop event-to-stim latency benchmark
+  - NFR-1.1 requirement: <200ms (event → VNS trigger)
+  - Pipeline: ECG → resample + denoise + forward + co-occurrence check
+  - Per-call processing p95 = 16.2ms on CPU
+  - At 200ms stride: worst-case = 216ms → FAIL
+  - At 100ms stride: worst-case = 116ms → PASS
+  - Deployment setting: lsl.inference_stride_ms=100 added to config_stroke.yaml
+  - Model is stateless CNN — stride change requires no retraining
+
+S-41 (2026-03-22): NaN-mask MIMIC exhalation + FANTASIA reference data — training in progress
+  - Cache: 477 records (215 reference CVES, 40 FANTASIA, 217 masked MIMIC, 5 EDR fallback)
+  - Masked cache: 2.65M windows
+  - Training: phase_detector_masked.pth — Epoch 2 in progress
