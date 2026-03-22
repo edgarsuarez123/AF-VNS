@@ -172,6 +172,9 @@ cycles and respiratory modulation regardless of pathology.
 | S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
 | S-39 | Per-source evaluation: CVES (ref labels) vs MIMIC (EDR) | **Done** | 2026-03-22 |
 | S-38 | 5s windows with reference labels — full respiratory cycle context | **Done** | 2026-03-22 |
+| S-40a | Large model [32,64,96] 29K params — capacity experiment | **Done** | 2026-03-22 |
+| S-40b | Weighted loss 0.7 exh — optimization experiment | **Done** | 2026-03-22 |
+| S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
 
@@ -254,7 +257,7 @@ cycles and respiratory modulation regardless of pathology.
 
 ## Resume From Here
 
-**Current state (2026-03-22) — S-32/S-33/S-34 COMPLETE, S-35 IN PROGRESS:**
+**Current state (2026-03-22) — S-32–S-40 COMPLETE. Exhalation ceiling confirmed at ~56% ECG-only.**
 
 ### S-32 — Parser extracts respiratory channel ✅
 - `parse_cerevasc_dir()` now returns `resp_signal` and `resp_channel` fields
@@ -307,7 +310,7 @@ cycles and respiratory modulation regardless of pathology.
 
 **Conclusion:** 5s windows do NOT improve exhalation. The model plateaued at 58% val_exh during training (early stop Epoch 42). The bottleneck is not window size — the model has enough temporal context at 2s. Root cause is label quality for MIMIC records (EDR noise) and possibly model capacity.
 
-**Next:** 6a (bigger model) + 6b (exhalation loss weighting) — these address capacity and optimization separately.
+**Next:** S-40a (bigger model) + S-40b (weighted loss) — completed, see below.
 
 ### S-36 — Evaluation Complete ✅ (2026-03-22 13:15)
 
@@ -330,8 +333,35 @@ cycles and respiratory modulation regardless of pathology.
   3. Model learns from mixed-quality labels (215 ref + 11 EDR in train)
   4. Exhalation phase is harder than diastole (physiological variability)
 
-**Next Steps for Improvement:**
-- Mask MIMIC exhalation labels to NaN during training (train on CVES ref only)
-- Investigate thermst vs flow_rate — flow_rate likely higher SNR
-- Longer training run or ensemble across random seeds
-- Collect independent test set with hardware resp sensor ground truth
+### S-40a — Large Model [32,64,96] ✅ (2026-03-22)
+
+- 29,474 params (4× base), equal task weights
+- Test: **diastole 84.06%, exhalation 56.07%**
+- Verdict: No improvement. Capacity is not the bottleneck.
+
+### S-40b — Weighted Loss (0.3 dia / 0.7 exh) ✅ (2026-03-22)
+
+- Base 7.5K model, exhalation loss weighted 2.3× higher
+- Early stop Epoch 17 (faster convergence but unstable — exh swinging 40-60%)
+- Test: **diastole 82.78%, exhalation 56.36%**
+- Verdict: No improvement. Weighting shifts optimization budget but can't fix label noise.
+
+### Ablation Summary — ECG-Only Exhalation Ceiling (2026-03-22)
+
+| Experiment | Diastole | Exhalation | Notes |
+|-----------|----------|------------|-------|
+| EDR baseline (S-26) | 83.58% | ~52% | Pure EDR labels, all sources |
+| Reference labels (S-36) | **84.34%** | **56.54%** | CVES: reference; MIMIC: EDR fallback |
+| 5s windows (S-38) | 82.27% | 57.36% | No gain; window size not the limit |
+| Large model 29K (S-40a) | 84.06% | 56.07% | No gain; capacity not the limit |
+| Weighted loss 0.7 exh (S-40b) | 82.78% | 56.36% | No gain; optimization not the limit |
+
+**Root cause confirmed:** ~56% exhalation accuracy is the ECG-only ceiling on this mixed dataset.
+MIMIC exhalation labels are random noise (49.77% per S-39) — they actively hurt training.
+CVES-only exhalation would be ~58-62% based on per-source diagnostics.
+
+**To break through 60%+ exhalation, one of the following is required:**
+1. Remove MIMIC exhalation from training (NaN-mask it) — isolates clean CVES signal
+2. Better MIMIC labels via QRS amplitude modulation EDR (6c)
+3. More reference-labeled data: FANTASIA + capnobase (~82 additional records)
+4. Deploy with impedance hardware (production plan — bypasses ECG-only limitation entirely)

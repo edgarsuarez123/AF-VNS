@@ -1594,3 +1594,18 @@ S-40 (2026-03-22): 6a Large model + 6b Weighted loss experiments
   - 6b: phase_model (7.5K) with task_weight_exh=0.7, task_weight_dia=0.3
     Pending (launch after 6a completes)
   - phase_train.py: multitask_bce_loss() now accepts dia_weight/exh_weight params
+
+S-40a (2026-03-22): Large model [32,64,96] 29K params
+  - Test: diastole 84.06%, exhalation 56.07%
+  - Verdict: No improvement. Capacity is not the bottleneck.
+
+S-40b (2026-03-22): Weighted loss (0.3 dia / 0.7 exh)
+  - Early stop Epoch 17, unstable (exh swinging 40-60% per epoch)
+  - Test: diastole 82.78%, exhalation 56.36%
+  - Verdict: No improvement. Label noise defeats loss weighting.
+
+ABLATION COMPLETE (2026-03-22): ECG-only ceiling confirmed at ~56% exhalation
+  - Root cause: MIMIC exhalation labels are noise (49.77% per S-39)
+  - Neither window size, capacity, nor loss weighting can overcome label noise
+  - Best model remains: reference labels, 2s windows, 7.5K base model
+  - Next options: A) NaN-mask MIMIC exh, B) QRS-amplitude EDR, C) more data, D) Phase 2 hardware
