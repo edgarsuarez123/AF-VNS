@@ -201,6 +201,8 @@ def parse_sharee_dir(
     data_cfg = config.get("data", {})
     target_fs: float = float(data_cfg.get("target_fs", 0))
     waveform_sec: float = float(data_cfg.get("waveform_sec", 10))
+    # Limit signal length at read time to avoid loading full 24h recordings into RAM
+    max_signal_sec: Optional[float] = data_cfg.get("max_signal_sec", None)
 
     base = Path(data_dir)
     if not base.is_dir():
@@ -219,7 +221,9 @@ def parse_sharee_dir(
         label = label_map.get(name, 0)
 
         try:
-            record = wfdb.rdrecord(str(base / name))
+            hdr = wfdb.rdheader(str(base / name))
+            sampto = int(max_signal_sec * hdr.fs) if max_signal_sec else None
+            record = wfdb.rdrecord(str(base / name), sampto=sampto)
         except Exception as e:
             logger.warning("Failed to read SHAREE record %s: %s", name, e)
             continue
@@ -418,6 +422,8 @@ def parse_fantasia_dir(
     data_cfg = config.get("data", {})
     target_fs = int(data_cfg.get("target_fs", 250))
     waveform_sec = int(data_cfg.get("waveform_sec", 10))
+    # Limit signal length at read time to avoid loading full ~2h recordings into RAM
+    max_signal_sec: Optional[float] = data_cfg.get("max_signal_sec", None)
 
     data_dir = Path(data_dir)
     hea_files = sorted(data_dir.glob("*.hea"))
@@ -430,7 +436,9 @@ def parse_fantasia_dir(
         stem = hea.stem
         record_path = str(hea.parent / stem)
         try:
-            rec = wfdb.rdrecord(record_path)
+            hdr = wfdb.rdheader(record_path)
+            sampto = int(max_signal_sec * hdr.fs) if max_signal_sec else None
+            rec = wfdb.rdrecord(record_path, sampto=sampto)
         except Exception as e:
             logger.warning("FANTASIA: failed to read %s: %s", stem, e)
             continue
