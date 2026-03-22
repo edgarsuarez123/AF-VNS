@@ -169,7 +169,9 @@ cycles and respiratory modulation regardless of pathology.
 | S-26 | Train phase detector on CVES + MIMIC-3 combined | **Done** | 2026-03-20 — early stop Epoch 50, best avg_acc=68.64% |
 | S-27 | `src/training/phase_evaluate.py` — accuracy, per-class precision/recall for diastole + exhalation; confusion matrices | **Done** | 2026-03-20 |
 | S-28 | Evaluate + diagnose exhalation bottleneck | **Done** | 2026-03-21 — see sub-steps below |
-| S-29 | OOD evaluation on SHaRe — report generalization | Pending | Blocked until exhalation is fixed |
+| S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
+| S-39 | Per-source evaluation: CVES (ref labels) vs MIMIC (EDR) | **Done** | 2026-03-22 |
+| S-38 | 5s windows with reference labels — full respiratory cycle context | Running | |
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
 
@@ -283,6 +285,24 @@ cycles and respiratory modulation regardless of pathology.
 - Best exhalation: 61.12% (Epoch 13) — up from 52% baseline
 - Diastole holding at 85-86%
 - Continuing with patience=15 early stopping
+
+### S-39 — Per-Source Evaluation ✅ (2026-03-22)
+
+| Source | Diastole | Exhalation | Label Method |
+|--------|----------|------------|------------|
+| **CVES** | **84.34%** | **56.54%** | Reference (hardware thermst/flow_rate) |
+| **MIMIC** | **69.73%** | **49.77%** | EDR (RSA — effectively noise) |
+
+**Conclusions:**
+- MIMIC exhalation = coin flip (49.77%). EDR labels are noise for ICU data.
+- MIMIC diastole also lower (69.73%) — noisy ICU ECG hurts both tasks.
+- CVES exhalation at 56.54% is the real baseline with hardware reference labels.
+- Training on MIMIC EDR exhalation may hurt overall performance (gradient noise).
+
+### S-38 — 5s Windows (In Progress)
+- Rebuilding combined (CVES+MIMIC) cache with 5s windows and reference labels
+- Previous 5s with EDR: diastole 79.86%, exh 53.90%
+- Expected: improvement with reference labels + full respiratory cycle context
 
 ### S-36 — Evaluation Complete ✅ (2026-03-22 13:15)
 
