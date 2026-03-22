@@ -193,11 +193,11 @@ cycles and respiratory modulation regardless of pathology.
 
 | Step | Description | Status |
 |------|-------------|--------|
-| S-32 | Extract `thermst`/`flow_rate`/`resp` channel from CVES in `parse_cerevasc_dir()` — return alongside ECG signal | Pending |
-| S-33 | `src/features/resp_labels.py` — generate exhalation labels from reference respiratory signal (peak detection on thermistor/flow_rate) instead of EDR | Pending |
-| S-34 | Update `stroke_precompute_cache.py` — use reference resp signal for exhalation labels when available (CVES), fall back to EDR for MIMIC-3/SHaRe | Pending |
-| S-35 | Rebuild CVES cache with reference labels, retrain phase detector | Pending |
-| S-36 | Evaluate — exhalation accuracy is now a real number (model vs. measured breathing) | Pending |
+| S-32 | Extract `thermst`/`flow_rate`/`resp` channel from CVES in `parse_cerevasc_dir()` — return alongside ECG signal | **Done** | 2026-03-22 |
+| S-33 | `src/features/resp_labels.py` — generate exhalation labels from reference respiratory signal (Butterworth bandpass + scipy peak detection) instead of EDR | **Done** | 2026-03-22 |
+| S-34 | Update `stroke_precompute_cache.py` — use reference resp signal for exhalation labels when available (CVES), fall back to EDR for MIMIC-3/SHaRe. Tracks exh_method_counts in metadata. | **Done** | 2026-03-22 |
+| S-35 | Rebuild CVES cache with reference labels, retrain phase detector | Running | |
+| S-36 | Evaluate — exhalation accuracy is now a real number (model vs. measured breathing) | Pending | |
 
 ### Previous Steps (Stroke vs. Control — completed but superseded)
 
