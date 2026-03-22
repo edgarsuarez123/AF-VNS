@@ -1562,3 +1562,35 @@ S-28 FINAL (2026-03-21): 5s window training complete — exhalation still broken
     - Not affected by autonomic state, works during stress tests
     - Or: accept limitation, document that exhalation needs impedance hardware (Phase 2)
   - Diastole is solid at 83-85% -> meets NFR-1.1 for cardiac phase
+
+S-32/S-33/S-34 (2026-03-22): Reference respiratory signal pipeline complete
+  - DISCOVERY: CVES .dat files contain flow_rate + thermst channels (hardware-measured breathing)
+  - S-32: parse_cerevasc_dir() now extracts resp_signal + resp_channel (215/226 records = 95%)
+  - S-33: resp_labels.py — Butterworth bandpass + scipy peak detection on reference signals
+  - S-34: stroke_precompute_cache.py prefers reference over EDR, tracks exh_method_counts
+  - 30 new tests across 3 test files, all passing
+
+S-35/S-36 (2026-03-22): Cache rebuilt + trained + evaluated with reference labels
+  - Cache: 226 records, 1.95M windows, exh_method_counts: reference=215, edr=11
+  - Training: best Epoch 13, avg_acc=73.67% (vs 68.64% with EDR)
+  - Test: diastole 84.34%, exhalation 56.54% (+4.56% over EDR baseline)
+
+S-39 (2026-03-22): Per-source diagnostic evaluation
+  - CVES (ref labels): diastole 84.34%, exhalation 56.54%
+  - MIMIC (EDR labels): diastole 69.73%, exhalation 49.77% (= random chance)
+  - Confirmed: MIMIC EDR labels are noise; CVES reference is real improvement
+  - Next: 5s windows with reference labels (S-38)
+
+S-38 (2026-03-22): 5s windows with reference labels
+  - Cache: 778,237 windows @ 5s, CVES+MIMIC, reference=215, edr=11
+  - Training: early stop Epoch 42, best avg_acc=70.51%
+  - Test set: diastole 82.27%, exhalation 57.36%
+  - Verdict: 5s windows offer NO improvement (diastole worse, exh +0.8%)
+  - Root cause is model capacity / label quality, not window size
+
+S-40 (2026-03-22): 6a Large model + 6b Weighted loss experiments
+  - 6a: phase_model_large channels=[32,64,96] ~30K params, equal weights
+    Training launched → train_large_err.log
+  - 6b: phase_model (7.5K) with task_weight_exh=0.7, task_weight_dia=0.3
+    Pending (launch after 6a completes)
+  - phase_train.py: multitask_bce_loss() now accepts dia_weight/exh_weight params

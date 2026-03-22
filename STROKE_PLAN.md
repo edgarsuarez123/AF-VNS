@@ -171,7 +171,7 @@ cycles and respiratory modulation regardless of pathology.
 | S-28 | Evaluate + diagnose exhalation bottleneck | **Done** | 2026-03-21 — see sub-steps below |
 | S-29 | OOD evaluation on SHaRe — report generalization | Pending | |
 | S-39 | Per-source evaluation: CVES (ref labels) vs MIMIC (EDR) | **Done** | 2026-03-22 |
-| S-38 | 5s windows with reference labels — full respiratory cycle context | Running | |
+| S-38 | 5s windows with reference labels — full respiratory cycle context | **Done** | 2026-03-22 |
 | S-30 | Latency benchmark — single-window inference <200ms end-to-end | Pending | |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
 
@@ -299,10 +299,15 @@ cycles and respiratory modulation regardless of pathology.
 - CVES exhalation at 56.54% is the real baseline with hardware reference labels.
 - Training on MIMIC EDR exhalation may hurt overall performance (gradient noise).
 
-### S-38 — 5s Windows (In Progress)
-- Rebuilding combined (CVES+MIMIC) cache with 5s windows and reference labels
-- Previous 5s with EDR: diastole 79.86%, exh 53.90%
-- Expected: improvement with reference labels + full respiratory cycle context
+### S-38 — 5s Windows ✅ (2026-03-22)
+
+**Test Set Results (129,892 windows @ 5s each):**
+- **Diastole: 82.27%** (vs 84.34% for 2s model — worse)
+- **Exhalation: 57.36%** (vs 56.54% for 2s model — marginal +0.8%)
+
+**Conclusion:** 5s windows do NOT improve exhalation. The model plateaued at 58% val_exh during training (early stop Epoch 42). The bottleneck is not window size — the model has enough temporal context at 2s. Root cause is label quality for MIMIC records (EDR noise) and possibly model capacity.
+
+**Next:** 6a (bigger model) + 6b (exhalation loss weighting) — these address capacity and optimization separately.
 
 ### S-36 — Evaluation Complete ✅ (2026-03-22 13:15)
 

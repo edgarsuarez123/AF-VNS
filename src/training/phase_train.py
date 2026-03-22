@@ -82,24 +82,26 @@ def multitask_bce_loss(
     exh_targets: torch.Tensor,
     dia_pw: torch.Tensor,
     exh_pw: torch.Tensor,
+    dia_weight: float = 0.5,
+    exh_weight: float = 0.5,
 ) -> torch.Tensor:
-    """Multi-task BCE with NaN masking. Returns scalar loss."""
+    """Multi-task BCE with NaN masking and per-task loss weights. Returns scalar loss."""
     dia_logits = logits[:, :, 0]
     exh_logits = logits[:, :, 1]
     dia_mask = ~torch.isnan(dia_targets)
     exh_mask = ~torch.isnan(exh_targets)
 
-    losses: list[torch.Tensor] = []
+    # weights should sum to 1.0; default (0.5, 0.5) matches original equal-avg behavior
+    loss = torch.tensor(0.0, device=logits.device, requires_grad=True)
     if dia_mask.any():
-        losses.append(F.binary_cross_entropy_with_logits(
-            dia_logits[dia_mask], dia_targets[dia_mask], pos_weight=dia_pw))
+        dia_loss = F.binary_cross_entropy_with_logits(
+            dia_logits[dia_mask], dia_targets[dia_mask], pos_weight=dia_pw)
+        loss = loss + dia_weight * dia_loss
     if exh_mask.any():
-        losses.append(F.binary_cross_entropy_with_logits(
-            exh_logits[exh_mask], exh_targets[exh_mask], pos_weight=exh_pw))
-
-    if not losses:
-        return torch.tensor(0.0, device=logits.device, requires_grad=True)
-    return sum(losses) / len(losses)
+        exh_loss = F.binary_cross_entropy_with_logits(
+            exh_logits[exh_mask], exh_targets[exh_mask], pos_weight=exh_pw)
+        loss = loss + exh_weight * exh_loss
+    return loss
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +189,8 @@ def main():
     max_epochs = args.max_epochs if args.max_epochs is not None else int(train_cfg.get("max_epochs", 100))
     patience = int(train_cfg.get("patience", 15))
     grad_clip = float(train_cfg.get("grad_clip", 1.0))
+    dia_weight = float(train_cfg.get("task_weight_dia", 0.5))
+    exh_weight = float(train_cfg.get("task_weight_exh", 0.5))
 
     Path(checkpoint_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -219,6 +223,7 @@ def main():
     # Per-task pos_weight
     dia_pw, exh_pw = compute_phase_pos_weights(train_ds, device)
     logger.info("pos_weight — diastole=%.2f  exhalation=%.2f", dia_pw.item(), exh_pw.item())
+    logger.info("task_weight — diastole=%.2f  exhalation=%.2f", dia_weight, exh_weight)
 
     # Build model
     model = build_phase_detector(
@@ -252,7 +257,7 @@ def main():
 
             optimizer.zero_grad()
             logits = model(ecg)
-            loss = multitask_bce_loss(logits, dia, exh, dia_pw, exh_pw)
+            loss = multitask_bce_loss(logits, dia, exh, dia_pw, exh_pw, dia_weight, exh_weight)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
             optimizer.step()

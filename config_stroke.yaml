@@ -186,3 +186,32 @@ phase_training_5s:
   patience: 15
   grad_clip: 1.0
   checkpoint_path: models/checkpoints/phase_detector_5s.pth
+
+# 6a — larger model: channels [32, 64, 96] (~30K params)
+phase_model_large:
+  channels: [32, 64, 96]
+  kernels: [7, 5, 3]
+  strides: [5, 2, 2]
+  dropout: 0.15
+  n_frames: 10
+  n_tasks: 2
+
+phase_training_large:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  # equal weights — isolates capacity effect
+  task_weight_dia: 0.5
+  task_weight_exh: 0.5
+
+# 6b — exhalation-weighted loss: 0.3 dia + 0.7 exh
+phase_training_weighted:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.3
+  task_weight_exh: 0.7
