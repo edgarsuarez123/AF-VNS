@@ -177,6 +177,14 @@ cycles and respiratory modulation regardless of pathology.
 | S-30 | Closed-loop event-to-stim latency benchmark — NFR-1.1 <200ms | **Done** | 2026-03-22 — 116ms worst-case p95 at 100ms stride (PASS) |
 | S-41 | NaN-mask MIMIC exhalation + FANTASIA reference data — retrain | **Done** | 2026-03-22 — dia 82.47%, exh 56.48% (no gain; see notes) |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
+| S-42 | `dl_bidmc.py` — BIDMC download script | **Done** | 2026-03-23 |
+| S-43 | `config_stroke.yaml` — add `bidmc_subdir` | **Done** | 2026-03-23 |
+| S-44 | `parse_bidmc_dir()` in stroke_parsers.py — ECG (II) + RESP (impedance pneumography), 125→250 Hz | **Done** | 2026-03-23 |
+| S-45 | `stroke_precompute_cache.py` — BIDMC in training branch + standalone `--dataset bidmc` | **Done** | 2026-03-23 |
+| S-46 | 7 tests for `parse_bidmc_dir` — all passing | **Done** | 2026-03-23 |
+| S-47 | Download BIDMC + rebuild cache with BIDMC included | Running | Download in background |
+| S-48 | Retrain phase detector with BIDMC reference labels | Pending | |
+| S-49 | Evaluate — compare diastole/exhalation vs baseline (84.34% / 56.54%) | Pending | |
 
 ### S-41 — Masked+FANTASIA Results (2026-03-22)
 
@@ -308,7 +316,32 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 
 ## Resume From Here
 
-**Current state (2026-03-22) — S-32–S-40 COMPLETE. Exhalation ceiling confirmed at ~56% ECG-only.**
+**Current state (2026-03-23) — S-42–S-46 COMPLETE. BIDMC download running in background.**
+
+Check download: `Get-Content "C:\Users\Edgar\AF VNS\bidmc_download.log" -Tail 5`
+Check errors: `Get-Content "C:\Users\Edgar\AF VNS\bidmc_download_err.log" -Tail 5`
+
+Once download completes (~53 records), rebuild cache:
+```powershell
+Remove-Item "models/artifacts/phase_detect_split.json" -ErrorAction SilentlyContinue
+Start-Process -WindowStyle Hidden "C:\Users\Edgar\AF VNS\.venv\Scripts\python.exe" `
+  -ArgumentList "-m src.training.stroke_precompute_cache --config config_stroke.yaml --dataset training --workers 4 --mask-edr-exhalation" `
+  -WorkingDirectory "C:\Users\Edgar\AF VNS" `
+  -RedirectStandardOutput "C:\Users\Edgar\AF VNS\cache_rebuild.log" `
+  -RedirectStandardError "C:\Users\Edgar\AF VNS\cache_rebuild_err.log"
+```
+Expected: `exh_method_counts.reference` increases from 215 → ~268
+
+Then retrain:
+```powershell
+Start-Process -WindowStyle Hidden "C:\Users\Edgar\AF VNS\.venv\Scripts\python.exe" `
+  -ArgumentList "-m src.training.phase_train --config config_stroke.yaml" `
+  -WorkingDirectory "C:\Users\Edgar\AF VNS" `
+  -RedirectStandardOutput "C:\Users\Edgar\AF VNS\train.log" `
+  -RedirectStandardError "C:\Users\Edgar\AF VNS\train_err.log"
+```
+
+**Previous state (2026-03-22) — S-32–S-40 COMPLETE. Exhalation ceiling confirmed at ~56% ECG-only.**
 
 ### S-32 — Parser extracts respiratory channel ✅
 - `parse_cerevasc_dir()` now returns `resp_signal` and `resp_channel` fields
