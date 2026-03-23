@@ -340,9 +340,33 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 
 ---
 
+### CVES-Only Retrain & Data Strategy
+
+| Step | Description | Status | Completed At |
+|------|-------------|--------|--------------|
+| S-50 | Verify CVES-only cache (`cache_phase_detect_cves`) — 1.95M windows, 95% reference labels | **Done** | 2026-03-23 |
+| S-51 | Train phase detector on CVES-only cache → `phase_detector_cves.pth` | **In Progress** | — |
+| S-52 | Evaluate CVES-only model — compare vs baseline (dia 84.34% / exh 56.54%) | Pending | — |
+| S-53 | Update STROKE_PLAN.md with results + Data Strategy section | Pending | — |
+
+---
+
 ## Resume From Here
 
-**Current state (2026-03-23) — S-31 COMPLETE. Full pipeline integrated.**
+**Current state (2026-03-23) — S-51 IN PROGRESS. CVES-only training running.**
+
+Monitor: `Get-Content "C:\Users\Edgar\AF VNS\phase_train_cves_err.log" -Tail 5`
+
+When training finishes, run S-52 evaluation:
+```
+.venv/Scripts/python -m src.training.phase_evaluate --config config_stroke.yaml --checkpoint models/checkpoints/phase_detector_cves.pth --cache-dir models/artifacts/cache_phase_detect_cves
+```
+
+Then update STROKE_PLAN.md with results (S-53).
+
+---
+
+**Previous state (2026-03-23) — S-31 COMPLETE. Full pipeline integrated.**
 
 `src/models/closed_loop_pipeline.py` — `ClosedLoopPipeline` + `build_closed_loop_pipeline()` factory.
 10/10 integration tests passing. 267/268 total tests passing (1 pre-existing BIDMC parser channel-name bug).

@@ -5,6 +5,20 @@ Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
 Last updated: 2026-03-23
 
 --------------------------------------------------------------------------------
+S-50. CVES-ONLY CACHE — VERIFIED (2026-03-23)
+--------------------------------------------------------------------------------
+Cache at models/artifacts/cache_phase_detect_cves/ confirmed valid.
+1,948,391 windows. exh_method_counts: reference=215, edr=11, none=0 (95% ref).
+Split: train=1,319,227 / val=336,711 / test=251,402. No rebuild needed.
+
+--------------------------------------------------------------------------------
+S-51. CVES-ONLY RETRAIN — IN PROGRESS (2026-03-23)
+--------------------------------------------------------------------------------
+Training launched: phase_train.py --cache-dir cache_phase_detect_cves
+--checkpoint-out models/checkpoints/phase_detector_cves.pth
+GPU training, ~44 batches/sec, patience=15. Log: phase_train_cves_err.log
+
+--------------------------------------------------------------------------------
 S-31. CLOSED-LOOP INTEGRATION PIPELINE (2026-03-23)
 --------------------------------------------------------------------------------
 
