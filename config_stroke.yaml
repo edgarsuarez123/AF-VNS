@@ -23,6 +23,7 @@ data:
   sharee_subdir: data/raw/stroke avns/shareedb
   cves_subdir: data/raw/stroke avns/cves
   fantasia_subdir: data/raw/stroke avns/fantasia
+  bidmc_subdir: data/raw/stroke avns/bidmc
   max_signal_sec: 300        # Cap long recordings (SHaRe 24h, FANTASIA 2h) to 5 min
   # Keep same waveform/HRV windows as AF pipeline so backbone weights transfer cleanly
   waveform_sec: 10

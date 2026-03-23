@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data.stroke_parsers import (
     parse_cerevasc_dir,
     parse_fantasia_dir,
+    parse_bidmc_dir,
     parse_mimic3_stroke_dir,
     parse_sharee_dir,
     _select_resp_channel,
@@ -588,3 +589,107 @@ def test_parse_fantasia_integration():
     n_with_resp = sum(1 for r in records if r["resp_signal"] is not None)
     print(f"\nFANTASIA: {len(records)} records, {n_with_resp} with resp_signal")
     assert n_with_resp == len(records), "All FANTASIA records should have resp_signal"
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — parse_bidmc_dir
+# ---------------------------------------------------------------------------
+
+def _write_bidmc_record(tmp_dir: Path, name: str, n_samples: int = 3000, fs: int = 125) -> None:
+    """Write a synthetic BIDMC-like record with II (ECG) + RESP channels."""
+    rng = np.random.default_rng(42)
+    sig = (rng.standard_normal((n_samples, 2)) * 0.5).astype(np.float64)
+    wfdb.wrsamp(
+        name,
+        fs=fs,
+        units=["mV", "mV"],
+        sig_name=["II", "RESP"],
+        p_signal=sig,
+        write_dir=str(tmp_dir),
+    )
+
+
+def test_parse_bidmc_returns_records():
+    """parse_bidmc_dir returns a non-empty list for a valid directory."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        _write_bidmc_record(tmp_dir, "bidmc01", n_samples=3000)
+        cfg = _make_stroke_config(tmp_dir)
+        records = parse_bidmc_dir(str(tmp_dir), cfg)
+    assert len(records) == 1
+
+
+def test_parse_bidmc_subject_id_prefix():
+    """subject_id uses bidmc_ prefix to avoid ID collisions with other datasets."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        _write_bidmc_record(tmp_dir, "bidmc01")
+        cfg = _make_stroke_config(tmp_dir)
+        records = parse_bidmc_dir(str(tmp_dir), cfg)
+    assert records[0]["subject_id"] == "bidmc_bidmc01"
+
+
+def test_parse_bidmc_label_zero():
+    """All BIDMC records have label=0 (phase detection, not stroke classification)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        for name in ["bidmc01", "bidmc02"]:
+            _write_bidmc_record(tmp_dir, name)
+        cfg = _make_stroke_config(tmp_dir)
+        records = parse_bidmc_dir(str(tmp_dir), cfg)
+    assert all(r["label"] == 0 for r in records)
+
+
+def test_parse_bidmc_resamples_to_250():
+    """Records at 125 Hz are resampled to target_fs=250 Hz."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        _write_bidmc_record(tmp_dir, "bidmc01", n_samples=3000, fs=125)
+        cfg = _make_stroke_config(tmp_dir, target_fs=250.0)
+        records = parse_bidmc_dir(str(tmp_dir), cfg)
+    assert len(records) == 1
+    assert abs(records[0]["fs"] - 250.0) < 0.1
+
+
+def test_parse_bidmc_resp_signal_extracted():
+    """resp_signal is non-None and resp_channel is 'resp' (impedance pneumography)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        _write_bidmc_record(tmp_dir, "bidmc01", n_samples=3000)
+        cfg = _make_stroke_config(tmp_dir)
+        records = parse_bidmc_dir(str(tmp_dir), cfg)
+    assert records[0]["resp_signal"] is not None
+    assert records[0]["resp_channel"] == "resp"
+    assert len(records[0]["resp_signal"]) == len(records[0]["signal"])
+
+
+def test_parse_bidmc_too_short_skipped():
+    """Records shorter than waveform_sec * target_fs are skipped."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        _write_bidmc_record(tmp_dir, "short", n_samples=100, fs=125)  # 0.8s < 10s
+        cfg = _make_stroke_config(tmp_dir, target_fs=250.0, waveform_sec=10.0)
+        records = parse_bidmc_dir(str(tmp_dir), cfg)
+    assert len(records) == 0
+
+
+def test_parse_bidmc_empty_dir():
+    """Empty directory returns empty list without error."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_stroke_config(Path(tmp))
+        records = parse_bidmc_dir(tmp, cfg)
+    assert records == []
+
+
+@pytest.mark.integration
+def test_parse_bidmc_integration():
+    """Integration: real BIDMC records should parse with resp_signal."""
+    data_dir = "data/raw/stroke avns/bidmc"
+    config_path = "config_stroke.yaml"
+    if not Path(data_dir).is_dir():
+        pytest.skip("BIDMC data not found")
+    records = parse_bidmc_dir(data_dir, config_path)
+    assert len(records) > 0, "Expected records from BIDMC"
+    n_with_resp = sum(1 for r in records if r["resp_signal"] is not None)
+    print(f"\nBIDMC: {len(records)} records, {n_with_resp} with resp_signal")
+    assert n_with_resp == len(records), "All BIDMC records should have resp_signal"

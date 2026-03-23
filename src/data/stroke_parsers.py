@@ -488,3 +488,98 @@ def parse_fantasia_dir(
 
     logger.info("Parsed %d records from fantasia (dir: %s)", len(records), data_dir)
     return records
+
+
+# ---------------------------------------------------------------------------
+# BIDMC (Beth Israel Deaconess Medical Center — PhysioNet bidmc)
+# 53 ICU patient records, ~8 minutes each, 125 Hz.
+# Channels: II (ECG lead II) + RESP (impedance pneumography).
+# All label=0 — phase detection task, not stroke classification.
+# Provides reference exhalation labels via impedance pneumography (clean signal).
+# ---------------------------------------------------------------------------
+
+def parse_bidmc_dir(
+    data_dir: str,
+    config_path: str,
+) -> List[StrokeRecordDict]:
+    """Parse BIDMC PhysioNet records. Returns StrokeRecordDicts with
+    ECG + impedance pneumography respiratory reference signal.
+
+    BIDMC is 125 Hz native; resampled to target_fs (250 Hz) automatically.
+    Impedance pneumography peaks = end of inhale (no inversion needed —
+    same polarity as flow_rate).
+    """
+    import wfdb
+
+    config = load_config(config_path)
+    data_cfg = config.get("data", {})
+    target_fs = int(data_cfg.get("target_fs", 250))
+    waveform_sec = int(data_cfg.get("waveform_sec", 10))
+    max_signal_sec: Optional[float] = data_cfg.get("max_signal_sec", None)
+
+    data_dir = Path(data_dir)
+    hea_files = sorted(data_dir.glob("*.hea"))
+    if not hea_files:
+        logger.warning("No .hea files found in bidmc dir: %s", data_dir)
+        return []
+
+    records = []
+    for hea in hea_files:
+        stem = hea.stem
+        record_path = str(hea.parent / stem)
+        try:
+            hdr = wfdb.rdheader(record_path)
+            sampto = int(max_signal_sec * hdr.fs) if max_signal_sec else None
+            rec = wfdb.rdrecord(record_path, sampto=sampto)
+        except Exception as e:
+            logger.warning("BIDMC: failed to read %s: %s", stem, e)
+            continue
+
+        sig_names_upper = [n.strip().upper() for n in rec.sig_name]
+        fs = float(rec.fs)
+
+        # ECG: prefer II, fall back to any ECG-named channel
+        ecg_idx = next((i for i, n in enumerate(sig_names_upper) if n == "II"), None)
+        if ecg_idx is None:
+            ecg_idx = next((i for i, n in enumerate(sig_names_upper) if "ECG" in n), None)
+        if ecg_idx is None:
+            logger.warning("BIDMC %s: no ECG channel in %s — skipping", stem, sig_names_upper)
+            continue
+
+        # RESP: impedance pneumography channel
+        resp_idx = next((i for i, n in enumerate(sig_names_upper) if "RESP" in n), None)
+
+        signal_all = np.nan_to_num(rec.p_signal, nan=0.0)
+        ecg = signal_all[:, ecg_idx].astype(np.float64)
+
+        resp_signal = None
+        resp_channel = None
+        if resp_idx is not None:
+            resp_signal = signal_all[:, resp_idx].astype(np.float64)
+            resp_channel = "resp"  # no inversion — same polarity as flow_rate
+
+        # Resample from 125 Hz to target_fs (250 Hz = 2x integer upsample)
+        if fs != target_fs:
+            ecg = _resample_to_target_fs(ecg, fs, target_fs)
+            if resp_signal is not None:
+                resp_signal = _resample_to_target_fs(resp_signal, fs, target_fs)
+
+        min_len = waveform_sec * target_fs
+        if len(ecg) < min_len:
+            logger.debug("BIDMC %s: signal too short (%d < %d) — skipping", stem, len(ecg), min_len)
+            continue
+
+        records.append({
+            "subject_id": f"bidmc_{stem}",
+            "signal": ecg,
+            "fs": float(target_fs),
+            "label": 0,  # all BIDMC subjects are ICU controls (phase detection, not stroke classification)
+            "session_id": None,
+            "epoch_type": None,
+            "condition": None,
+            "resp_signal": resp_signal,
+            "resp_channel": resp_channel,
+        })
+
+    logger.info("Parsed %d records from bidmc (dir: %s)", len(records), data_dir)
+    return records

@@ -29,6 +29,7 @@ if __name__ == "__main__":
 from src.data.splitter import create_split, load_split
 from src.data.stroke_parsers import (
     parse_fantasia_dir,
+    parse_bidmc_dir,
     StrokeRecordDict,
     parse_cerevasc_dir,
     parse_mimic3_stroke_dir,
@@ -481,6 +482,15 @@ def main(
         else:
             logger.info("FANTASIA dir not found (%s) — skipping", fantasia_dir)
 
+        # Load BIDMC (optional — included if directory exists)
+        bidmc_dir = data_cfg.get("bidmc_subdir", "data/raw/stroke avns/bidmc")
+        if Path(bidmc_dir).exists():
+            bidmc_records = parse_bidmc_dir(bidmc_dir, config_path)
+            logger.info("Loaded %d BIDMC records", len(bidmc_records))
+            records.extend(bidmc_records)
+        else:
+            logger.info("BIDMC dir not found (%s) — skipping", bidmc_dir)
+
     elif dataset == "ood":
         cache_dir = Path(precompute_cfg.get(
             "ood_cache_dir", "models/artifacts/cache_phase_detect_ood"))
@@ -510,8 +520,17 @@ def main(
         logger.info("Loaded %d MIMIC-3 stroke records", len(mimic_records))
         records.extend(mimic_records)
 
+    elif dataset == "bidmc":
+        cache_dir = Path(precompute_cfg.get("cache_dir", "models/artifacts/cache_phase_detect")).parent / "cache_phase_detect_bidmc"
+        split_path = str(cache_dir / "phase_detect_bidmc_split.json")
+
+        bidmc_dir = data_cfg.get("bidmc_subdir", "data/raw/stroke avns/bidmc")
+        bidmc_records = parse_bidmc_dir(bidmc_dir, config_path)
+        logger.info("Loaded %d BIDMC records", len(bidmc_records))
+        records.extend(bidmc_records)
+
     else:
-        raise ValueError(f"Unknown dataset: {dataset!r}. Use 'training', 'ood', 'cves', or 'mimic'.")
+        raise ValueError(f"Unknown dataset: {dataset!r}. Use 'training', 'ood', 'cves', 'mimic', or 'bidmc'.")
 
     if not records:
         logger.error("No records loaded for dataset=%s. Check data paths.", dataset)
@@ -542,8 +561,8 @@ if __name__ == "__main__":
     p.add_argument("--config", default=CONFIG_PATH, help="Path to config_stroke.yaml")
     p.add_argument("--workers", type=int, default=1,
                    help="Worker processes (0 = all cores). Default 1 = single-threaded.")
-    p.add_argument("--dataset", choices=["training", "ood", "cves", "mimic"], default="training",
-                   help="training=CVES+MIMIC-3, ood=SHaRe, cves=CVES only, mimic=MIMIC-3 only")
+    p.add_argument("--dataset", choices=["training", "ood", "cves", "mimic", "bidmc"], default="training",
+                   help="training=CVES+MIMIC-3+BIDMC, ood=SHaRe, cves=CVES only, mimic=MIMIC-3 only, bidmc=BIDMC only")
     p.add_argument("--config-section", default="phase_precompute",
                    help="Config section for window params (e.g. phase_precompute_5s)")
     p.add_argument("--mask-edr-exhalation", action="store_true",
