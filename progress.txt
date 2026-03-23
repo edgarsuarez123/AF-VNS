@@ -5,6 +5,23 @@ Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
 Last updated: 2026-03-23
 
 --------------------------------------------------------------------------------
+S-31. CLOSED-LOOP INTEGRATION PIPELINE (2026-03-23)
+--------------------------------------------------------------------------------
+
+Created `src/models/closed_loop_pipeline.py`:
+- `StimEvent` dataclass: timestamp_samples, amplitude, frequency, pulse_width, diastole_prob, exhalation_prob
+- `PipelineState` dataclass: counters + event history snapshot
+- `ClosedLoopPipeline` class: synchronous streaming pipeline
+  - Fast path: every 100ms (25 samples) → denoise → PhaseDetector → co-occurrence check
+  - Slow path: every 60s (15000 samples) → AutonomicState → StimRecommender → update stim params
+  - deque ring buffer (maxlen=15000), O(1) append
+  - Safe defaults (1mA/10Hz/50µs) before first autonomic update
+- `build_closed_loop_pipeline()` factory wires all 3 components from config_stroke.yaml
+- `closed_loop:` section added to config_stroke.yaml
+- 10/10 integration tests passing (tests/test_closed_loop_pipeline.py)
+- 267/268 total tests passing (1 pre-existing BIDMC channel-name bug, unrelated)
+
+--------------------------------------------------------------------------------
 S-47-S-49. BIDMC INTEGRATION + RETRAIN + EVALUATE (2026-03-23)
 --------------------------------------------------------------------------------
 

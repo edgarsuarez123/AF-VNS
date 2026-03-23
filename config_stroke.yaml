@@ -36,6 +36,12 @@ lsl:
   expected_hz: 250
   inference_stride_ms: 100     # Closed-loop deployment stride; 100ms → worst-case 116ms (NFR-1.1 PASS)
 
+closed_loop:
+  fs: 250                      # Expected ECG sampling rate (Hz)
+  inference_stride_ms: 100     # Fast path: run PhaseDetector every N ms
+  slow_window_sec: 60          # Slow path: AutonomicState window length
+  co_occurrence_threshold: 0.5 # Sigmoid threshold for diastole+exhalation trigger
+
 hrv:
   window_sec: [30, 300]
   subwindow_sec: 60

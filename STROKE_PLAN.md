@@ -176,7 +176,7 @@ cycles and respiratory modulation regardless of pathology.
 | S-29 | OOD evaluation on SHaRe — report generalization | **Done** | 2026-03-22 — diastole 81.06% (-3.3% vs in-dist 84.34%) |
 | S-30 | Closed-loop event-to-stim latency benchmark — NFR-1.1 <200ms | **Done** | 2026-03-22 — 116ms worst-case p95 at 100ms stride (PASS) |
 | S-41 | NaN-mask MIMIC exhalation + FANTASIA reference data — retrain | **Done** | 2026-03-22 — dia 82.47%, exh 56.48% (no gain; see notes) |
-| S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
+| S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | **Done** | 2026-03-23 — `src/models/closed_loop_pipeline.py`, 10 tests passing |
 | S-42 | `dl_bidmc.py` — BIDMC download script | **Done** | 2026-03-23 |
 | S-43 | `config_stroke.yaml` — add `bidmc_subdir` | **Done** | 2026-03-23 |
 | S-44 | `parse_bidmc_dir()` in stroke_parsers.py — ECG (II) + RESP (impedance pneumography), 125→250 Hz | **Done** | 2026-03-23 |
@@ -342,10 +342,15 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 
 ## Resume From Here
 
-**Current state (2026-03-23) — S-42–S-49 COMPLETE. BIDMC integrated, evaluated, analysis done.**
+**Current state (2026-03-23) — S-31 COMPLETE. Full pipeline integrated.**
 
-Next step: **S-31** — End-to-end integration (phase detector + autonomic state + stim recommender).
-Alternatively: address exhalation ceiling with CVES-only retrain (remove MIMIC entirely) or hardware path.
+`src/models/closed_loop_pipeline.py` — `ClosedLoopPipeline` + `build_closed_loop_pipeline()` factory.
+10/10 integration tests passing. 267/268 total tests passing (1 pre-existing BIDMC parser channel-name bug).
+
+Next options:
+- Fix pre-existing BIDMC parser bug (`II,` comma artifact in channel names)
+- CVES-only retrain (remove MIMIC) to isolate target-population exhalation ceiling
+- LSL streaming integration (live ECG → pipeline → hardware trigger)
 
 **Previous state (2026-03-22) — S-32–S-40 COMPLETE. Exhalation ceiling confirmed at ~56% ECG-only.**
 
