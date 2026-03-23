@@ -175,8 +175,27 @@ cycles and respiratory modulation regardless of pathology.
 | S-40b | Weighted loss 0.7 exh — optimization experiment | **Done** | 2026-03-22 |
 | S-29 | OOD evaluation on SHaRe — report generalization | **Done** | 2026-03-22 — diastole 81.06% (-3.3% vs in-dist 84.34%) |
 | S-30 | Closed-loop event-to-stim latency benchmark — NFR-1.1 <200ms | **Done** | 2026-03-22 — 116ms worst-case p95 at 100ms stride (PASS) |
-| S-41 | NaN-mask MIMIC exhalation + FANTASIA reference data — retrain | In Progress | Started 2026-03-22 |
+| S-41 | NaN-mask MIMIC exhalation + FANTASIA reference data — retrain | **Done** | 2026-03-22 — dia 82.47%, exh 56.48% (no gain; see notes) |
 | S-31 | Integration: phase detector + autonomic state + stim recommender end-to-end | Pending | |
+
+### S-41 — Masked+FANTASIA Results (2026-03-22)
+
+**Result:** Diastole 82.47%, Exhalation 56.48% — no improvement over reference-only baseline (84.34% / 56.54%).
+
+**Root cause analysis:**
+- Val exhalation was 59.88% but test was 56.48% — gap suggests val/test distribution mismatch, likely because FANTASIA's 40 healthy resting-ECG records are over-represented in one split
+- FANTASIA subjects are young/elderly healthy controls with resting ECG; CVES has stress-protocol ECG — different HR variability, cardiac morphology, and respiratory patterns
+- FANTASIA may have **hurt diastole** (−1.87%) by shifting learned morphology features away from the stress-protocol ECG that matches deployment population
+- Exhalation ceiling unchanged: CVES stress-protocol exhalation is inherently harder to detect from ECG, regardless of label quality
+
+**Conclusion:** Adding healthy resting ECG data (FANTASIA) as a label-quality fix doesn't help and slightly hurts diastole. The test ceiling for exhalation is the CVES stress-protocol ECG difficulty, not label noise.
+
+**Next options (post-ablation):**
+- Option B: QRS amplitude modulation EDR — better MIMIC labels without requiring hardware
+- CVES-only training: exclude MIMIC+FANTASIA, train purely on target population → isolate performance ceiling on target data
+- Phase 2 hardware: impedance pneumography closes exhalation gap definitively
+
+---
 
 ### S-29 — OOD Generalization Results (2026-03-22)
 

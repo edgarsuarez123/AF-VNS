@@ -1628,3 +1628,11 @@ S-41 (2026-03-22): NaN-mask MIMIC exhalation + FANTASIA reference data — train
   - Cache: 477 records (215 reference CVES, 40 FANTASIA, 217 masked MIMIC, 5 EDR fallback)
   - Masked cache: 2.65M windows
   - Training: phase_detector_masked.pth — Epoch 2 in progress
+
+S-41 RESULT (2026-03-22): Masked+FANTASIA model test evaluation
+  - Diastole: 82.47% (regression from 84.34% — likely FANTASIA healthy ECG shifts distribution)
+  - Exhalation: 56.48% (no improvement — test CVES frames still hit the same ceiling)
+  - Val exh was 59.88% but didn't transfer to test set
+  - Conclusion: NaN-masking alone insufficient; test ceiling is ECG signal quality on CVES stress protocols
+  - FANTASIA healthy resting ECG may hurt diastole (different HR/morphology distribution from stroke patients)
+  - Next: evaluate on CVES-only test subset to isolate FANTASIA distribution shift effect
