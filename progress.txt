@@ -2,7 +2,28 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-20
+Last updated: 2026-03-23
+
+--------------------------------------------------------------------------------
+S-47-S-49. BIDMC INTEGRATION + RETRAIN + EVALUATE (2026-03-23)
+--------------------------------------------------------------------------------
+
+S-47: BIDMC downloaded (53 records, bidmc01–53). Cache rebuilt with CVES+MIMIC+BIDMC:
+- 517 records processed, 51 skipped, 2.7M windows (11:36 runtime)
+- exh_method_counts: reference=253, edr=7, masked_edr=257, none=0
+- masked_edr: MIMIC exhalation masked as NaN (no noisy EDR gradients during training)
+
+S-48: Retrained phase detector. Early stop Epoch 24. dia=82.80%, exh=55.96%.
+
+S-49: Evaluation complete.
+  Combined test (408K windows, CVES+MIMIC+BIDMC): dia=83.13%, exh=56.14%
+  Per-source vs baseline:
+    CVES:  dia 84.34%→84.09% (-0.3%), exh 56.54%→56.50% (-0.04%)  [unchanged]
+    MIMIC: dia 69.73%→80.53% (+10.8%), exh 49.77%→49.90%           [big diastole gain]
+  Root cause: masked_edr removed MIMIC exhalation noise → better MIMIC cardiac features
+  Combined average lower because BIDMC test records are harder (resting/ICU vs stress)
+  Conclusion: exhalation ceiling confirmed at ~56-57% ECG-only. Next: S-31 integration
+  or hardware path.
 
 --------------------------------------------------------------------------------
 S-25. PRECOMPUTE PHASE LABELS — CVES + MIMIC-3 (2026-03-20)

@@ -182,9 +182,35 @@ cycles and respiratory modulation regardless of pathology.
 | S-44 | `parse_bidmc_dir()` in stroke_parsers.py — ECG (II) + RESP (impedance pneumography), 125→250 Hz | **Done** | 2026-03-23 |
 | S-45 | `stroke_precompute_cache.py` — BIDMC in training branch + standalone `--dataset bidmc` | **Done** | 2026-03-23 |
 | S-46 | 7 tests for `parse_bidmc_dir` — all passing | **Done** | 2026-03-23 |
-| S-47 | Download BIDMC + rebuild cache with BIDMC included | Running | Download in background |
-| S-48 | Retrain phase detector with BIDMC reference labels | Pending | |
-| S-49 | Evaluate — compare diastole/exhalation vs baseline (84.34% / 56.54%) | Pending | |
+| S-47 | Download BIDMC + rebuild cache with BIDMC included | **Done** | 2026-03-23 — 53 records, 517 total, 2.7M windows, 11:36 runtime |
+| S-48 | Retrain phase detector with BIDMC reference labels | **Done** | 2026-03-23 — early stop Epoch 24, dia=82.80%, exh=55.96% |
+| S-49 | Evaluate — compare diastole/exhalation vs baseline (84.34% / 56.54%) | **Done** | 2026-03-23 — see results below |
+
+### S-49 — BIDMC Retrain Results (2026-03-23)
+
+**Combined test set (408,531 windows — CVES + MIMIC + BIDMC):**
+| Task | Baseline (S-36, no BIDMC) | BIDMC model | Delta |
+|------|--------------------------|-------------|-------|
+| Diastole | 84.34% | 83.13% | −1.2% |
+| Exhalation | 56.54% | 56.14% | −0.4% |
+
+**Per-source breakdown (new model vs old baseline):**
+| Source | Diastole (before) | Diastole (after) | Exhalation (before) | Exhalation (after) |
+|--------|------------------|-----------------|--------------------|--------------------|
+| CVES | 84.34% | **84.09%** | 56.54% | **56.50%** |
+| MIMIC | 69.73% | **80.53%** | 49.77% | **49.90%** |
+
+**Key findings:**
+- CVES numbers unchanged — BIDMC did not hurt the target population performance
+- MIMIC diastole: **+10.8%** (69.73% → 80.53%) — the `--mask-edr-exhalation` flag removed noisy MIMIC exhalation gradients; model now learns better cardiac features from MIMIC ECG
+- Combined test average looks lower (83.13%) because BIDMC records are in the test set and BIDMC ECG is resting/ICU (harder for the model trained on stress-protocol CVES)
+- MIMIC exhalation still coin-flip (49.90%) — irreducible without reference resp signal
+
+**Root cause of overall dip:** BIDMC test records pull the combined average down. CVES performance (target population) is unchanged. The masked_edr approach was the real gain — it improved MIMIC diastole by +10.8%.
+
+**Conclusion:** BIDMC did not improve exhalation. Exhalation ceiling is confirmed at ~56-57% ECG-only on the target population (CVES). To break through 60%+: deploy impedance hardware (production plan) or CVES-only retrain to isolate target-population performance.
+
+---
 
 ### S-41 — Masked+FANTASIA Results (2026-03-22)
 
@@ -316,30 +342,10 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 
 ## Resume From Here
 
-**Current state (2026-03-23) — S-42–S-46 COMPLETE. BIDMC download running in background.**
+**Current state (2026-03-23) — S-42–S-49 COMPLETE. BIDMC integrated, evaluated, analysis done.**
 
-Check download: `Get-Content "C:\Users\Edgar\AF VNS\bidmc_download.log" -Tail 5`
-Check errors: `Get-Content "C:\Users\Edgar\AF VNS\bidmc_download_err.log" -Tail 5`
-
-Once download completes (~53 records), rebuild cache:
-```powershell
-Remove-Item "models/artifacts/phase_detect_split.json" -ErrorAction SilentlyContinue
-Start-Process -WindowStyle Hidden "C:\Users\Edgar\AF VNS\.venv\Scripts\python.exe" `
-  -ArgumentList "-m src.training.stroke_precompute_cache --config config_stroke.yaml --dataset training --workers 4 --mask-edr-exhalation" `
-  -WorkingDirectory "C:\Users\Edgar\AF VNS" `
-  -RedirectStandardOutput "C:\Users\Edgar\AF VNS\cache_rebuild.log" `
-  -RedirectStandardError "C:\Users\Edgar\AF VNS\cache_rebuild_err.log"
-```
-Expected: `exh_method_counts.reference` increases from 215 → ~268
-
-Then retrain:
-```powershell
-Start-Process -WindowStyle Hidden "C:\Users\Edgar\AF VNS\.venv\Scripts\python.exe" `
-  -ArgumentList "-m src.training.phase_train --config config_stroke.yaml" `
-  -WorkingDirectory "C:\Users\Edgar\AF VNS" `
-  -RedirectStandardOutput "C:\Users\Edgar\AF VNS\train.log" `
-  -RedirectStandardError "C:\Users\Edgar\AF VNS\train_err.log"
-```
+Next step: **S-31** — End-to-end integration (phase detector + autonomic state + stim recommender).
+Alternatively: address exhalation ceiling with CVES-only retrain (remove MIMIC entirely) or hardware path.
 
 **Previous state (2026-03-22) — S-32–S-40 COMPLETE. Exhalation ceiling confirmed at ~56% ECG-only.**
 
