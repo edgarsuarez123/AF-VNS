@@ -18,7 +18,7 @@ from typing import Tuple
 import numpy as np
 import yaml
 from scipy.interpolate import interp1d
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, sosfiltfilt
 
 logger = logging.getLogger(__name__)
 
@@ -122,12 +122,13 @@ def _qrs_amplitude_edr(
                              bounds_error=False, fill_value=(amplitudes[0], amplitudes[-1]))
         amp_continuous = interp_fn(t_full)
 
-    # Bandpass filter to respiratory band
+    # Bandpass filter to respiratory band using SOS for numerical stability
+    # (ba form is unstable at narrow bands relative to high sample rates)
     nyq = fs / 2.0
     low = bandpass_low / nyq
     high = min(bandpass_high / nyq, 0.99)
-    b, a = butter(bandpass_order, [low, high], btype="band")
-    edr_signal = filtfilt(b, a, amp_continuous)
+    sos = butter(bandpass_order, [low, high], btype="band", output="sos")
+    edr_signal = sosfiltfilt(sos, amp_continuous)
 
     return edr_signal.astype(np.float64)
 
