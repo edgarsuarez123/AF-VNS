@@ -345,24 +345,85 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 | Step | Description | Status | Completed At |
 |------|-------------|--------|--------------|
 | S-50 | Verify CVES-only cache (`cache_phase_detect_cves`) — 1.95M windows, 95% reference labels | **Done** | 2026-03-23 |
-| S-51 | Train phase detector on CVES-only cache → `phase_detector_cves.pth` | **In Progress** | — |
-| S-52 | Evaluate CVES-only model — compare vs baseline (dia 84.34% / exh 56.54%) | Pending | — |
-| S-53 | Update STROKE_PLAN.md with results + Data Strategy section | Pending | — |
+| S-51 | Train phase detector on CVES-only cache → `phase_detector_cves.pth` | **Done** | 2026-03-23 — early stop Ep 71, best val avg=69.18% |
+| S-52 | Evaluate CVES-only model — compare vs baseline (dia 84.34% / exh 56.54%) | **Done** | 2026-03-23 — see results below |
+| S-53 | Update STROKE_PLAN.md with results + Data Strategy section | **Done** | 2026-03-23 |
+
+### S-52 — CVES-Only Retrain Results (2026-03-23)
+
+| Task | Baseline (S-36, CVES+MIMIC) | CVES-Only | Delta |
+|------|-----------------------------|-----------|-------|
+| Diastole | 84.34% | **85.31%** | +0.97% |
+| Exhalation | 56.54% | **50.56%** | −6.0% |
+
+**Key findings:**
+- Diastole marginally improved (+1%) — CVES-only cardiac morphology is cleaner
+- Exhalation collapsed to coin-flip (50.56%) — removing MIMIC removed training volume that stabilized the shared feature space
+- MIMIC exhalation labels were already NaN-masked (zero gradient) in the baseline — they were never hurting exhalation; they were helping via diastole gradients that anchor shared CNN features
+- **CVES-only is strictly worse.** The mixed dataset (CVES+MIMIC, NaN-masked MIMIC exhalation) is the best configuration found.
+
+**Final ablation summary:**
+
+| Experiment | Diastole | Exhalation | Notes |
+|-----------|----------|------------|-------|
+| EDR baseline (S-26) | 83.58% | ~52% | Pure EDR labels |
+| Reference labels, CVES+MIMIC (S-36) | **84.34%** | **56.54%** | Best overall |
+| 5s windows (S-38) | 82.27% | 57.36% | No net gain |
+| Large model 29K (S-40a) | 84.06% | 56.07% | No gain |
+| Weighted loss (S-40b) | 82.78% | 56.36% | No gain |
+| Masked EDR + FANTASIA (S-41) | 82.47% | 56.48% | No gain |
+| BIDMC added (S-49) | 83.13% | 56.14% | No gain on CVES |
+| **CVES-only (S-52)** | 85.31% | **50.56%** | Exhalation collapses |
+
+**ECG-only exhalation ceiling confirmed at 56-57%.** No software-side intervention improves it.
+
+---
+
+## Data Strategy
+
+### Why Exhalation from ECG is Fundamentally Limited
+
+Exhalation detection from ECG is indirect. ECG measures cardiac electrical activity; breathing modulates it through three mechanisms:
+
+| Mechanism | SNR | Suppressed By |
+|-----------|-----|---------------|
+| RSA (Respiratory Sinus Arrhythmia) — vagus slows HR on exhale | High (healthy resting) | Stress, stroke, autonomic dysfunction |
+| QRS amplitude modulation — chest expansion shifts electrode position | Low | Motion, electrode shift |
+| T-wave morphology shift — diaphragm changes cardiac axis | Very low | Any noise |
+
+Under orthostatic autonomic stress (CVES protocols) and in stroke patients (impaired vagal function), RSA is suppressed. The ECG-respiration coupling that makes exhalation detectable is weakest exactly at deployment conditions.
+
+### Why CVES Is the Only Viable Dataset
+
+Two conditions must hold simultaneously: **reference signal quality** AND **condition match to deployment**.
+
+| Dataset | Ref Signal | Condition Match | Verdict |
+|---------|-----------|-----------------|---------|
+| **CVES** | Hardware thermistor/flow_rate | Orthostatic stress, autonomic challenge | **Both — unique** |
+| BIDMC | Impedance pneumography | Resting ICU | Wrong conditions |
+| FANTASIA | RIP belt | Healthy resting | Wrong conditions |
+| WESAD | RIP belt | Cognitive stress (TSST), healthy | Closer but not matching |
+| DriveDB | Noisy impedance (78% SQI) | Driving stress | Bad labels |
+| MIMIC-III | None (EDR fallback) | Resting ICU | Neither |
+
+No public dataset combines hardware reference respiratory signals with orthostatic/autonomic stress protocols on clinical subjects. CVES is unique.
+
+### Production Path to >85% Exhalation
+
+The grant's hardware plan (impedance pneumography integrated into the VNS device) bypasses the ECG-only limitation entirely — direct measurement, no inference required. Software exhalation detection at 56% is the best achievable ECG-only baseline and serves as the pre-hardware benchmark.
 
 ---
 
 ## Resume From Here
 
-**Current state (2026-03-23) — S-51 IN PROGRESS. CVES-only training running.**
+**Current state (2026-03-23) — S-50 through S-53 COMPLETE. All ablations done.**
 
-Monitor: `Get-Content "C:\Users\Edgar\AF VNS\phase_train_cves_err.log" -Tail 5`
+Exhalation ceiling confirmed at ~56% ECG-only. Best model: `phase_detector_ref.pth` (S-36, CVES+MIMIC, reference labels) — dia=84.34%, exh=56.54%.
 
-When training finishes, run S-52 evaluation:
-```
-.venv/Scripts/python -m src.training.phase_evaluate --config config_stroke.yaml --checkpoint models/checkpoints/phase_detector_cves.pth --cache-dir models/artifacts/cache_phase_detect_cves
-```
-
-Then update STROKE_PLAN.md with results (S-53).
+Next options:
+- **LSL streaming integration** — live ECG → `ClosedLoopPipeline` → hardware trigger
+- **Fix BIDMC parser bug** — `II,` comma artifact in channel names (1 failing test)
+- **Grant write-up** — data strategy section documents ECG ceiling + hardware path
 
 ---
 

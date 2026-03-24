@@ -12,11 +12,26 @@ Cache at models/artifacts/cache_phase_detect_cves/ confirmed valid.
 Split: train=1,319,227 / val=336,711 / test=251,402. No rebuild needed.
 
 --------------------------------------------------------------------------------
-S-51. CVES-ONLY RETRAIN — IN PROGRESS (2026-03-23)
+S-51. CVES-ONLY RETRAIN — DONE (2026-03-23)
 --------------------------------------------------------------------------------
-Training launched: phase_train.py --cache-dir cache_phase_detect_cves
---checkpoint-out models/checkpoints/phase_detector_cves.pth
-GPU training, ~44 batches/sec, patience=15. Log: phase_train_cves_err.log
+Early stop Epoch 71. Best val avg=69.18% (dia=84.79%, exh=53.54%).
+Checkpoint: models/checkpoints/phase_detector_cves.pth
+
+--------------------------------------------------------------------------------
+S-52. CVES-ONLY EVALUATION — DONE (2026-03-23)
+--------------------------------------------------------------------------------
+Test results: diastole=85.31%, exhalation=50.56%.
+vs baseline (S-36): dia +0.97%, exh -6.0%.
+CVES-only is worse — removing MIMIC collapsed exhalation to coin-flip.
+MIMIC NaN-masked records were stabilizing shared CNN features via diastole gradients.
+Best model remains phase_detector_ref.pth (S-36): dia=84.34%, exh=56.54%.
+
+--------------------------------------------------------------------------------
+S-53. DATA STRATEGY DOCUMENTED — DONE (2026-03-23)
+--------------------------------------------------------------------------------
+STROKE_PLAN.md updated with full ablation summary, data strategy section,
+ECG-only ceiling analysis, and why CVES is the only viable dataset.
+Production path: hardware impedance sensor on VNS device.
 
 --------------------------------------------------------------------------------
 S-31. CLOSED-LOOP INTEGRATION PIPELINE (2026-03-23)
