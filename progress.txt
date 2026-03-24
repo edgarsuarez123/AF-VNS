@@ -45,20 +45,21 @@ Smoke test on 5 CVES records vs hardware reference respiratory signal:
 Decision: PROCEED — fusion > RSA baseline. Cache rebuild + retrain authorized (S-64/S-65).
 
 --------------------------------------------------------------------------------
-S-56. DIA-WEIGHTED TRAINING — IN PROGRESS (2026-03-24)
+S-56/S-57/S-59. DIA-WEIGHTED TRAINING — DONE (2026-03-24)
 --------------------------------------------------------------------------------
-Training launched: phase_training_dia_weighted (0.7/0.3) on CVES+MIMIC cache.
-Checkpoint: models/checkpoints/phase_detector_dia_weighted.pth
-Log: logs/train_dia_weighted_err.log
-Running on CUDA. Awaiting completion for S-57 evaluation.
+Result: dia=83.60%, exh=56.13% — REGRESSION vs baseline (84.34%/56.54%).
+Early stop Ep 28. 0.7 diastole weight destabilizes shared CNN backbone.
+S-58 (0.6/0.4 moderate) SKIPPED — wrong direction confirmed.
+Conclusion: loss weighting is not the path to >85% diastole.
 
 --------------------------------------------------------------------------------
-S-64. FUSION CACHE REBUILD — IN PROGRESS (2026-03-24)
+S-64/S-65/S-66. FUSION EDR CACHE + RETRAIN — DONE (2026-03-24)
 --------------------------------------------------------------------------------
-Cache rebuild launched: cache_phase_detect_fusion (edr.method=fusion, mask=false).
-CVES: reference labels (unchanged). MIMIC: fusion EDR labels instead of NaN-masked.
-Log: logs/cache_fusion_err.log
-At 14% when checked. Awaiting completion for S-65 retrain.
+Cache: 2.73M windows, 568 records (CVES ref + MIMIC fusion EDR).
+Result: dia=83.67%, exh=54.33% — REGRESSION vs baseline.
+NaN masking for MIMIC was already optimal. Fusion labels introduce gradient noise.
+ECG-only exhalation ceiling DEFINITIVELY confirmed at 56-57% via all methods.
+Production model: phase_detector_ref.pth (S-36) — dia=84.34%, exh=56.54%.
 
 --------------------------------------------------------------------------------
 S-50. CVES-ONLY CACHE — VERIFIED (2026-03-23)

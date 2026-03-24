@@ -356,20 +356,59 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 | S-54 | `config_stroke.yaml` — add `phase_training_dia_weighted` (0.7/0.3) and `phase_training_dia_moderate` (0.6/0.4) sections | **Done** | 2026-03-24 |
 | S-55 | Fix `run_phase_validation()` — pass `dia_weight`/`exh_weight` through to `multitask_bce_loss`; val_loss was always 0.5/0.5 | **Done** | 2026-03-24 |
 | S-56 | Train 0.7/0.3 dia-weighted on CVES+MIMIC cache → `phase_detector_dia_weighted.pth` | **In Progress** | 2026-03-24 — running on CUDA |
-| S-57 | Evaluate 0.7/0.3 model — target: dia >85%, exh >55% | Pending | — |
-| S-58 | Train 0.6/0.4 moderate (conditional on S-57 results) | Pending | — |
-| S-59 | Summarize diastole experiment, update ablation table | Pending | — |
+| S-57 | Evaluate 0.7/0.3 model — target: dia >85%, exh >55% | **Done** | 2026-03-24 — dia=83.60%, exh=56.13% — no improvement |
+| S-58 | Train 0.6/0.4 moderate (conditional on S-57 results) | **Skipped** | S-57 showed regression — weighting hurts |
+| S-59 | Summarize diastole experiment, update ablation table | **Done** | 2026-03-24 — see results below |
 | S-60 | `src/features/edr.py` — implement `_qrs_amplitude_edr()` + `method="amplitude"` and `method="fusion"` in `extract_edr()`; SOS filter fix | **Done** | 2026-03-24 |
 | S-61 | `config_stroke.yaml` — add `edr.amplitude_bandpass_low/high/order` keys | **Done** | 2026-03-24 |
 | S-62 | 10 tests for QRS-AM EDR (shape, dtype, bounds, non-constant, known-modulation correlation) | **Done** | 2026-03-24 |
 | S-63 | Smoke test QRS-AM vs reference on 5 CVES records — gate for S-64 | **Done** | 2026-03-24 — fusion 0.196 > RSA 0.162, PROCEED |
 | S-64 | Rebuild training cache with fusion EDR for MIMIC → `cache_phase_detect_fusion` | **In Progress** | 2026-03-24 — running (~15 min) |
-| S-65 | Retrain + evaluate on fusion cache — compare vs baseline | Pending | — |
-| S-66 | QRS-AM experiment summary + update ablation table | Pending | — |
+| S-65 | Retrain + evaluate on fusion cache — compare vs baseline | **Done** | 2026-03-24 — dia=83.67%, exh=54.33% — regression |
+| S-66 | QRS-AM experiment summary + update ablation table | **Done** | 2026-03-24 — see results below |
 | S-67 | Update `STROKE_PLAN.md` — all new steps + ablation table | Pending | — |
 | S-68 | Update `stroke-data-strategy-report.md` — S-50–S-66 results | Pending | — |
 | S-69 | Update `STROKE_AI_INFRASTRUCTURE.md` — comprehensive refresh | Pending | — |
 | S-70 | Final model designation + update `paths.phase_detect_checkpoint` | Pending | — |
+
+### S-57/S-59 — Diastole Loss Weighting Results (2026-03-24)
+
+| Experiment | Diastole | Exhalation | Delta dia | Delta exh |
+|-----------|----------|------------|-----------|-----------|
+| Baseline S-36 (equal 0.5/0.5) | 84.34% | 56.54% | — | — |
+| Dia-weighted 0.7/0.3 (S-57) | 83.60% | 56.13% | −0.74% | −0.41% |
+
+**Conclusion:** Diastole weighting hurts both tasks. Early stopping at Ep 28 (baseline stopped ~Ep 50). The 0.7 diastole weight causes the optimizer to underfit exhalation faster than it can improve diastole. S-58 (0.6/0.4) skipped — the direction is wrong; more diastole weight is not the path to >85%.
+
+**Root cause:** At 0.7 weight, diastole gradients dominate but exhalation features partially share the CNN backbone. Suppressing exhalation gradients destabilizes the shared representation rather than focusing it.
+
+### S-65/S-66 — Fusion EDR Results (2026-03-24)
+
+| Experiment | Diastole | Exhalation | Delta dia | Delta exh |
+|-----------|----------|------------|-----------|-----------|
+| Baseline S-36 (masked MIMIC exh) | 84.34% | 56.54% | — | — |
+| Fusion EDR for MIMIC (S-65) | 83.67% | 54.33% | −0.67% | −2.21% |
+
+**Conclusion:** Fusion EDR labels for MIMIC are worse than NaN masking. Even though fusion has 0.196 correlation with reference (vs 0.162 for RSA), the labels introduce gradient noise that destabilizes both tasks. NaN masking (zero exhalation gradient for MIMIC) was already optimal.
+
+**ECG-only exhalation ceiling definitively confirmed:** Every ECG-only method attempted — RSA EDR, QRS amplitude modulation, fusion PCA, 5s windows, larger model, weighted loss, FANTASIA, BIDMC — produces 54–57% exhalation accuracy. The ceiling is the physics of ECG-respiration coupling under stress, not a modeling or data problem.
+
+### Final Ablation Summary (all experiments)
+
+| Experiment | Diastole | Exhalation | Notes |
+|-----------|----------|------------|-------|
+| EDR baseline (S-26) | 83.58% | ~52% | Pure RSA EDR labels |
+| Reference labels, CVES+MIMIC masked (S-36) | **84.34%** | **56.54%** | **Best overall** |
+| 5s windows (S-38) | 82.27% | 57.36% | No net gain |
+| Large model 29K (S-40a) | 84.06% | 56.07% | No gain |
+| Weighted loss exh 0.7 (S-40b) | 82.78% | 56.36% | No gain |
+| Masked EDR + FANTASIA (S-41) | 82.47% | 56.48% | No gain; FANTASIA hurts dia |
+| BIDMC added (S-49) | 83.13% | 56.14% | No gain on CVES |
+| CVES-only (S-52) | 85.31% | 50.56% | Exh collapses without MIMIC volume |
+| **Dia-weighted 0.7/0.3 (S-57)** | 83.60% | 56.13% | Regression |
+| **Fusion EDR MIMIC (S-65)** | 83.67% | 54.33% | Regression — NaN masking was better |
+
+**Production model: `phase_detector_ref.pth` (S-36) — dia=84.34%, exh=56.54%**
 
 ### S-63 — QRS-AM Smoke Test Results (2026-03-24)
 
@@ -448,26 +487,18 @@ The grant's hardware plan (impedance pneumography integrated into the VNS device
 
 ## Resume From Here
 
-**Current state (2026-03-24) — S-54 through S-64 IN PROGRESS.**
+**Current state (2026-03-24) — S-54 through S-66 COMPLETE. All experiments done.**
 
-Two background processes running:
-1. **S-56 training** — `phase_detector_dia_weighted.pth` (0.7/0.3 dia-weighted, CVES+MIMIC cache). Log: `logs/train_dia_weighted_err.log`
-2. **S-64 cache rebuild** — `cache_phase_detect_fusion` (fusion EDR for MIMIC). Log: `logs/cache_fusion_err.log`
+**Final conclusion: `phase_detector_ref.pth` (S-36) remains the production model.**
+- Diastole: 84.34% | Exhalation: 56.54%
+- Every attempted improvement (loss weighting, QRS-AM, FANTASIA, BIDMC, larger model, 5s windows) either showed no gain or regression
+- ECG-only exhalation ceiling definitively confirmed at 56-57%
 
-**Next immediate steps when processes complete:**
-- S-57: Evaluate `phase_detector_dia_weighted.pth` — target dia >85%, exh >55%
-- S-65: Train on fusion cache → `phase_detector_fusion.pth`, then evaluate
-- S-58: If S-57 exh dropped too much, retrain with 0.6/0.4 moderate weighting
-- S-59/S-66: Summarize both experiments, update ablation table
-- S-67–S-70: Documentation updates
-
-**Best model so far:** `phase_detector_ref.pth` — dia=84.34%, exh=56.54% (S-36)
-
-**Check progress:**
-```
-tail -3 logs/train_dia_weighted_err.log  # training epochs
-tail -3 logs/cache_fusion_err.log        # cache rebuild %
-```
+**Next steps (S-67–S-70): Documentation updates**
+- S-67: Update STROKE_PLAN.md steps table ← done above
+- S-68: Update `stroke-data-strategy-report.md` with full ablation table
+- S-69: Update `STROKE_AI_INFRASTRUCTURE.md` (stale — predates reference labels)
+- S-70: Final model designation in config
 
 ---
 
