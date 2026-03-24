@@ -2,7 +2,63 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-23
+Last updated: 2026-03-24
+
+--------------------------------------------------------------------------------
+S-54. DIA-WEIGHTED LOSS CONFIG (2026-03-24)
+--------------------------------------------------------------------------------
+Added phase_training_dia_weighted (task_weight_dia=0.7, task_weight_exh=0.3) and
+phase_training_dia_moderate (0.6/0.4) sections to config_stroke.yaml.
+Goal: push diastole past 85% grant milestone without losing exhalation stability.
+
+--------------------------------------------------------------------------------
+S-55. VALIDATION LOSS BUG FIX (2026-03-24)
+--------------------------------------------------------------------------------
+Fixed run_phase_validation() in phase_train.py — was always computing val_loss with
+0.5/0.5 task weights regardless of training config. Now passes dia_weight/exh_weight
+through. Makes val_loss curves meaningful and early stopping reliable for weighted runs.
+
+--------------------------------------------------------------------------------
+S-60/S-61. QRS AMPLITUDE MODULATION EDR (2026-03-24)
+--------------------------------------------------------------------------------
+Implemented _qrs_amplitude_edr() in src/features/edr.py:
+  - Extracts R-peak amplitudes, cubic interpolates to full rate, bandpass 0.1-0.5 Hz
+  - Uses SOS Butterworth filter (ba form numerically unstable at narrow respiratory band)
+  - extract_edr() now supports method="amplitude" and method="fusion" (PCA of RSA+AM)
+  - Added try/except around nk.rsp_findpeaks for low-SNR robustness
+Added config keys: edr.amplitude_bandpass_low/high/order
+
+--------------------------------------------------------------------------------
+S-62. QRS-AM TESTS (2026-03-24)
+--------------------------------------------------------------------------------
+10 unit tests added to tests/test_phase_detection.py::TestQrsAmplitudeEdr:
+  shape, dtype, bounds, non-constant, short-signal edge case, correlation test.
+All passing.
+
+--------------------------------------------------------------------------------
+S-63. QRS-AM SMOKE TEST — GATE PASSED (2026-03-24)
+--------------------------------------------------------------------------------
+Smoke test on 5 CVES records vs hardware reference respiratory signal:
+  RSA (vangent2019): mean |corr| = 0.162
+  QRS amplitude:     mean |corr| = 0.171 (+0.009)
+  Fusion (PCA):      mean |corr| = 0.196 (+0.034)
+Decision: PROCEED — fusion > RSA baseline. Cache rebuild + retrain authorized (S-64/S-65).
+
+--------------------------------------------------------------------------------
+S-56. DIA-WEIGHTED TRAINING — IN PROGRESS (2026-03-24)
+--------------------------------------------------------------------------------
+Training launched: phase_training_dia_weighted (0.7/0.3) on CVES+MIMIC cache.
+Checkpoint: models/checkpoints/phase_detector_dia_weighted.pth
+Log: logs/train_dia_weighted_err.log
+Running on CUDA. Awaiting completion for S-57 evaluation.
+
+--------------------------------------------------------------------------------
+S-64. FUSION CACHE REBUILD — IN PROGRESS (2026-03-24)
+--------------------------------------------------------------------------------
+Cache rebuild launched: cache_phase_detect_fusion (edr.method=fusion, mask=false).
+CVES: reference labels (unchanged). MIMIC: fusion EDR labels instead of NaN-masked.
+Log: logs/cache_fusion_err.log
+At 14% when checked. Awaiting completion for S-65 retrain.
 
 --------------------------------------------------------------------------------
 S-50. CVES-ONLY CACHE — VERIFIED (2026-03-23)

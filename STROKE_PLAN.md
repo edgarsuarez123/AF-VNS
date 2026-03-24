@@ -349,6 +349,38 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 | S-52 | Evaluate CVES-only model — compare vs baseline (dia 84.34% / exh 56.54%) | **Done** | 2026-03-23 — see results below |
 | S-53 | Update STROKE_PLAN.md with results + Data Strategy section | **Done** | 2026-03-23 |
 
+### Diastole Loss Weighting & QRS Amplitude EDR
+
+| Step | Description | Status | Completed At |
+|------|-------------|--------|--------------|
+| S-54 | `config_stroke.yaml` — add `phase_training_dia_weighted` (0.7/0.3) and `phase_training_dia_moderate` (0.6/0.4) sections | **Done** | 2026-03-24 |
+| S-55 | Fix `run_phase_validation()` — pass `dia_weight`/`exh_weight` through to `multitask_bce_loss`; val_loss was always 0.5/0.5 | **Done** | 2026-03-24 |
+| S-56 | Train 0.7/0.3 dia-weighted on CVES+MIMIC cache → `phase_detector_dia_weighted.pth` | **In Progress** | 2026-03-24 — running on CUDA |
+| S-57 | Evaluate 0.7/0.3 model — target: dia >85%, exh >55% | Pending | — |
+| S-58 | Train 0.6/0.4 moderate (conditional on S-57 results) | Pending | — |
+| S-59 | Summarize diastole experiment, update ablation table | Pending | — |
+| S-60 | `src/features/edr.py` — implement `_qrs_amplitude_edr()` + `method="amplitude"` and `method="fusion"` in `extract_edr()`; SOS filter fix | **Done** | 2026-03-24 |
+| S-61 | `config_stroke.yaml` — add `edr.amplitude_bandpass_low/high/order` keys | **Done** | 2026-03-24 |
+| S-62 | 10 tests for QRS-AM EDR (shape, dtype, bounds, non-constant, known-modulation correlation) | **Done** | 2026-03-24 |
+| S-63 | Smoke test QRS-AM vs reference on 5 CVES records — gate for S-64 | **Done** | 2026-03-24 — fusion 0.196 > RSA 0.162, PROCEED |
+| S-64 | Rebuild training cache with fusion EDR for MIMIC → `cache_phase_detect_fusion` | **In Progress** | 2026-03-24 — running (~15 min) |
+| S-65 | Retrain + evaluate on fusion cache — compare vs baseline | Pending | — |
+| S-66 | QRS-AM experiment summary + update ablation table | Pending | — |
+| S-67 | Update `STROKE_PLAN.md` — all new steps + ablation table | Pending | — |
+| S-68 | Update `stroke-data-strategy-report.md` — S-50–S-66 results | Pending | — |
+| S-69 | Update `STROKE_AI_INFRASTRUCTURE.md` — comprehensive refresh | Pending | — |
+| S-70 | Final model designation + update `paths.phase_detect_checkpoint` | Pending | — |
+
+### S-63 — QRS-AM Smoke Test Results (2026-03-24)
+
+| Method | Mean \|corr\| vs reference (5 CVES records) | vs baseline |
+|--------|---------------------------------------------|-------------|
+| RSA vangent2019 | 0.162 | — |
+| QRS amplitude only | 0.171 | +0.009 |
+| **Fusion (PCA)** | **0.196** | **+0.034** |
+
+Decision: Fusion passes gate. Proceeding with S-64 cache rebuild using `method="fusion"` and `mask_edr_exhalation=false` for MIMIC records.
+
 ### S-52 — CVES-Only Retrain Results (2026-03-23)
 
 | Task | Baseline (S-36, CVES+MIMIC) | CVES-Only | Delta |
@@ -416,14 +448,26 @@ The grant's hardware plan (impedance pneumography integrated into the VNS device
 
 ## Resume From Here
 
-**Current state (2026-03-23) — S-50 through S-53 COMPLETE. All ablations done.**
+**Current state (2026-03-24) — S-54 through S-64 IN PROGRESS.**
 
-Exhalation ceiling confirmed at ~56% ECG-only. Best model: `phase_detector_ref.pth` (S-36, CVES+MIMIC, reference labels) — dia=84.34%, exh=56.54%.
+Two background processes running:
+1. **S-56 training** — `phase_detector_dia_weighted.pth` (0.7/0.3 dia-weighted, CVES+MIMIC cache). Log: `logs/train_dia_weighted_err.log`
+2. **S-64 cache rebuild** — `cache_phase_detect_fusion` (fusion EDR for MIMIC). Log: `logs/cache_fusion_err.log`
 
-Next options:
-- **LSL streaming integration** — live ECG → `ClosedLoopPipeline` → hardware trigger
-- **Fix BIDMC parser bug** — `II,` comma artifact in channel names (1 failing test)
-- **Grant write-up** — data strategy section documents ECG ceiling + hardware path
+**Next immediate steps when processes complete:**
+- S-57: Evaluate `phase_detector_dia_weighted.pth` — target dia >85%, exh >55%
+- S-65: Train on fusion cache → `phase_detector_fusion.pth`, then evaluate
+- S-58: If S-57 exh dropped too much, retrain with 0.6/0.4 moderate weighting
+- S-59/S-66: Summarize both experiments, update ablation table
+- S-67–S-70: Documentation updates
+
+**Best model so far:** `phase_detector_ref.pth` — dia=84.34%, exh=56.54% (S-36)
+
+**Check progress:**
+```
+tail -3 logs/train_dia_weighted_err.log  # training epochs
+tail -3 logs/cache_fusion_err.log        # cache rebuild %
+```
 
 ---
 
