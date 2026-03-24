@@ -137,6 +137,16 @@ phase_precompute:
   ood_cache_dir: models/artifacts/cache_phase_detect_ood
   split_path: models/artifacts/phase_detect_split.json
 
+# S-64 — fusion EDR experiment cache (QRS-AM + RSA PCA, MIMIC labels not masked)
+phase_precompute_fusion:
+  window_sec: 2.0
+  stride_sec: 0.2
+  min_valid_frames: 8
+  frame_rate_hz: 5.0
+  cache_dir: models/artifacts/cache_phase_detect_fusion
+  ood_cache_dir: models/artifacts/cache_phase_detect_ood
+  split_path: models/artifacts/phase_detect_split.json   # reuse existing split
+
 # Phase detection CNN model (PhaseDetector, ~7.5K params)
 phase_model:
   channels: [16, 32, 48]
