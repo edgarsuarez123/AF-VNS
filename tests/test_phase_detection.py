@@ -339,6 +339,96 @@ class TestExtractEdr:
 
 
 # ===========================================================================
+# QRS amplitude modulation EDR (S-62)
+# ===========================================================================
+
+class TestQrsAmplitudeEdr:
+    """Tests for method='amplitude' and method='fusion' in extract_edr."""
+
+    @pytest.fixture()
+    def long_ecg(self):
+        return _synth_ecg(duration=60)
+
+    def test_amplitude_method_length(self, long_ecg):
+        edr_sig, _, _ = extract_edr(long_ecg, FS, method="amplitude")
+        assert len(edr_sig) == len(long_ecg)
+
+    def test_amplitude_method_dtype(self, long_ecg):
+        edr_sig, _, _ = extract_edr(long_ecg, FS, method="amplitude")
+        assert edr_sig.dtype == np.float64
+
+    def test_amplitude_method_peaks_int64(self, long_ecg):
+        _, peaks, troughs = extract_edr(long_ecg, FS, method="amplitude")
+        assert peaks.dtype == np.int64
+        assert troughs.dtype == np.int64
+
+    def test_amplitude_method_peaks_within_bounds(self, long_ecg):
+        edr_sig, peaks, troughs = extract_edr(long_ecg, FS, method="amplitude")
+        n = len(edr_sig)
+        if len(peaks) > 0:
+            assert peaks.min() >= 0 and peaks.max() < n
+        if len(troughs) > 0:
+            assert troughs.min() >= 0 and troughs.max() < n
+
+    def test_amplitude_method_not_constant(self, long_ecg):
+        """QRS-AM signal should show variation — not flat."""
+        edr_sig, _, _ = extract_edr(long_ecg, FS, method="amplitude")
+        assert edr_sig.std() > 0.0
+
+    def test_fusion_method_length(self, long_ecg):
+        edr_sig, _, _ = extract_edr(long_ecg, FS, method="fusion")
+        assert len(edr_sig) == len(long_ecg)
+
+    def test_fusion_method_dtype(self, long_ecg):
+        edr_sig, _, _ = extract_edr(long_ecg, FS, method="fusion")
+        assert edr_sig.dtype == np.float64
+
+    def test_fusion_method_not_constant(self, long_ecg):
+        edr_sig, _, _ = extract_edr(long_ecg, FS, method="fusion")
+        assert edr_sig.std() > 0.0
+
+    def test_short_signal_amplitude_zeros(self):
+        """Signal with < 2 R-peaks → zero EDR, empty arrays (amplitude method)."""
+        short = np.zeros(int(FS * 5), dtype=np.float64)
+        edr_sig, peaks, troughs = extract_edr(short, FS, method="amplitude")
+        assert np.all(edr_sig == 0.0)
+        assert len(peaks) == 0
+        assert len(troughs) == 0
+
+    def test_known_amplitude_modulation(self):
+        """Synthetic ECG with sinusoidal R-peak amplitude at 0.2 Hz.
+        QRS-AM should produce a signal correlated with the modulation."""
+        import neurokit2 as nk
+        from src.features.phase_labels import get_rpeak_indices
+
+        fs = 250.0
+        duration = 60
+        t = np.arange(int(fs * duration)) / fs
+        # Clean synthetic ECG
+        ecg = nk.ecg_simulate(duration=duration, sampling_rate=int(fs), heart_rate=70, noise=0.01)
+        ecg = np.asarray(ecg, dtype=np.float64)
+
+        # Get R-peaks and scale amplitudes with a 0.2 Hz sine
+        rpeaks = get_rpeak_indices(ecg, fs)
+        if len(rpeaks) < 5:
+            pytest.skip("Not enough R-peaks in synthetic ECG")
+        resp_freq = 0.2  # Hz
+        modulation = 0.3 * np.sin(2 * np.pi * resp_freq * rpeaks / fs)
+        ecg_mod = ecg.copy()
+        for i, rp in enumerate(rpeaks):
+            ecg_mod[max(0, rp-5):min(len(ecg), rp+5)] *= (1.0 + modulation[i])
+
+        edr_sig, _, _ = extract_edr(ecg_mod, fs, method="amplitude")
+
+        # Sample the EDR at R-peak positions and check correlation with modulation
+        if len(edr_sig) > 0 and len(rpeaks) > 5:
+            edr_at_peaks = edr_sig[rpeaks]
+            correlation = np.corrcoef(edr_at_peaks, modulation)[0, 1]
+            # QRS-AM should show non-trivial correlation (unit test — real validation in S-63 smoke test)
+            assert abs(correlation) > 0.05, f"Expected |corr|>0.05, got {correlation:.3f}"
+
+
+# ===========================================================================
 # generate_exhalation_labels
 # ===========================================================================
 

@@ -17,6 +17,8 @@ from typing import Tuple
 
 import numpy as np
 import yaml
+from scipy.interpolate import interp1d
+from scipy.signal import butter, filtfilt
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,66 @@ def _downsample_to_frames(
 
 
 # ---------------------------------------------------------------------------
+# Private: QRS amplitude modulation EDR
+# ---------------------------------------------------------------------------
+
+def _qrs_amplitude_edr(
+    signal: np.ndarray,
+    rpeaks: np.ndarray,
+    fs: float,
+    bandpass_low: float = 0.1,
+    bandpass_high: float = 0.5,
+    bandpass_order: int = 4,
+) -> np.ndarray:
+    """Extract respiratory proxy from R-peak amplitude modulation.
+
+    Chest expansion during breathing shifts electrode position, causing R-peak
+    heights to oscillate at the respiratory rate. Unlike RSA-based EDR, this
+    method does not require intact autonomic modulation and persists during
+    orthostatic stress tests.
+
+    Parameters
+    ----------
+    signal : 1D float64 ECG signal
+    rpeaks : sample indices of R-peaks
+    fs : sampling rate in Hz
+    bandpass_low, bandpass_high : respiratory band (Hz)
+    bandpass_order : Butterworth filter order
+
+    Returns
+    -------
+    edr_signal : 1D float64 amplitude-modulation respiratory proxy (same length as signal)
+    """
+    if len(rpeaks) < 3:
+        return np.zeros(len(signal), dtype=np.float64)
+
+    # R-peak amplitudes as a proxy for chest position
+    amplitudes = signal[rpeaks].astype(np.float64)
+    times = rpeaks / fs
+    t_full = np.arange(len(signal)) / fs
+
+    # Cubic interpolation to full sample rate
+    try:
+        interp_fn = interp1d(times, amplitudes, kind="cubic",
+                             bounds_error=False, fill_value=(amplitudes[0], amplitudes[-1]))
+        amp_continuous = interp_fn(t_full)
+    except ValueError:
+        # Fallback to linear if cubic fails (too few points)
+        interp_fn = interp1d(times, amplitudes, kind="linear",
+                             bounds_error=False, fill_value=(amplitudes[0], amplitudes[-1]))
+        amp_continuous = interp_fn(t_full)
+
+    # Bandpass filter to respiratory band
+    nyq = fs / 2.0
+    low = bandpass_low / nyq
+    high = min(bandpass_high / nyq, 0.99)
+    b, a = butter(bandpass_order, [low, high], btype="band")
+    edr_signal = filtfilt(b, a, amp_continuous)
+
+    return edr_signal.astype(np.float64)
+
+
+# ---------------------------------------------------------------------------
 # Public: EDR extraction
 # ---------------------------------------------------------------------------
 
@@ -85,7 +147,10 @@ def extract_edr(
     ----------
     signal : 1D float64 ECG (should be denoised for best results)
     fs : sampling rate in Hz
-    method : nk.ecg_rsp method ("vangent2019", "soni2019", "charlton2016", "sarkar2015")
+    method : EDR method.
+        RSA-based (neurokit2): "vangent2019", "soni2019", "charlton2016", "sarkar2015"
+        QRS amplitude: "amplitude" — R-peak height modulation (works during stress)
+        Fusion: "fusion" — PCA of RSA + amplitude channels (first component)
 
     Returns
     -------
@@ -100,7 +165,7 @@ def extract_edr(
 
     signal = np.asarray(signal, dtype=np.float64).ravel()
 
-    # R-peak detection
+    # R-peak detection (needed by all methods)
     from src.features.phase_labels import get_rpeak_indices
     rpeaks = get_rpeak_indices(signal, fs)
 
@@ -111,23 +176,48 @@ def extract_edr(
             np.array([], dtype=np.int64),
         )
 
-    # Heart rate signal (continuous, same length as ECG)
-    info_dict = {"ECG_R_Peaks": rpeaks.tolist()}
-    ecg_rate = nk.signal_rate(
-        info_dict, sampling_rate=fs, desired_length=len(signal)
-    )
+    # --- QRS amplitude modulation path ---
+    if method == "amplitude":
+        edr_signal = _qrs_amplitude_edr(signal, rpeaks, fs)
 
-    # ECG-Derived Respiration via bandpass-filtered HR variability
-    edr_signal = nk.ecg_rsp(ecg_rate, sampling_rate=fs, method=method)
-    edr_signal = np.asarray(edr_signal, dtype=np.float64)
+    # --- Fusion: PCA of RSA + amplitude channels ---
+    elif method == "fusion":
+        # RSA channel
+        info_dict = {"ECG_R_Peaks": rpeaks.tolist()}
+        ecg_rate = nk.signal_rate(info_dict, sampling_rate=fs, desired_length=len(signal))
+        rsa_signal = np.asarray(nk.ecg_rsp(ecg_rate, sampling_rate=fs, method="vangent2019"),
+                                dtype=np.float64)
+        # Amplitude channel
+        amp_signal = _qrs_amplitude_edr(signal, rpeaks, fs)
+        # PCA: first principal component of 2-channel matrix
+        mat = np.stack([rsa_signal, amp_signal], axis=1)  # (N, 2)
+        mat -= mat.mean(axis=0)
+        std = mat.std(axis=0)
+        std[std == 0] = 1.0
+        mat /= std
+        cov = np.cov(mat.T)
+        eigvals, eigvecs = np.linalg.eigh(cov)
+        pc1 = eigvecs[:, np.argmax(eigvals)]  # first PC
+        edr_signal = mat @ pc1
 
-    # Detect respiratory peaks and troughs
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=FutureWarning)
-        rsp_info = nk.rsp_findpeaks(edr_signal, sampling_rate=fs)
+    # --- RSA-based path (neurokit2) ---
+    else:
+        info_dict = {"ECG_R_Peaks": rpeaks.tolist()}
+        ecg_rate = nk.signal_rate(info_dict, sampling_rate=fs, desired_length=len(signal))
+        edr_signal = nk.ecg_rsp(ecg_rate, sampling_rate=fs, method=method)
+        edr_signal = np.asarray(edr_signal, dtype=np.float64)
 
-    peak_indices = np.asarray(rsp_info.get("RSP_Peaks", []), dtype=np.int64)
-    trough_indices = np.asarray(rsp_info.get("RSP_Troughs", []), dtype=np.int64)
+    # Detect respiratory peaks and troughs (shared for all methods)
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            rsp_info = nk.rsp_findpeaks(edr_signal, sampling_rate=fs)
+        peak_indices = np.asarray(rsp_info.get("RSP_Peaks", []), dtype=np.int64)
+        trough_indices = np.asarray(rsp_info.get("RSP_Troughs", []), dtype=np.int64)
+    except (IndexError, ValueError, KeyError):
+        # nk.rsp_findpeaks can fail on low-SNR signals (e.g., QRS-AM on noisy ECG)
+        peak_indices = np.array([], dtype=np.int64)
+        trough_indices = np.array([], dtype=np.int64)
 
     return edr_signal, peak_indices, trough_indices
 

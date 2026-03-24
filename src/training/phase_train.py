@@ -114,6 +114,8 @@ def run_phase_validation(
     device: torch.device,
     dia_pw: torch.Tensor,
     exh_pw: torch.Tensor,
+    dia_weight: float = 0.5,
+    exh_weight: float = 0.5,
 ) -> tuple[float, float, float, float]:
     """Compute val loss + per-task accuracy (threshold 0.5).
 
@@ -131,7 +133,7 @@ def run_phase_validation(
             exh = exh.to(device)
 
             logits = model(ecg)
-            loss = multitask_bce_loss(logits, dia, exh, dia_pw, exh_pw)
+            loss = multitask_bce_loss(logits, dia, exh, dia_pw, exh_pw, dia_weight, exh_weight)
             loss_sum += loss.item() * ecg.shape[0]
             n += ecg.shape[0]
 
@@ -270,7 +272,7 @@ def main():
 
         if val_loader is not None and len(val_loader.dataset) > 0:
             val_loss, dia_acc, exh_acc, avg_acc = run_phase_validation(
-                model, val_loader, device, dia_pw, exh_pw)
+                model, val_loader, device, dia_pw, exh_pw, dia_weight, exh_weight)
         else:
             val_loss, dia_acc, exh_acc, avg_acc = 0.0, 0.0, 0.0, 0.0
 

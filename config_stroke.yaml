@@ -111,6 +111,10 @@ edr:
   min_resp_cycles: 2             # Need at least 2 full respiratory cycles
   denoise_before_edr: true       # CWT denoise before R-peak detection
   mask_edr_exhalation: true      # Force NaN for records without reference resp signal (MIMIC)
+  # QRS amplitude modulation EDR (S-61) — respiratory band for R-peak height interpolation
+  amplitude_bandpass_low: 0.1
+  amplitude_bandpass_high: 0.5
+  amplitude_bandpass_order: 4
 
 # Reference respiratory signal label generation (CVES thermistor / flow_rate)
 resp_labels:
@@ -226,3 +230,23 @@ phase_training_weighted:
   grad_clip: 1.0
   task_weight_dia: 0.3
   task_weight_exh: 0.7
+
+# S-54 — diastole-weighted loss: 0.7 dia + 0.3 exh
+phase_training_dia_weighted:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.7
+  task_weight_exh: 0.3
+
+# S-54 — moderate diastole-weighted loss: 0.6 dia + 0.4 exh
+phase_training_dia_moderate:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.6
+  task_weight_exh: 0.4
