@@ -15,7 +15,7 @@ paths:
   phase2_scaler: models/artifacts/stroke_phase2_scaler.pkl
   phase1_checkpoint: models/checkpoints/stroke_phase1_model.pth
   phase2_checkpoint: models/checkpoints/stroke_phase2_model.pth
-  phase_detect_checkpoint: models/checkpoints/phase_detector.pth
+  phase_detect_checkpoint: models/checkpoints/phase_detector_ref.pth  # S-70: production model (S-36, dia=84.34%, exh=56.54%)
 
 data:
   raw_dir: data/raw/stroke avns

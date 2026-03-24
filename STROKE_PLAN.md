@@ -366,10 +366,10 @@ Model is a stateless CNN — stride can be changed freely in deployment without 
 | S-64 | Rebuild training cache with fusion EDR for MIMIC → `cache_phase_detect_fusion` | **In Progress** | 2026-03-24 — running (~15 min) |
 | S-65 | Retrain + evaluate on fusion cache — compare vs baseline | **Done** | 2026-03-24 — dia=83.67%, exh=54.33% — regression |
 | S-66 | QRS-AM experiment summary + update ablation table | **Done** | 2026-03-24 — see results below |
-| S-67 | Update `STROKE_PLAN.md` — all new steps + ablation table | Pending | — |
-| S-68 | Update `stroke-data-strategy-report.md` — S-50–S-66 results | Pending | — |
-| S-69 | Update `STROKE_AI_INFRASTRUCTURE.md` — comprehensive refresh | Pending | — |
-| S-70 | Final model designation + update `paths.phase_detect_checkpoint` | Pending | — |
+| S-67 | Update `STROKE_PLAN.md` — all new steps + ablation table | **Done** | 2026-03-24 |
+| S-68 | Update `stroke-data-strategy-report.md` — S-50–S-66 results, final ablation | **Done** | 2026-03-24 |
+| S-69 | Update `STROKE_AI_INFRASTRUCTURE.md` — comprehensive refresh (data flow, labels, results) | **Done** | 2026-03-24 |
+| S-70 | Final model designation — `paths.phase_detect_checkpoint: phase_detector_ref.pth` | **Done** | 2026-03-24 |
 
 ### S-57/S-59 — Diastole Loss Weighting Results (2026-03-24)
 
@@ -494,11 +494,15 @@ The grant's hardware plan (impedance pneumography integrated into the VNS device
 - Every attempted improvement (loss weighting, QRS-AM, FANTASIA, BIDMC, larger model, 5s windows) either showed no gain or regression
 - ECG-only exhalation ceiling definitively confirmed at 56-57%
 
-**Next steps (S-67–S-70): Documentation updates**
-- S-67: Update STROKE_PLAN.md steps table ← done above
-- S-68: Update `stroke-data-strategy-report.md` with full ablation table
-- S-69: Update `STROKE_AI_INFRASTRUCTURE.md` (stale — predates reference labels)
-- S-70: Final model designation in config
+**S-54 through S-70 ALL COMPLETE.**
+
+Production model: `phase_detector_ref.pth` — dia=84.34%, exh=56.54%, latency 116ms.
+All ECG-only improvement strategies exhausted. Hardware (impedance pneumography) is the only path to >85% exhalation.
+
+**Remaining open items:**
+- Fix BIDMC parser bug (`II,` comma artifact — 1 failing test)
+- LSL streaming integration (when hardware available)
+- Phase 2 hardware integration
 
 ---
 
