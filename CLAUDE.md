@@ -27,6 +27,7 @@ Each git branch has its own plan file. **Never update the wrong branch's plan.**
 |--------|-----------|
 | `master` (AF work) | `AF_PLAN.md` |
 | `feature/stroke-avns` | `STROKE_PLAN.md` |
+| `feature/tinnitus-avns` | `TINNITUS_PLAN.md` |
 
 Check your current branch at session start and only read/update that branch's plan file.
 
