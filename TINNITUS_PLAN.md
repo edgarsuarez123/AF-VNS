@@ -55,7 +55,7 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
   - Pattern: `resp_labels.py:_bandpass_filter()`
   - Verify: PSD concentrated in 0.5–8 Hz
 
-- [ ] 5. **F5: PPG diastole detection**
+- [x] 5. **F5: PPG diastole detection** — done 2026-03-28
   - `src/features/ppg_phase_labels.py` — systolic peak detection (via peak_detector, signal_type="ppg") + dicrotic notch detection
   - Dicrotic notch: local min in descending limb after ~30% of beat interval
   - Output: per-frame 5 Hz labels matching `phase_labels.generate_phase_labels()` interface
@@ -114,6 +114,15 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
+### F5 — PPG diastole detection (2026-03-28)
+- Created `src/features/ppg_phase_labels.py` with `generate_ppg_phase_labels()` — mirrors `phase_labels.generate_phase_labels()` interface exactly so PhaseDetector CNN training pipeline can be reused
+- Systolic peak detection via `nk.ppg_findpeaks()` (same neurokit2 backend as `peak_detector.py`)
+- Dicrotic notch detection: local minimum search after `notch_start_fraction × beat_interval` from systolic peak; midpoint fallback for very short beats
+- Diastole window: notch → (next peak − notch_guard_ms); systole = everything else
+- Integration test: PPG diastole labels vs simultaneous ECG-derived labels on 3 BIDMC records — agreement well above 60% floor threshold
+- Decision: notch_start_fraction=0.30 (search starts after 30% of beat interval) — empirically avoids the systolic upstroke while catching the notch before it transitions into the diastolic hump
+- 17/17 tests passing
+
 ### F4 — PPG bandpass filter (2026-03-28)
 - Created `src/features/ppg_filter.py` with `denoise_ppg()` — Butterworth bandpass 0.5–8 Hz, SOS form for numerical stability
 - Config-driven via `config_tinnitus.yaml` ppg_filter section; falls back to defaults if no config provided
@@ -146,4 +155,4 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** F5 — PPG diastole detection (`src/features/ppg_phase_labels.py`)
+**Next step:** F6 — PPG-derived respiration (`src/features/ppg_resp.py`)
