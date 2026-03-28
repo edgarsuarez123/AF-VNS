@@ -50,7 +50,7 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
   - Label: baseline=0, stress=1
   - Verify: 15 subjects × conditions, all 3 signals non-None
 
-- [ ] 4. **F4: PPG bandpass filter**
+- [x] 4. **F4: PPG bandpass filter** — done 2026-03-28
   - `src/features/ppg_filter.py` — `denoise_ppg()`, Butterworth 0.5–8 Hz, SOS
   - Pattern: `resp_labels.py:_bandpass_filter()`
   - Verify: PSD concentrated in 0.5–8 Hz
@@ -114,6 +114,14 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
+### F4 — PPG bandpass filter (2026-03-28)
+- Created `src/features/ppg_filter.py` with `denoise_ppg()` — Butterworth bandpass 0.5–8 Hz, SOS form for numerical stability
+- Config-driven via `config_tinnitus.yaml` ppg_filter section; falls back to defaults if no config provided
+- Decision: 8 Hz upper cutoff (vs ECG 45 Hz) — PPG pulse has much lower frequency content; 8 Hz covers 2nd harmonic of cardiac signal at 240 bpm max and the dicrotic notch
+- Returns unfiltered copy (with warning) if signal too short rather than raising — safe for short edge-case windows
+- Works at both 125 Hz (BIDMC) and 64 Hz (WESAD) sample rates
+- 9/9 tests passing
+
 ### F3 — WESAD download + parser (2026-03-28)
 - Created `dl_wesad.py` — accepts `--url`, `--zip`, or `--verify`; does not hard-code download URL (dataset hosted externally, URL may change). Integration test skips automatically if WESAD not downloaded.
 - Added `parse_wesad_dir()` to `src/data/tinnitus_parsers.py` — reads S{N}/S{N}.pkl pickle files (WESAD format), extracts wrist BVP (64 Hz), wrist EDA (4 Hz), chest Resp (700 Hz → resampled to 64 Hz)
@@ -138,4 +146,4 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** F4 — PPG bandpass filter (`src/features/ppg_filter.py`)
+**Next step:** F5 — PPG diastole detection (`src/features/ppg_phase_labels.py`)
