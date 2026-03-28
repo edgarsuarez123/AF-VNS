@@ -1,5 +1,10 @@
 """Tests for tinnitus pipeline schema and config."""
 
+import pickle
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 import yaml
@@ -7,8 +12,12 @@ import yaml
 from src.data.tinnitus_parsers import (
     TinnitusRecordDict,
     _REQUIRED_KEYS,
+    _WESAD_BVP_FS,
+    _WESAD_CHEST_FS,
+    _WESAD_EDA_FS,
     validate_tinnitus_record,
     parse_bidmc_ppg_dir,
+    parse_wesad_dir,
 )
 
 
@@ -160,3 +169,167 @@ class TestBidmcPpgParser:
         records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
         for r in records:
             assert len(r["ppg_signal"]) > 0
+
+
+def _make_wesad_pickle(n_chest: int = 700 * 120, n_bvp: int = 64 * 120) -> dict:
+    """Build a minimal WESAD-format data dict for one subject (120s duration)."""
+    # Labels at chest FS: 30s undefined, 60s baseline, 30s stress
+    labels = np.zeros(n_chest, dtype=np.int32)
+    labels[int(700 * 30):int(700 * 90)] = 1   # baseline
+    labels[int(700 * 90):] = 2                 # stress
+
+    return {
+        "signal": {
+            "wrist": {
+                "BVP": np.random.randn(n_bvp).reshape(-1, 1),
+                "EDA": np.abs(np.random.randn(int(n_bvp * _WESAD_EDA_FS / _WESAD_BVP_FS))).reshape(-1, 1),
+                "TEMP": np.random.randn(int(n_bvp * 4 / _WESAD_BVP_FS)).reshape(-1, 1),
+                "ACC": np.random.randn(int(n_bvp * 32 / _WESAD_BVP_FS), 3),
+            },
+            "chest": {
+                "Resp": np.random.randn(n_chest).reshape(-1, 1),
+                "EDA": np.random.randn(n_chest).reshape(-1, 1),
+                "ECG": np.random.randn(n_chest).reshape(-1, 1),
+            },
+        },
+        "label": labels,
+        "subject": 2,
+    }
+
+
+class TestWesadParser:
+    CONFIG_PATH = "config_tinnitus.yaml"
+
+    def _write_wesad_subject(self, tmp_dir: Path, subject_id: int) -> None:
+        subj_dir = tmp_dir / f"S{subject_id}"
+        subj_dir.mkdir()
+        data = _make_wesad_pickle()
+        with open(subj_dir / f"S{subject_id}.pkl", "wb") as f:
+            pickle.dump(data, f)
+
+    def test_parses_mock_subject(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_wesad_subject(tmp_path, 2)
+            # Point config subjects list to only S2
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        assert len(records) >= 1
+
+    def test_all_records_pass_schema_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_wesad_subject(tmp_path, 2)
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        for r in records:
+            assert validate_tinnitus_record(r), f"{r['subject_id']} failed validation"
+
+    def test_ppg_fs_is_64(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_wesad_subject(tmp_path, 2)
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        for r in records:
+            assert r["ppg_fs"] == _WESAD_BVP_FS
+
+    def test_eda_and_resp_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_wesad_subject(tmp_path, 2)
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        for r in records:
+            assert r["eda_signal"] is not None
+            assert r["resp_signal"] is not None
+
+    def test_undefined_epochs_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_wesad_subject(tmp_path, 2)
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        # No record should have condition="undefined"
+        for r in records:
+            assert r["condition"] != "undefined"
+
+    def test_labels_are_binary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            self._write_wesad_subject(tmp_path, 2)
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        for r in records:
+            assert r["label"] in (0, 1)
+
+    def test_missing_subject_skipped_gracefully(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # Write S2 but request S2 and S3 (S3 missing)
+            self._write_wesad_subject(tmp_path, 2)
+            with patch("src.data.tinnitus_parsers._load_tinnitus_config") as mock_cfg:
+                mock_cfg.return_value = {
+                    "wesad": {
+                        "label_map": {0: None, 1: 0, 2: 1, 3: 0, 4: 0},
+                        "subjects": [2, 3],
+                    }
+                }
+                records = parse_wesad_dir(str(tmp_path), self.CONFIG_PATH)
+
+        # Should still return records for S2
+        assert len(records) >= 1
+
+    @pytest.mark.skipif(
+        not Path("data/raw/tinnitus avns/wesad/S2/S2.pkl").exists(),
+        reason="WESAD not downloaded",
+    )
+    def test_real_wesad_all_subjects(self):
+        records = parse_wesad_dir("data/raw/tinnitus avns/wesad", self.CONFIG_PATH)
+        subject_ids = {r["session_id"] for r in records}
+        # Expect at least 10 subjects (some may have short epochs filtered)
+        assert len(subject_ids) >= 10
+        for r in records:
+            assert validate_tinnitus_record(r)

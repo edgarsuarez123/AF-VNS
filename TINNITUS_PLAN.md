@@ -43,7 +43,7 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
   - Pattern: `stroke_parsers.py:parse_bidmc_dir()` (line 501)
   - Verify: 53 records, ppg_fs == 125.0, resp_signal not None
 
-- [ ] 3. **F3: WESAD download + parser**
+- [x] 3. **F3: WESAD download + parser** — done 2026-03-28
   - `dl_wesad.py` — download from UCI ML repo
   - `src/data/tinnitus_parsers.py` — `parse_wesad_dir()`, pickle format S{N}/S{N}.pkl
   - Extract: wrist/BVP (64 Hz), wrist/EDA (4 Hz), chest/Resp (700 Hz → downsample)
@@ -114,6 +114,14 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
+### F3 — WESAD download + parser (2026-03-28)
+- Created `dl_wesad.py` — accepts `--url`, `--zip`, or `--verify`; does not hard-code download URL (dataset hosted externally, URL may change). Integration test skips automatically if WESAD not downloaded.
+- Added `parse_wesad_dir()` to `src/data/tinnitus_parsers.py` — reads S{N}/S{N}.pkl pickle files (WESAD format), extracts wrist BVP (64 Hz), wrist EDA (4 Hz), chest Resp (700 Hz → resampled to 64 Hz)
+- Segments signals into continuous label epochs; skips undefined (label=0) and epochs < 30s
+- Decision: WESAD PPG is at 64 Hz (Empatica E4 native) — kept as-is rather than upsampling to 125 Hz to preserve signal fidelity; phase precompute will handle mixed-FS datasets
+- Decision: amusement (label=3) and meditation (label=4) mapped to 0 (baseline) for arousal gating — mechanistically similar to relaxed wakefulness per SBIR spec
+- 29/30 tests passing (1 skipped — real data integration, will pass after WESAD download)
+
 ### F2 — BIDMC PPG parser (2026-03-28)
 - Added `parse_bidmc_ppg_dir()` to `src/data/tinnitus_parsers.py`
 - Extracts PLETH (PPG) + RESP (impedance pneumography) channels from BIDMC WFDB records at native 125 Hz
@@ -130,4 +138,4 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** F3 — WESAD download + parser (`dl_wesad.py` + `parse_wesad_dir()`)
+**Next step:** F4 — PPG bandpass filter (`src/features/ppg_filter.py`)
