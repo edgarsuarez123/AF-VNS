@@ -1,0 +1,134 @@
+# RS-Personalized AI-Driven Adaptive Stimulation — Tinnitus AVNS
+# Tri-fold synchronized aVNS: cardiac diastole + exhalation + EDA arousal-in-band.
+# Signals: PPG (not ECG), respiratory effort / PPG-derived, EDA.
+# Reference: aVNS Tinnitus.md (SBIR Fast Track spec)
+
+paths:
+  phase_detect_checkpoint: models/checkpoints/tinnitus_phase_detector.pth
+  cache_dir: models/artifacts/cache_tinnitus_phase
+  split_path: models/artifacts/tinnitus_phase_split.json
+
+data:
+  raw_dir: data/raw/tinnitus avns
+  bidmc_subdir: data/raw/stroke avns/bidmc      # BIDMC already downloaded here
+  wesad_subdir: data/raw/tinnitus avns/wesad
+  ppg_target_fs: 125       # Hz — matches BIDMC native rate + SBIR ≥125 Hz requirement
+  eda_target_fs: 4         # Hz — matches Empatica E4 EDA native rate
+  max_signal_sec: 480      # Cap recordings at 8 min (BIDMC duration)
+
+# PPG bandpass filter (replaces ECG wavelet denoising for this pipeline)
+ppg_filter:
+  bandpass_low_hz: 0.5     # Remove baseline drift
+  bandpass_high_hz: 8.0    # Preserve pulse morphology; remove HF noise/motion
+  bandpass_order: 4        # Butterworth order (SOS form)
+
+# PPG diastole detection
+ppg_diastole:
+  frame_rate_hz: 5.0                # Output frame rate (200ms per frame) — matches stroke pipeline
+  notch_search_start_fraction: 0.30 # Search for dicrotic notch after this fraction of beat interval
+  notch_guard_ms: 100               # Reserve 100ms before next systolic peak as end of diastole
+  min_beats: 2
+  min_hr_bpm: 40.0
+  max_hr_bpm: 200.0
+
+# PPG-derived respiration (fallback when no belt is available)
+ppg_resp:
+  method: "riiv"                    # "riiv" (amplitude mod) | "rifv" (IBI freq mod) | "baseline"
+  bandpass_low_hz: 0.1
+  bandpass_high_hz: 0.5
+  bandpass_order: 4
+  min_resp_rate_bpm: 6.0
+  max_resp_rate_bpm: 30.0
+  min_resp_cycles: 2
+
+# Reference respiratory label settings (for BIDMC impedance pneumography)
+# Reuses resp_labels.py logic — same bandpass params
+resp_labels:
+  bandpass_low_hz: 0.08
+  bandpass_high_hz: 0.6
+  bandpass_order: 4
+  min_peak_distance_sec: 1.5
+  min_resp_rate_bpm: 6.0
+  max_resp_rate_bpm: 30.0
+  min_resp_cycles: 2
+  thermst_invert: false             # BIDMC impedance pneumography — no inversion needed
+
+# EDA arousal gating
+eda:
+  decomposition_method: "cvxeda"    # neurokit2 eda_phasic method
+  tonic_window_sec: 60              # Running window for tonic SCL estimation
+  calibration_sec: 120              # Baseline period for per-subject threshold calibration
+  low_threshold_sigma: 1.5          # SCL < baseline - N*sigma → drowsy → hold stimulation
+  high_threshold_sigma: 2.5         # SCL > baseline + N*sigma → hyperaroused → hold stimulation
+  scr_min_amplitude: 0.02           # µS — minimum phasic SCR amplitude to count
+  frame_rate_hz: 1.0                # Arousal gate update rate (EDA is slow — 4 Hz input, 1 Hz gate)
+
+# Phase detector CNN — PPG input variant
+# Uses existing PhaseDetector class; only input_samples changes vs stroke config
+phase_model:
+  channels: [16, 32, 48]
+  kernels: [7, 5, 3]
+  strides: [5, 2, 2]
+  dropout: 0.1
+  n_frames: 10                      # 2s × 5Hz output frames
+  n_tasks: 2                        # diastole + exhalation
+  input_samples: 250                # 2s × 125Hz (PPG native rate — not 500 like ECG @ 250Hz)
+
+# Phase detection precompute (2s windows)
+phase_precompute:
+  window_sec: 2.0
+  stride_sec: 0.2                   # Dense overlap for training
+  min_valid_frames: 8               # Skip windows with <8/10 non-NaN frames
+  frame_rate_hz: 5.0
+
+# Phase detector training
+phase_training:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.5              # Equal weighting to start; tune after first run
+  task_weight_exh: 0.5
+
+# Tri-fold closed-loop pipeline
+closed_loop:
+  ppg_fs: 125                       # Expected PPG sampling rate (Hz)
+  eda_fs: 4                         # Expected EDA sampling rate (Hz)
+  inference_stride_ms: 100          # Fast path: run PhaseDetector every 100ms
+  slow_window_sec: 60               # Slow path: AutonomicState window
+  diastole_threshold: 0.5           # Sigmoid threshold for diastole gate
+  exhalation_threshold: 0.5         # Sigmoid threshold for exhalation gate
+  # EDA arousal gate uses eda.low/high_threshold_sigma (per-subject calibrated)
+
+# Autonomic state (PPG-derived HRV — signal-agnostic once RR intervals extracted)
+autonomic_state:
+  window_sec: 60
+  features: [lf_hf_ratio, norm_hf_power, sampen, dfa_alpha1]
+  fs_resample: 4.0
+
+# Stim parameter recommender — same rule-based logic as stroke pipeline
+stim_recommender:
+  amplitude_range: [0.0, 0.8]       # mA — SBIR target: 0.8 mA constant current
+  frequency_range: [1.0, 30.0]      # Hz — SBIR: 30 Hz
+  pulse_width_range: [50, 100]      # µs — SBIR: 100 µs
+  lf_hf_high: 2.0
+  norm_hf_low: 0.3
+  sampen_high: 2.0
+  dfa_normal_range: [0.5, 1.5]
+
+# Artifact rejection (signal-agnostic — operates on RR intervals)
+artifact:
+  amplitude_mad_multiple: 30
+  rr_deviation_percent: 60
+  rr_fraction_threshold: 0.30
+
+# WESAD label mapping
+wesad:
+  label_map:
+    0: null          # undefined — skip
+    1: 0             # baseline → arousal-in-band (label=0)
+    2: 1             # stress → arousal-too-high (label=1)
+    3: 0             # amusement → treat as baseline for gating purposes
+    4: 0             # meditation → treat as baseline
+  subjects: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17]  # S2–S17, S12 excluded (corrupted)

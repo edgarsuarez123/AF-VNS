@@ -32,7 +32,7 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
 
 ## Implementation Steps
 
-- [ ] 1. **F1: TinnitusRecordDict schema + config_tinnitus.yaml**
+- [x] 1. **F1: TinnitusRecordDict schema + config_tinnitus.yaml** — done 2026-03-28
   - `src/data/tinnitus_parsers.py` — define TypedDict with ppg, resp, eda fields
   - `config_tinnitus.yaml` — sections: data, ppg_filter, eda, phase_model, phase_training, closed_loop
   - Key values: `ppg_target_fs: 125`, `eda_target_fs: 4`
@@ -114,10 +114,14 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
-*(Updated after each completed feature)*
+### F1 — TinnitusRecordDict schema + config_tinnitus.yaml (2026-03-28)
+- Created `src/data/tinnitus_parsers.py` with `TinnitusRecordDict` TypedDict, `_REQUIRED_KEYS` set, and `validate_tinnitus_record()` — mirrors `StrokeRecordDict` pattern from `stroke_parsers.py`
+- Created `config_tinnitus.yaml` with all required sections: `data`, `ppg_filter`, `eda`, `ppg_diastole`, `ppg_resp`, `resp_labels`, `phase_model`, `phase_training`, `closed_loop`, `autonomic_state`, `stim_recommender`, `artifact`, `wesad`
+- Key decisions: PPG target fs = 125 Hz (BIDMC native, meets SBIR ≥125 Hz spec); EDA target fs = 4 Hz (Empatica E4 native); `phase_model.input_samples = 250` (2s × 125 Hz, vs 500 for ECG @ 250 Hz); WESAD label map treats amusement/meditation as baseline (label=0) for arousal gating
+- 14/14 tests passing
 
 ---
 
 ## Resume From Here
 
-**Next step:** F1 — Create `src/data/tinnitus_parsers.py` + `config_tinnitus.yaml`
+**Next step:** F2 — BIDMC PPG parser (`parse_bidmc_ppg_dir()` in `src/data/tinnitus_parsers.py`)
