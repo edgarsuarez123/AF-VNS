@@ -38,7 +38,7 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
   - Key values: `ppg_target_fs: 125`, `eda_target_fs: 4`
   - Verify: import schema, load config, unit test validates required keys
 
-- [ ] 2. **F2: BIDMC PPG parser**
+- [x] 2. **F2: BIDMC PPG parser** — done 2026-03-28
   - `src/data/tinnitus_parsers.py` — `parse_bidmc_ppg_dir()`, extract PLETH + RESP at 125 Hz
   - Pattern: `stroke_parsers.py:parse_bidmc_dir()` (line 501)
   - Verify: 53 records, ppg_fs == 125.0, resp_signal not None
@@ -114,6 +114,12 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
+### F2 — BIDMC PPG parser (2026-03-28)
+- Added `parse_bidmc_ppg_dir()` to `src/data/tinnitus_parsers.py`
+- Extracts PLETH (PPG) + RESP (impedance pneumography) channels from BIDMC WFDB records at native 125 Hz
+- Decision: no resampling to 250 Hz — 125 Hz meets SBIR spec and avoids interpolation artifacts; stroke parser resampled to 250 Hz because ECG backbone required it
+- All 53 records parsed, all pass schema validation; 22/22 tests passing
+
 ### F1 — TinnitusRecordDict schema + config_tinnitus.yaml (2026-03-28)
 - Created `src/data/tinnitus_parsers.py` with `TinnitusRecordDict` TypedDict, `_REQUIRED_KEYS` set, and `validate_tinnitus_record()` — mirrors `StrokeRecordDict` pattern from `stroke_parsers.py`
 - Created `config_tinnitus.yaml` with all required sections: `data`, `ppg_filter`, `eda`, `ppg_diastole`, `ppg_resp`, `resp_labels`, `phase_model`, `phase_training`, `closed_loop`, `autonomic_state`, `stim_recommender`, `artifact`, `wesad`
@@ -124,4 +130,4 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** F2 — BIDMC PPG parser (`parse_bidmc_ppg_dir()` in `src/data/tinnitus_parsers.py`)
+**Next step:** F3 — WESAD download + parser (`dl_wesad.py` + `parse_wesad_dir()`)

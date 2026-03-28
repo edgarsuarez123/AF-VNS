@@ -8,6 +8,7 @@ from src.data.tinnitus_parsers import (
     TinnitusRecordDict,
     _REQUIRED_KEYS,
     validate_tinnitus_record,
+    parse_bidmc_ppg_dir,
 )
 
 
@@ -111,3 +112,51 @@ class TestTinnitusConfig:
         # Labels 0-4 must all be present
         for k in [0, 1, 2, 3, 4]:
             assert k in label_map, f"Missing WESAD label {k}"
+
+
+class TestBidmcPpgParser:
+    BIDMC_DIR = "data/raw/stroke avns/bidmc"
+    CONFIG_PATH = "config_tinnitus.yaml"
+
+    def test_returns_53_records(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        assert len(records) == 53, f"Expected 53, got {len(records)}"
+
+    def test_ppg_signal_is_1d_float64(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert isinstance(r["ppg_signal"], np.ndarray)
+            assert r["ppg_signal"].ndim == 1
+            assert r["ppg_signal"].dtype == np.float64
+
+    def test_ppg_fs_is_125(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert r["ppg_fs"] == 125.0
+
+    def test_resp_signal_not_none(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert r["resp_signal"] is not None
+            assert r["resp_channel"] == "impedance"
+
+    def test_eda_is_none(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert r["eda_signal"] is None
+            assert r["eda_fs"] is None
+
+    def test_label_is_zero(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert r["label"] == 0
+
+    def test_all_records_pass_schema_validation(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert validate_tinnitus_record(r), f"Record {r['subject_id']} failed validation"
+
+    def test_ppg_signal_nonzero(self):
+        records = parse_bidmc_ppg_dir(self.BIDMC_DIR, self.CONFIG_PATH)
+        for r in records:
+            assert len(r["ppg_signal"]) > 0
