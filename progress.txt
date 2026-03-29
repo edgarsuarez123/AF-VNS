@@ -2,7 +2,42 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-24
+Last updated: 2026-03-28
+
+--------------------------------------------------------------------------------
+TINNITUS PIPELINE — Branch: feature/tinnitus-avns (2026-03-28)
+--------------------------------------------------------------------------------
+New branch for aVNS tinnitus SBIR. Tri-fold synchronized trigger:
+cardiac diastole + exhalation + EDA arousal-in-band using PPG (not ECG).
+Forked from feature/stroke-avns to reuse bifold trigger infrastructure.
+
+T-1. SCHEMA + CONFIG
+  Created TinnitusRecordDict (ppg, resp, eda fields) in tinnitus_parsers.py.
+  Created config_tinnitus.yaml — ppg_target_fs=125Hz, eda_target_fs=4Hz,
+  phase_model.input_samples=250 (2s×125Hz vs 500 for ECG@250Hz).
+
+T-2. BIDMC PPG PARSER
+  parse_bidmc_ppg_dir() — extracts PLETH (PPG) + impedance resp from 53 BIDMC
+  records at native 125Hz. No upsample (meets SBIR ≥125Hz spec).
+
+T-3. WESAD DOWNLOAD + PARSER
+  dl_wesad.py — download/extract script. WESAD downloaded (2.14 GB, complete).
+  Extraction pending.
+  parse_wesad_dir() — reads S{N}/S{N}.pkl, extracts BVP (64Hz), EDA (4Hz),
+  chest Resp (700Hz→64Hz). Segments by label epoch, skips undefined/<30s.
+
+T-4. PPG BANDPASS FILTER
+  denoise_ppg() in ppg_filter.py — Butterworth 0.5-8Hz SOS. Works at 125Hz
+  and 64Hz. Tighter than ECG filter (45Hz) — PPG pulse needs 0.5-8Hz only.
+
+T-5. PPG DIASTOLE DETECTION
+  generate_ppg_phase_labels() in ppg_phase_labels.py — systolic peak via
+  nk.ppg_findpeaks() + dicrotic notch local-min search. Per-frame 5Hz labels
+  matching phase_labels interface. Integration test vs ECG on BIDMC passes.
+
+Total new tests: 67 passing (14+22+29+9+17). WESAD integration test: 1 skipped
+pending extraction.
+
 
 --------------------------------------------------------------------------------
 S-54. DIA-WEIGHTED LOSS CONFIG (2026-03-24)

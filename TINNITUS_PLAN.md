@@ -155,4 +155,9 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** F6 — PPG-derived respiration (`src/features/ppg_resp.py`)
+**Next step:** Extract WESAD zip, then F6 — PPG-derived respiration (`src/features/ppg_resp.py`)
+
+**WESAD status:** Downloaded (2.14 GB at `data/raw/tinnitus avns/wesad/WESAD.zip`). Run to extract:
+```
+python dl_wesad.py --zip "data/raw/tinnitus avns/wesad/WESAD.zip" --out "data/raw/tinnitus avns/wesad"
+```
