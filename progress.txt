@@ -1837,3 +1837,8 @@ S-41 RESULT (2026-03-22): Masked+FANTASIA model test evaluation
   - Conclusion: NaN-masking alone insufficient; test ceiling is ECG signal quality on CVES stress protocols
   - FANTASIA healthy resting ECG may hurt diastole (different HR/morphology distribution from stroke patients)
   - Next: evaluate on CVES-only test subset to isolate FANTASIA distribution shift effect
+
+--- F10 + F11 — 2026-03-30 ---
+F10: tinnitus_phase_train.py — TinnitusPhaseDataset loads _ppg.npy; reuses phase_train losses/validation. CUDA training launched, early stopped epoch 16, avg_acc=0.617 (dia=0.72, exh=0.51). Checkpoint: models/checkpoints/tinnitus_phase_detector.pth.
+F11: arousal_gate.py — ArousalGate with ring buffer, calibrate/update/is_in_band/get_state. 8/8 tests passing. Config-driven thresholds from config_tinnitus.yaml.
+432 passed, 2 skipped, 3 pre-existing failures (unrelated to F10/F11).
