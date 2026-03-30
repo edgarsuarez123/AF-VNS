@@ -79,10 +79,14 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
   - Added 3 tests to `tests/test_phase_train.py::TestPhaseDetectorPPGConfig`
   - Verify: forward pass `(4, 1, 250)` → `(4, 10, 2)` ✓; config YAML check ✓; `build_phase_detector` end-to-end ✓; 3/3 tests passing
 
-- [ ] 9. **F9: Tinnitus precompute cache**
-  - `src/training/tinnitus_precompute_cache.py` — BIDMC + WESAD → 2s PPG windows + labels → .npz
-  - Subject-level split via `splitter.py`
-  - Verify: .npz files exist, shapes correct (250 samples, 10 frames)
+- [x] 9. **F9: Tinnitus precompute cache** — done 2026-03-30
+  - `src/training/tinnitus_precompute_cache.py` — BIDMC (53 records) + WESAD (75 epoch records) → 2s PPG windows + labels → `.npy`
+  - Subject-level 70/15/15 split via `splitter.py` → `models/artifacts/tinnitus_phase_split.json`
+  - WESAD BVP at 64 Hz resampled to 125 Hz via `scipy.signal.resample` → all windows 250 samples
+  - Exhalation: reference resp preferred (impedance / chest belt), PPG-derived fallback; 128/128 records used reference
+  - Result: 350,624 total windows — 237,142 train / 61,769 val / 51,713 test
+  - Cache at: `models/artifacts/cache_tinnitus_phase/`
+  - 15/15 tests passing (unit + real-data integration)
 
 - [ ] 10. **F10: Phase detection training**
   - `src/training/tinnitus_phase_train.py` + `tinnitus_phase_evaluate.py`
@@ -115,6 +119,13 @@ F1 ─┬─> F2 ─────────────────────
 ---
 
 ## Progress Log
+
+### F9 — Tinnitus precompute cache (2026-03-30)
+- Created `src/training/tinnitus_precompute_cache.py` — mirrors `stroke_precompute_cache.py` pattern with tinnitus-specific changes: `ppg_signal`/`ppg_fs`, WESAD 64 Hz resample to 125 Hz, `generate_ppg_phase_labels` for diastole, reference resp → PPG-derived fallback
+- Config fix: `config_tinnitus.yaml` `wesad_subdir` updated to include `WESAD/` subdir (inner path containing `S{N}/`)
+- 128/128 records processed, 0 skipped; all used reference resp (impedance or chest belt)
+- Cache: 350,624 windows (237k train / 62k val / 52k test), 250 samples × 10 frames each
+- 15/15 tests passing
 
 ### F8 — PPG PhaseDetector CNN config (2026-03-30)
 - `config_tinnitus.yaml` `phase_model` section with `input_samples: 250` was already present since F1
@@ -179,6 +190,6 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** F9 — Tinnitus precompute cache (`src/training/tinnitus_precompute_cache.py`)
+**Next step:** F10 — Phase detection training (`src/training/tinnitus_phase_train.py`)
 
 **WESAD status:** Extracted. Data at `data/raw/tinnitus avns/wesad/WESAD/` (zip extracted into WESAD/ subdir). 75 records parsed successfully.

@@ -38,6 +38,15 @@ T-5. PPG DIASTOLE DETECTION
 Total new tests: 67 passing (14+22+29+9+17). WESAD integration test: 1 skipped
 pending extraction.
 
+T-9. TINNITUS PRECOMPUTE CACHE (2026-03-30)
+  src/training/tinnitus_precompute_cache.py. BIDMC (53) + WESAD (75 epoch records).
+  WESAD BVP 64 Hz → 125 Hz via scipy.signal.resample → 250 samples/window.
+  Exhalation: reference resp preferred (impedance/chest belt), PPG-derived fallback.
+  128/128 records used reference resp; 0 skipped.
+  Output: 350,624 windows (237k/62k/52k train/val/test) at models/artifacts/cache_tinnitus_phase/
+  Split: models/artifacts/tinnitus_phase_split.json (70/15/15 subject-level).
+  15/15 tests passing.
+
 T-7. EDA FEATURE EXTRACTION (2026-03-30)
   extract_eda_features() in src/features/eda.py. Full tonic/phasic decomposition
   via neurokit2 cvxEDA (highpass fallback), per-subject SCL calibration, binary

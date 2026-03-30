@@ -11,7 +11,7 @@ paths:
 data:
   raw_dir: data/raw/tinnitus avns
   bidmc_subdir: data/raw/stroke avns/bidmc      # BIDMC already downloaded here
-  wesad_subdir: data/raw/tinnitus avns/wesad
+  wesad_subdir: data/raw/tinnitus avns/wesad/WESAD  # inner dir containing S2/, S3/, ...
   ppg_target_fs: 125       # Hz — matches BIDMC native rate + SBIR ≥125 Hz requirement
   eda_target_fs: 4         # Hz — matches Empatica E4 EDA native rate
   max_signal_sec: 480      # Cap recordings at 8 min (BIDMC duration)
