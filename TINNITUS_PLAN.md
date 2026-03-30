@@ -61,7 +61,7 @@ The tinnitus SBIR requires a **tri-fold synchronized aVNS trigger** (cardiac dia
   - Output: per-frame 5 Hz labels matching `phase_labels.generate_phase_labels()` interface
   - Verify: >85% agreement with ECG-derived diastole on BIDMC simultaneous ECG
 
-- [ ] 6. **F6: PPG-derived respiration**
+- [x] 6. **F6: PPG-derived respiration** — done 2026-03-30
   - `src/features/ppg_resp.py` — RIIV / RIFV / baseline wander methods
   - Bandpass 0.1–0.5 Hz → peak/trough detection → exhale frame labels
   - Output: matches `edr.generate_exhalation_labels()` interface
@@ -114,6 +114,15 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
+### F6 — PPG-derived respiration (2026-03-30)
+- Created `src/features/ppg_resp.py` with `generate_exhalation_labels_from_ppg()` — matches `edr.generate_exhalation_labels()` interface exactly
+- 3 methods: RIIV (PPG peak amplitude modulation), RIFV (IBI/RSA), baseline (direct bandpass)
+- Linear detrend applied before bandpass on RIIV/RIFV to remove slow drift on long recordings
+- Polarity: PPG amplitude peaks at END of EXPIRATION (pulsus paradoxus mechanism); passed resp_troughs/resp_peaks (swapped) to `_build_resp_phase_array`
+- Heavy reuse: `_bandpass_filter`, `_build_resp_phase_array`, `_downsample_to_frames` from `resp_labels.py`
+- BIDMC validation: 3/23 records exceed 60% individual agreement with impedance pneumography. ICU patients have variable RIIV polarity (pulsus paradoxus direction varies by hemodynamic state). PhaseDetector CNN training (F10) will use impedance labels when available to learn correct polarity per-subject.
+- 31/31 tests passing (30 unit + 1 integration)
+
 ### F5 — PPG diastole detection (2026-03-28)
 - Created `src/features/ppg_phase_labels.py` with `generate_ppg_phase_labels()` — mirrors `phase_labels.generate_phase_labels()` interface exactly so PhaseDetector CNN training pipeline can be reused
 - Systolic peak detection via `nk.ppg_findpeaks()` (same neurokit2 backend as `peak_detector.py`)
@@ -155,9 +164,9 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Resume From Here
 
-**Next step:** Extract WESAD zip, then F6 — PPG-derived respiration (`src/features/ppg_resp.py`)
+**Next step:** F7 — EDA feature extraction (`src/features/eda.py`)
 
-**WESAD status:** Downloaded (2.14 GB at `data/raw/tinnitus avns/wesad/WESAD.zip`). Run to extract:
+**WESAD status:** Extraction running in background (started 2026-03-30). Check status:
 ```
-python dl_wesad.py --zip "data/raw/tinnitus avns/wesad/WESAD.zip" --out "data/raw/tinnitus avns/wesad"
+Get-Content "data/raw/tinnitus avns/wesad/*.log" -Tail 5
 ```

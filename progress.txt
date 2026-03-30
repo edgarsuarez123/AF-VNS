@@ -38,6 +38,22 @@ T-5. PPG DIASTOLE DETECTION
 Total new tests: 67 passing (14+22+29+9+17). WESAD integration test: 1 skipped
 pending extraction.
 
+T-6. PPG-DERIVED RESPIRATION (2026-03-30)
+  generate_exhalation_labels_from_ppg() in src/features/ppg_resp.py.
+  3 extraction methods:
+    RIIV (default): PPG peak amplitudes → cubic interp → detrend → bandpass 0.1-0.5Hz
+    RIFV: IBI series → cubic interp → detrend → bandpass (RSA-based)
+    baseline: direct bandpass of raw PPG at 0.1-0.5Hz
+  Polarity: RIIV/RIFV amplitude peaks at end of EXPIRATION (pulsus paradoxus);
+    resp_troughs/peaks swapped in _build_resp_phase_array call.
+  Reuses: _bandpass_filter, _build_resp_phase_array, _downsample_to_frames from
+    resp_labels.py; get_ppg_peak_indices from ppg_phase_labels.py.
+  Interface matches edr.generate_exhalation_labels() exactly.
+  BIDMC validation: 3/23 records exceed 60% agreement with impedance ground truth
+    (ICU patients have variable RIIV polarity; CNN training will use impedance
+    supervision to learn correct polarity).
+  31/31 tests passing. Total suite: 373 passing, 1 pre-existing failure (stroke).
+
 
 --------------------------------------------------------------------------------
 S-54. DIA-WEIGHTED LOSS CONFIG (2026-03-24)
