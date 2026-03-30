@@ -51,7 +51,7 @@ def verify_wesad_dir(out_dir: Path) -> bool:
 
 
 def extract_wesad_zip(zip_path: Path, out_dir: Path) -> None:
-    print(f"Extracting {zip_path} → {out_dir} ...")
+    print(f"Extracting {zip_path} -> {out_dir} ...")
     out_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path, "r") as zf:
         members = zf.namelist()
