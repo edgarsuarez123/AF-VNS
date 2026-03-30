@@ -351,3 +351,60 @@ class TestPhaseTrainSmoke:
         assert "val_dia_acc" in state
         assert "val_exh_acc" in state
         assert "val_avg_acc" in state
+
+
+# ---------------------------------------------------------------------------
+# F8: PPG PhaseDetector CNN config verification
+# ---------------------------------------------------------------------------
+
+class TestPhaseDetectorPPGConfig:
+    """Verify PhaseDetector works with PPG input shape (input_samples=250).
+
+    F8 uses existing PhaseDetector unchanged — only input_samples differs from
+    the ECG pipeline (250 = 2s @ 125 Hz PPG vs 500 = 2s @ 250 Hz ECG).
+    """
+
+    def test_forward_pass_250_samples(self):
+        """(4, 1, 250) input → (4, 10, 2) output — tinnitus PPG PhaseDetector."""
+        from src.models.phase_detector import PhaseDetectorConfig, PhaseDetector
+
+        cfg = PhaseDetectorConfig(input_samples=250)
+        model = PhaseDetector(cfg)
+        model.eval()
+
+        x = torch.randn(4, 1, 250)
+        with torch.no_grad():
+            out = model(x)
+
+        assert out.shape == (4, 10, 2), (
+            f"Expected (4, 10, 2), got {tuple(out.shape)}"
+        )
+
+    def test_config_tinnitus_yaml_input_samples(self):
+        """config_tinnitus.yaml phase_model.input_samples == 250."""
+        import yaml, os
+        root = Path(__file__).resolve().parents[1]
+        cfg_path = root / "config_tinnitus.yaml"
+        with open(cfg_path) as f:
+            cfg = yaml.safe_load(f)
+        assert cfg["phase_model"]["input_samples"] == 250, (
+            f"Expected input_samples=250, got {cfg['phase_model']['input_samples']}"
+        )
+
+    def test_build_phase_detector_from_tinnitus_config(self):
+        """build_phase_detector reads config_tinnitus.yaml and produces correct shape."""
+        import os
+        from src.models.phase_detector import build_phase_detector
+
+        root = Path(__file__).resolve().parents[1]
+        cfg_path = str(root / "config_tinnitus.yaml")
+        model = build_phase_detector(cfg_path, model_section="phase_model")
+        model.eval()
+
+        x = torch.randn(2, 1, 250)
+        with torch.no_grad():
+            out = model(x)
+
+        assert out.shape == (2, 10, 2), (
+            f"Expected (2, 10, 2), got {tuple(out.shape)}"
+        )

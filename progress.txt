@@ -38,6 +38,23 @@ T-5. PPG DIASTOLE DETECTION
 Total new tests: 67 passing (14+22+29+9+17). WESAD integration test: 1 skipped
 pending extraction.
 
+T-7. EDA FEATURE EXTRACTION (2026-03-30)
+  extract_eda_features() in src/features/eda.py. Full tonic/phasic decomposition
+  via neurokit2 cvxEDA (highpass fallback), per-subject SCL calibration, binary
+  arousal_in_band gate at 1 Hz. Output: 9-key dict matching tri-fold gate spec.
+  Config fix: calibration_sec 120→1200 — WESAD baselines are ~19 min; 120s gave
+  an unrealistically tight band (cal_std ~0.004-0.03 uS), failing 13/15 subjects.
+  1200s captures full baseline variance. Short clinical baselines still cap to
+  signal length via min(len(tonic), calibration_sec*fs).
+  WESAD validation: 15/15 subjects baseline >80% in-band, 15/15 stress >50% out-of-band.
+  35/35 tests passing.
+
+T-8. PHASEDECTOR PPG CONFIG VERIFIED (2026-03-30)
+  F8: config_tinnitus.yaml already had phase_model.input_samples=250.
+  Added 3 tests to test_phase_train.py: forward pass (4,1,250)→(4,10,2),
+  config YAML value check, and build_phase_detector end-to-end.
+  3/3 new tests passing.
+
 T-6. PPG-DERIVED RESPIRATION (2026-03-30)
   generate_exhalation_labels_from_ppg() in src/features/ppg_resp.py.
   3 extraction methods:

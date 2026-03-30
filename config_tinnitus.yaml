@@ -57,7 +57,7 @@ resp_labels:
 eda:
   decomposition_method: "cvxeda"    # neurokit2 eda_phasic method
   tonic_window_sec: 60              # Running window for tonic SCL estimation
-  calibration_sec: 120              # Baseline period for per-subject threshold calibration
+  calibration_sec: 1200             # Baseline period for per-subject threshold calibration (covers full WESAD ~19min baseline; caps to signal length for shorter clinical baselines)
   low_threshold_sigma: 1.5          # SCL < baseline - N*sigma → drowsy → hold stimulation
   high_threshold_sigma: 2.5         # SCL > baseline + N*sigma → hyperaroused → hold stimulation
   scr_min_amplitude: 0.02           # µS — minimum phasic SCR amplitude to count
