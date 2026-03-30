@@ -166,7 +166,4 @@ F1 ─┬─> F2 ─────────────────────
 
 **Next step:** F7 — EDA feature extraction (`src/features/eda.py`)
 
-**WESAD status:** Extraction running in background (started 2026-03-30). Check status:
-```
-Get-Content "data/raw/tinnitus avns/wesad/*.log" -Tail 5
-```
+**WESAD status:** Extracted. Data at `data/raw/tinnitus avns/wesad/WESAD/` (zip extracted into WESAD/ subdir). 75 records parsed successfully.
