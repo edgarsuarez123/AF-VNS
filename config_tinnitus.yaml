@@ -123,6 +123,24 @@ artifact:
   rr_deviation_percent: 60
   rr_fraction_threshold: 0.30
 
+# Supervised arousal state classifier (F13 — trained on WESAD EDA features)
+arousal_classifier:
+  model_type: "gradient_boosting"   # "gradient_boosting" | "logistic_regression"
+  window_sec: 60                    # Feature extraction window (seconds)
+  hop_sec: 30                       # Sliding window hop (50% overlap)
+  n_estimators: 100
+  max_depth: 3
+  learning_rate: 0.1
+  features:
+    - tonic_scl_mean
+    - tonic_scl_std
+    - phasic_mean
+    - max_scr_amplitude
+    - scr_rate
+  checkpoint_path: models/checkpoints/arousal_classifier.pkl
+  cache_dir: models/artifacts/cache_tinnitus_arousal
+  split_path: models/artifacts/tinnitus_arousal_split.json
+
 # WESAD label mapping
 wesad:
   label_map:

@@ -122,6 +122,14 @@ F1 ─┬─> F2 ─────────────────────
 
 ## Progress Log
 
+### F13 — Supervised arousal state classifier (2026-03-31)
+- Created `src/training/tinnitus_precompute_arousal.py` — extracts 5 EDA features per 60s window with 30s hop from WESAD records. Features: tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amplitude, scr_rate. Cache: 1,398 windows (930/185/283 train/val/test), saved to `models/artifacts/cache_tinnitus_arousal/`
+- Created `src/models/arousal_classifier.py` — `ArousalClassifier` wrapping `GradientBoostingClassifier` (n_estimators=100, max_depth=3, lr=0.1, subsample=0.8). NaN imputation via train-set column medians. save/load via joblib. Also supports `logistic_regression` variant.
+- Created `src/training/tinnitus_train_arousal.py` — training script. Results: val acc=0.935/AUROC=0.995, test acc=0.859/AUROC=0.930. Top features: scr_rate (0.39), tonic_scl_mean (0.24). Checkpoint at `models/checkpoints/arousal_classifier.pkl`.
+- Modified `src/models/arousal_gate.py` — added optional `classifier` param. `update()` now computes 5-feature vector after each decomposition and stores as `_current_features`. `is_in_band()` uses classifier prediction if available, rule-based sigma threshold as fallback. `get_state()` now includes `using_classifier` and `current_features` keys.
+- Added `arousal_classifier` section to `config_tinnitus.yaml` — model_type, window/hop sec, GBT params, checkpoint/cache paths.
+- 26/26 new tests passing (11 classifier + 7 precompute + 8 gate); full suite 462 passing.
+
 ### F12 — Tri-fold closed-loop pipeline (2026-03-31)
 - Created `src/models/tinnitus_closed_loop.py` — `TinnitusStimEvent` (adds `arousal_in_band` field vs stroke's `StimEvent`), `TinnitusPipelineState` (adds `eda_calibrated`), `TinnitusClosedLoopPipeline`
 - Fast path: last 250 PPG samples → `denoise_ppg()` → tensor `(1,1,250)` → PhaseDetector → sigmoid → tri-fold check (dia > threshold AND exh > threshold AND `arousal_gate.is_in_band()`)
@@ -216,14 +224,25 @@ F1 ─┬─> F2 ─────────────────────
 
 ---
 
+- [x] 13. **F13: Supervised arousal state classifier (WESAD, GBT)** — done 2026-03-31
+  - `src/models/arousal_classifier.py` — `ArousalClassifier` (GBT or LogReg, save/load)
+  - `src/training/tinnitus_precompute_arousal.py` — 5 EDA features × 60s windows, 1,398 total
+  - `src/training/tinnitus_train_arousal.py` — training script
+  - Modified `src/models/arousal_gate.py` — optional `classifier` param, feature vector in `update()`
+  - Results: val acc=0.935 / AUROC=0.995; test acc=0.859 / AUROC=0.930 (>80% SBIR target ✓)
+  - 26/26 new tests passing; full suite 462 passing
+
+---
+
 ## Resume From Here
 
-**All F1–F12 steps complete.** Pipeline is fully implemented end-to-end.
+**All F1–F13 steps complete.** Pipeline is fully implemented end-to-end.
 
 **Next actions (optional polish):**
 - Label smoothing / exhalation reweighting for F10 checkpoint (exh_acc=0.51, below 80% SBIR target)
 - LSL integration layer for real-time hardware deployment
 - End-to-end offline replay test with actual BIDMC/WESAD data
+- Load trained ArousalClassifier into `build_tinnitus_closed_loop_pipeline()` factory
 
 **WESAD status:** Extracted at `data/raw/tinnitus avns/wesad/WESAD/`. 75 records parsed.
 **Checkpoint:** `models/checkpoints/tinnitus_phase_detector.pth` (avg_acc=0.617, dia=0.72, exh=0.51)

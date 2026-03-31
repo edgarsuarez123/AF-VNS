@@ -88,6 +88,15 @@ T-10. PHASE DETECTION TRAINING + F11. AROUSAL GATE MODULE (2026-03-30)
   BIDMC impedance pneumography mismatch). ArousalGate in arousal_gate.py:
   ring buffer, calibrate(), update(), is_in_band(). 8/8 tests passing.
 
+T-13. SUPERVISED AROUSAL STATE CLASSIFIER (2026-03-31)
+  src/models/arousal_classifier.py — ArousalClassifier (GBT, 5 EDA features).
+  src/training/tinnitus_precompute_arousal.py — 1,398 windows from WESAD (5 EDA feats/60s).
+  src/training/tinnitus_train_arousal.py — train script.
+  Modified src/models/arousal_gate.py — optional classifier param; computes feature vector in update().
+  Results: val acc=0.935/AUROC=0.995; test acc=0.859/AUROC=0.930 (>80% SBIR target).
+  Feature importance: scr_rate (39%), tonic_scl_mean (24%), phasic_mean (19%).
+  26/26 new tests passing. Full suite: 462 passing, 1 pre-existing failure.
+
 T-12. TRI-FOLD CLOSED-LOOP PIPELINE (2026-03-31)
   src/models/tinnitus_closed_loop.py — TinnitusClosedLoopPipeline.
   Fast path (100ms): PPG → denoise_ppg → PhaseDetector → diastole + exhalation check.
