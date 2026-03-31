@@ -80,6 +80,24 @@ T-6. PPG-DERIVED RESPIRATION (2026-03-30)
     supervision to learn correct polarity).
   31/31 tests passing. Total suite: 373 passing, 1 pre-existing failure (stroke).
 
+T-10. PHASE DETECTION TRAINING + F11. AROUSAL GATE MODULE (2026-03-30)
+  tinnitus_phase_train.py: TinnitusPhaseDataset subclasses PhaseDetectorDataset,
+  overrides load path from _ecg.npy → _ppg.npy. Checkpoint at
+  models/checkpoints/tinnitus_phase_detector.pth. Run 1: epoch 16 early stop,
+  avg_acc=0.617 (dia=0.72, exh=0.51). Exhalation near chance (label noise from
+  BIDMC impedance pneumography mismatch). ArousalGate in arousal_gate.py:
+  ring buffer, calibrate(), update(), is_in_band(). 8/8 tests passing.
+
+T-12. TRI-FOLD CLOSED-LOOP PIPELINE (2026-03-31)
+  src/models/tinnitus_closed_loop.py — TinnitusClosedLoopPipeline.
+  Fast path (100ms): PPG → denoise_ppg → PhaseDetector → diastole + exhalation check.
+  EDA path: ArousalGate.update() on each feed() call with eda_samples.
+  Slow path (60s): PPG → denoise_ppg → get_rr_intervals(ppg) → correct_rr_intervals
+    → autonomic_state.compute(rr) → stim_recommender.recommend().
+  Tri-fold gate: all 3 conditions required for TinnitusStimEvent to fire.
+  Safe stim defaults: 0.2 mA / 10 Hz / 50 µs (within SBIR hardware limits).
+  Factory: build_tinnitus_closed_loop_pipeline(config_path, checkpoint_path, device).
+  10/10 tests passing. Full suite: 443 passing, 2 pre-existing failures.
 
 --------------------------------------------------------------------------------
 S-54. DIA-WEIGHTED LOSS CONFIG (2026-03-24)
