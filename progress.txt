@@ -2,10 +2,10 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-03-28
+Last updated: 2026-04-02
 
 --------------------------------------------------------------------------------
-TINNITUS PIPELINE — Branch: feature/tinnitus-avns (2026-03-28)
+TINNITUS PIPELINE — Branch: feature/tinnitus-avns (2026-04-02)
 --------------------------------------------------------------------------------
 New branch for aVNS tinnitus SBIR. Tri-fold synchronized trigger:
 cardiac diastole + exhalation + EDA arousal-in-band using PPG (not ECG).
@@ -87,6 +87,27 @@ T-10. PHASE DETECTION TRAINING + F11. AROUSAL GATE MODULE (2026-03-30)
   avg_acc=0.617 (dia=0.72, exh=0.51). Exhalation near chance (label noise from
   BIDMC impedance pneumography mismatch). ArousalGate in arousal_gate.py:
   ring buffer, calibrate(), update(), is_in_band(). 8/8 tests passing.
+
+T-14. PHASE ACCURACY EXPERIMENTS — LABEL SMOOTHING + WEIGHTED LOSS (2026-04-02)
+  Added label_smoothing support to tinnitus_phase_train.py (reads from config, applies
+  to dia/exh labels before multitask_bce_loss: labels = labels*(1-eps) + eps*0.5).
+  3 experiment configs in config_tinnitus.yaml:
+    phase_training_ls        — 0.5/0.5 + label_smoothing=0.1 (isolates smoothing)
+    phase_training_dia_moderate — 0.6/0.4 + label_smoothing=0.1 (moderate dia bias)
+    phase_training_exh_moderate — 0.4/0.6 + label_smoothing=0.1 (moderate exh bias)
+  Context: stroke's extreme weighting (0.7/0.3) REGRESSED (S-56/57: dia 83.6→83.6,
+  exh 56.5→56.1). Using moderate splits + label smoothing for tinnitus.
+  Run 1 (ls): background CUDA → train_ls_err.log → tinnitus_phase_ls.pth
+  Runs 2+3: chained via run_phase_experiments.ps1 (waits for run 1 PID, then sequential)
+  Status: TRAINING IN PROGRESS
+
+T-15. AROUSAL CLASSIFIER WIRED INTO CLOSED-LOOP FACTORY (2026-04-02)
+  build_tinnitus_closed_loop_pipeline() now loads trained ArousalClassifier via
+  build_arousal_classifier() when closed_loop.use_arousal_classifier=true (default)
+  AND checkpoint exists. Falls back to rule-based ArousalGate otherwise.
+  Config: added use_arousal_classifier: true to closed_loop section.
+  2 new tests: test_factory_loads_arousal_classifier, test_factory_rule_based_when_classifier_disabled.
+  12/12 closed-loop tests passing.
 
 T-13. SUPERVISED AROUSAL STATE CLASSIFIER (2026-03-31)
   src/models/arousal_classifier.py — ArousalClassifier (GBT, 5 EDA features).

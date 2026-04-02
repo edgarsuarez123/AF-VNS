@@ -232,17 +232,45 @@ F1 ─┬─> F2 ─────────────────────
   - Results: val acc=0.935 / AUROC=0.995; test acc=0.859 / AUROC=0.930 (>80% SBIR target ✓)
   - 26/26 new tests passing; full suite 462 passing
 
+- [ ] 14. **F14: Phase accuracy experiments — label smoothing + weighted loss** — in progress 2026-04-02
+  - Added `label_smoothing` support to `src/training/tinnitus_phase_train.py` (same pattern as `stroke_train.py`)
+  - Added 3 config sections to `config_tinnitus.yaml`:
+    - `phase_training_ls` — 0.5/0.5 + `label_smoothing: 0.1` (isolates smoothing effect)
+    - `phase_training_dia_moderate` — 0.6/0.4 + `label_smoothing: 0.1`
+    - `phase_training_exh_moderate` — 0.4/0.6 + `label_smoothing: 0.1`
+  - Context: stroke's extreme weighting (0.7/0.3) destabilized shared CNN backbone; using moderate splits
+  - **Run 1 (ls):** launched as background process → `train_ls_err.log`, checkpoint → `tinnitus_phase_ls.pth`
+  - **Runs 2+3:** chained via `run_phase_experiments.ps1` (waits for run 1, then dia_moderate, then exh_moderate)
+  - Logs: `train_ls_err.log`, `train_chain_out.log`, `train_chain_err.log`
+  - Verify: compare dia_acc/exh_acc/avg_acc across 3 experiments vs baseline (dia=0.72, exh=0.51, avg=0.617)
+
+- [x] 15. **F15: Wire ArousalClassifier into closed-loop factory** — done 2026-04-02
+  - Modified `src/models/tinnitus_closed_loop.py` — `build_tinnitus_closed_loop_pipeline()` now calls `build_arousal_classifier()` when `use_arousal_classifier: true` (config flag, defaults to true) and checkpoint exists
+  - Falls back to rule-based ArousalGate if checkpoint missing or flag is false
+  - Added `use_arousal_classifier: true` to `closed_loop` section in `config_tinnitus.yaml`
+  - 2 new tests: `test_factory_loads_arousal_classifier`, `test_factory_rule_based_when_classifier_disabled`
+  - 12/12 tests passing
+
 ---
 
 ## Resume From Here
 
-**All F1–F13 steps complete.** Pipeline is fully implemented end-to-end.
+**F1–F13 complete. F15 complete. F14 training runs in progress (background).**
 
-**Next actions (optional polish):**
-- Label smoothing / exhalation reweighting for F10 checkpoint (exh_acc=0.51, below 80% SBIR target)
+**Monitor training:**
+- Run 1: `Get-Content train_ls_err.log -Tail 10`
+- Runs 2+3: `Get-Content train_chain_out.log -Tail 10` and `Get-Content train_chain_err.log -Tail 10`
+
+**After F14 completes:** Compare results across 3 experiments, pick best checkpoint, update F14 status.
+
+**Remaining optional work:**
 - LSL integration layer for real-time hardware deployment
 - End-to-end offline replay test with actual BIDMC/WESAD data
-- Load trained ArousalClassifier into `build_tinnitus_closed_loop_pipeline()` factory
 
 **WESAD status:** Extracted at `data/raw/tinnitus avns/wesad/WESAD/`. 75 records parsed.
-**Checkpoint:** `models/checkpoints/tinnitus_phase_detector.pth` (avg_acc=0.617, dia=0.72, exh=0.51)
+**Checkpoints:**
+- `tinnitus_phase_detector.pth` — baseline (avg=0.617, dia=0.72, exh=0.51)
+- `tinnitus_phase_ls.pth` — label smoothing run (in progress)
+- `tinnitus_phase_dia_mod.pth` — dia-moderate run (queued)
+- `tinnitus_phase_exh_mod.pth` — exh-moderate run (queued)
+- `arousal_classifier.pkl` — fitted GBT (test acc=0.859, AUROC=0.930)
