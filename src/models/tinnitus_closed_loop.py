@@ -364,6 +364,7 @@ def build_tinnitus_closed_loop_pipeline(
     from src.models.autonomic_state import build_autonomic_state
     from src.models.stim_recommender import build_stim_recommender
     from src.models.arousal_gate import ArousalGate
+    from src.models.arousal_classifier import build_arousal_classifier
     from src.training.build_model import load_config
 
     cfg = load_config(config_path)
@@ -375,6 +376,7 @@ def build_tinnitus_closed_loop_pipeline(
     slow_window_sec = float(cl_cfg.get("slow_window_sec", 60.0))
     diastole_threshold = float(cl_cfg.get("diastole_threshold", 0.5))
     exhalation_threshold = float(cl_cfg.get("exhalation_threshold", 0.5))
+    use_arousal_classifier = cl_cfg.get("use_arousal_classifier", True)
 
     phase_detector = build_phase_detector(
         config_path=config_path,
@@ -385,7 +387,17 @@ def build_tinnitus_closed_loop_pipeline(
 
     autonomic_state = build_autonomic_state(config_path=config_path)
     stim_recommender = build_stim_recommender(config_path=config_path)
-    arousal_gate = ArousalGate(config_path=config_path)
+
+    classifier = None
+    if use_arousal_classifier:
+        clf = build_arousal_classifier(config_path=config_path)
+        if clf._is_fitted:
+            classifier = clf
+            logger.info("ArousalGate using trained classifier")
+        else:
+            logger.info("ArousalClassifier checkpoint not found — falling back to rule-based gate")
+
+    arousal_gate = ArousalGate(config_path=config_path, classifier=classifier)
 
     return TinnitusClosedLoopPipeline(
         phase_detector=phase_detector,

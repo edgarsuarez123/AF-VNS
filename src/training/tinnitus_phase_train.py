@@ -83,6 +83,7 @@ def main():
     grad_clip = float(train_cfg.get("grad_clip", 1.0))
     dia_weight = float(train_cfg.get("task_weight_dia", 0.5))
     exh_weight = float(train_cfg.get("task_weight_exh", 0.5))
+    label_smoothing = float(train_cfg.get("label_smoothing", 0.0))
 
     Path(checkpoint_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -115,6 +116,9 @@ def main():
     dia_pw, exh_pw = compute_phase_pos_weights(train_ds, device)
     logger.info("pos_weight — diastole=%.2f  exhalation=%.2f", dia_pw.item(), exh_pw.item())
     logger.info("task_weight — diastole=%.2f  exhalation=%.2f", dia_weight, exh_weight)
+    if label_smoothing > 0:
+        logger.info("label_smoothing=%.3f (0→%.3f, 1→%.3f)",
+                     label_smoothing, label_smoothing * 0.5, 1 - label_smoothing * 0.5)
 
     # Build model (input_samples=250 from config_tinnitus.yaml phase_model section)
     model = build_phase_detector(
@@ -144,6 +148,10 @@ def main():
             ppg = ppg.to(device)
             dia = dia.to(device)
             exh = exh.to(device)
+
+            if label_smoothing > 0:
+                dia = dia * (1 - label_smoothing) + label_smoothing * 0.5
+                exh = exh * (1 - label_smoothing) + label_smoothing * 0.5
 
             optimizer.zero_grad()
             logits = model(ppg)

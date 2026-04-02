@@ -111,6 +111,29 @@ def test_factory_build():
     assert state.eda_calibrated is False
 
 
+def test_factory_loads_arousal_classifier():
+    """Factory wires trained ArousalClassifier into ArousalGate when checkpoint exists."""
+    pipe = build_tinnitus_closed_loop_pipeline(config_path=CONFIG_PATH, device="cpu")
+    gate = pipe._arousal_gate
+    assert gate._classifier is not None, "Classifier should be loaded when checkpoint exists"
+    assert gate._classifier._is_fitted is True
+
+
+def test_factory_rule_based_when_classifier_disabled(tmp_path):
+    """Factory uses rule-based gate when use_arousal_classifier is false."""
+    import yaml
+
+    with open(CONFIG_PATH) as f:
+        cfg = yaml.safe_load(f)
+    cfg["closed_loop"]["use_arousal_classifier"] = False
+    tmp_config = tmp_path / "config_no_clf.yaml"
+    with open(tmp_config, "w") as f:
+        yaml.dump(cfg, f)
+
+    pipe = build_tinnitus_closed_loop_pipeline(config_path=str(tmp_config), device="cpu")
+    assert pipe._arousal_gate._classifier is None
+
+
 # ---------------------------------------------------------------------------
 # Test 2: PPG buffer accumulates correctly
 # ---------------------------------------------------------------------------

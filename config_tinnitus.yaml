@@ -91,6 +91,39 @@ phase_training:
   task_weight_dia: 0.5              # Equal weighting to start; tune after first run
   task_weight_exh: 0.5
 
+# F14 — label smoothing baseline (isolates smoothing effect, equal weights)
+phase_training_ls:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.5
+  task_weight_exh: 0.5
+  label_smoothing: 0.1
+
+# F14 — moderate diastole bias + label smoothing
+phase_training_dia_moderate:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.6
+  task_weight_exh: 0.4
+  label_smoothing: 0.1
+
+# F14 — moderate exhalation bias + label smoothing
+phase_training_exh_moderate:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  task_weight_dia: 0.4
+  task_weight_exh: 0.6
+  label_smoothing: 0.1
+
 # Tri-fold closed-loop pipeline
 closed_loop:
   ppg_fs: 125                       # Expected PPG sampling rate (Hz)
@@ -99,6 +132,7 @@ closed_loop:
   slow_window_sec: 60               # Slow path: AutonomicState window
   diastole_threshold: 0.5           # Sigmoid threshold for diastole gate
   exhalation_threshold: 0.5         # Sigmoid threshold for exhalation gate
+  use_arousal_classifier: true       # Load trained ArousalClassifier if checkpoint exists; false = rule-based only
   # EDA arousal gate uses eda.low/high_threshold_sigma (per-subject calibrated)
 
 # Autonomic state (PPG-derived HRV — signal-agnostic once RR intervals extracted)
