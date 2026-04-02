@@ -251,21 +251,28 @@ F1 ─┬─> F2 ─────────────────────
   - 2 new tests: `test_factory_loads_arousal_classifier`, `test_factory_rule_based_when_classifier_disabled`
   - 12/12 tests passing
 
+- [ ] 16. **F16: Ultimate goal — tri-fold validation and (optional) joint modeling** — not started
+  - **SBIR end state:** stimulation only when **diastole ∧ exhalation ∧ EDA arousal-in-band** are simultaneously satisfied. Modular training (F10/F13/F14) + runtime AND (F12) is the shipping path; **F16 is where we prove and improve the full behavior on data.**
+  - **Phase A — required:** **End-to-end offline replay** on **WESAD** (and optionally BIDMC where EDA absent: phase-only or simulated EDA). Feed synchronized PPG + EDA through `TinnitusClosedLoopPipeline` (or equivalent batch harness). **Metrics:** fraction of time all three gates true, false stim rate, latency, per-modality failure modes; compare to window-level phase labels and arousal ground truth where defined.
+  - **Phase B — optional:** If labels for **simultaneous alignment** can be defined (e.g. frame-level AND of dia/exh/in-band on WESAD epochs), evaluate whether a **single fusion head** or **joint loss** beats the modular AND — research stretch, not required for first SBIR demo.
+  - **Deliverables:** script/module under `src/training/` or `scripts/`, config hooks, short results table in this plan; depends on F14 checkpoint choice + stable `arousal_classifier.pkl`.
+
 ---
 
 ## Resume From Here
 
 **F1–F13 complete. F15 complete. F14 training runs in progress (background).**
 
+**Ultimate goal (not done until F16):** validate and measure **true tri-fold** behavior on real multimodal data — see **F16** above.
+
 **Monitor training:**
 - Run 1: `Get-Content train_ls_err.log -Tail 10`
 - Runs 2+3: `Get-Content train_chain_out.log -Tail 10` and `Get-Content train_chain_err.log -Tail 10`
 
-**After F14 completes:** Compare results across 3 experiments, pick best checkpoint, update F14 status.
+**After F14 completes:** Compare results across 3 experiments, pick best checkpoint, update F14 status; then prioritize **F16 Phase A**.
 
 **Remaining optional work:**
 - LSL integration layer for real-time hardware deployment
-- End-to-end offline replay test with actual BIDMC/WESAD data
 
 **WESAD status:** Extracted at `data/raw/tinnitus avns/wesad/WESAD/`. 75 records parsed.
 **Checkpoints:**

@@ -88,6 +88,12 @@ T-10. PHASE DETECTION TRAINING + F11. AROUSAL GATE MODULE (2026-03-30)
   BIDMC impedance pneumography mismatch). ArousalGate in arousal_gate.py:
   ring buffer, calibrate(), update(), is_in_band(). 8/8 tests passing.
 
+T-16. ULTIMATE GOAL — TRI-FOLD VALIDATION (F16, planned 2026-04-02)
+  SBIR end state: stim only when diastole AND exhalation AND EDA in-band. F16 added to
+  TINNITUS_PLAN.md: Phase A = end-to-end offline replay on WESAD (metrics: tri-fold
+  coincidence, false stim, per-gate failure); Phase B optional = joint/fusion model if
+  simultaneous-alignment labels exist. Modular AND (F12) remains shipping path.
+
 T-14. PHASE ACCURACY EXPERIMENTS — LABEL SMOOTHING + WEIGHTED LOSS (2026-04-02)
   Added label_smoothing support to tinnitus_phase_train.py (reads from config, applies
   to dia/exh labels before multitask_bce_loss: labels = labels*(1-eps) + eps*0.5).
