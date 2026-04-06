@@ -175,6 +175,14 @@ arousal_classifier:
   cache_dir: models/artifacts/cache_tinnitus_arousal
   split_path: models/artifacts/tinnitus_arousal_split.json
 
+# F16 — Offline replay validation config
+replay_validation:
+  chunk_sec: 1.0                    # Streaming chunk size (simulate real-time at 1s granularity)
+  frame_rate_hz: 5.0                # Phase GT frame rate (must match ppg_diastole.frame_rate_hz)
+  arousal_frame_rate_hz: 1.0        # Arousal GT frame rate (must match eda.frame_rate_hz)
+  output_dir: models/artifacts/replay_validation
+  datasets: ["wesad"]               # ["wesad", "bidmc"] to include phase-only BIDMC
+
 # WESAD label mapping
 wesad:
   label_map:
