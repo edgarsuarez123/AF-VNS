@@ -1910,3 +1910,22 @@ BVP indirect resp) defeats any loss-level intervention. Best checkpoint remains 
 original baseline: models/checkpoints/tinnitus_phase_detector.pth (avg=0.617, dia=0.72, exh=0.51).
 
 Next: F16 — end-to-end offline replay validation on WESAD (all 3 modalities) + BIDMC (phase only).
+
+--- F16 — Tri-fold offline replay validation (2026-04-06) ---
+Created src/training/tinnitus_replay_validation.py:
+  - AlwaysInBandGate: drop-in ArousalGate mock for BIDMC (no EDA); always returns is_in_band()=True
+  - load_wesad_subjects(): groups WESAD records by session_id, baseline-first sort for EDA calibration
+  - load_bidmc_records(): wraps parse_bidmc_ppg_dir()
+  - generate_ground_truth(): resample PPG 64→125 Hz; dia GT from generate_ppg_phase_labels(); exh GT from
+    generate_exhalation_labels_from_reference() (WESAD has chest belt) or PPG-derived fallback;
+    arousal GT from extract_eda_features() with baseline EDA as calibration_signal
+  - replay_record(): streams in 1s chunks (125 PPG + 4 EDA samples per feed() call)
+  - compute_metrics(): builds fast-path evaluation grid (every 13 samples from sample 250),
+    maps to GT frame indices (t//25 for 5Hz, t//125 for 1Hz), computes per-gate and tri-fold P/R
+  - evaluate_wesad(): per-subject loop — calibrate, reset between epochs, replay, aggregate
+  - evaluate_bidmc(): BIDMC phase-only using AlwaysInBandGate
+  - save_results(): JSON + matplotlib summary plots (stim rate, trifold P/R, gate breakdown)
+  - CLI: --dataset wesad|bidmc|all --checkpoint --device --output-dir
+Created tests/test_tinnitus_replay_validation.py: 22/22 passing.
+Added replay_validation section to config_tinnitus.yaml.
+WESAD validation launched as background process → replay_wesad_err.log.

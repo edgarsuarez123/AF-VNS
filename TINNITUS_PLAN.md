@@ -249,7 +249,7 @@ F1 ─┬─> F2 ─────────────────────
   - 2 new tests: `test_factory_loads_arousal_classifier`, `test_factory_rule_based_when_classifier_disabled`
   - 12/12 tests passing
 
-- [ ] 16. **F16: Ultimate goal — tri-fold validation and (optional) joint modeling** — not started
+- [ ] 16. **F16: Ultimate goal — tri-fold validation and (optional) joint modeling** — in progress 2026-04-06
   - **SBIR end state:** stimulation only when **diastole ∧ exhalation ∧ EDA arousal-in-band** are simultaneously satisfied. Modular training (F10/F13/F14) + runtime AND (F12) is the shipping path; **F16 is where we prove and improve the full behavior on data.**
   - **Phase A — required:** **End-to-end offline replay** on **WESAD** (and optionally BIDMC where EDA absent: phase-only or simulated EDA). Feed synchronized PPG + EDA through `TinnitusClosedLoopPipeline` (or equivalent batch harness). **Metrics:** fraction of time all three gates true, false stim rate, latency, per-modality failure modes; compare to window-level phase labels and arousal ground truth where defined.
   - **Phase B — optional:** If labels for **simultaneous alignment** can be defined (e.g. frame-level AND of dia/exh/in-band on WESAD epochs), evaluate whether a **single fusion head** or **joint loss** beats the modular AND — research stretch, not required for first SBIR demo.
@@ -261,13 +261,20 @@ F1 ─┬─> F2 ─────────────────────
 
 **F1–F15 complete. F14 COMPLETE (no improvement; baseline checkpoint kept).**
 
-**Next: F16 Phase A — end-to-end offline replay validation.**
+**F16 Phase A IN PROGRESS.**
 
-Building `src/training/tinnitus_replay_validation.py`:
-- Feed WESAD (PPG 64→125 Hz + EDA 4 Hz + reference resp) through `TinnitusClosedLoopPipeline.feed()` in 1s chunks
-- BIDMC (PPG 125 Hz, phase-only via AlwaysInBandGate)
-- Compare stim events vs independently-generated ground truth (diastole/exhalation/arousal labels)
-- Metrics: trifold precision/recall, per-gate accuracy, stim rate baseline vs stress
+`src/training/tinnitus_replay_validation.py` built and tested (22/22 tests passing). WESAD validation running as background process.
+
+**Monitor:**
+- `Get-Content replay_wesad_err.log -Tail 10`
+
+**After validation completes:** Results at `models/artifacts/replay_validation/wesad_replay_results.json`. Update F16 status with metrics table. Commit.
+
+**Deliverables files:**
+- `src/training/tinnitus_replay_validation.py` — replay script
+- `tests/test_tinnitus_replay_validation.py` — 22 tests
+- `models/artifacts/replay_validation/wesad_replay_results.json` — results (pending)
+- `models/artifacts/replay_validation/wesad_replay_summary.png` — plots (pending)
 
 **Remaining optional work:**
 - LSL integration layer for real-time hardware deployment
