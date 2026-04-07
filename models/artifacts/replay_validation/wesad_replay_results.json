@@ -1,0 +1,4012 @@
+{
+  "dataset": "wesad",
+  "config_path": "config_tinnitus.yaml",
+  "checkpoint_path": null,
+  "device": "cuda",
+  "n_subjects": 15,
+  "n_epochs": 75,
+  "per_subject": {
+    "S10": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S10_amusement_5",
+          "session_id": "S10",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 39.17,
+          "duration_sec": 372.0,
+          "n_stim_events": 23,
+          "stim_rate_per_min": 3.7096774193548385,
+          "trifold_precision": 0.2608695652173913,
+          "trifold_recall": 0.012195121951219513,
+          "gate_failure_counts": {
+            "diastole": 486,
+            "exhalation": 486,
+            "arousal": 486
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3828,
+              "n_fired_true": 18,
+              "n_fired_false": 5,
+              "n_missed_true": 1110,
+              "precision": 0.782608695652174,
+              "recall": 0.015957446808510637,
+              "gt_positive_rate": 0.2946708463949843
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3828,
+              "n_fired_true": 8,
+              "n_fired_false": 15,
+              "n_missed_true": 1777,
+              "precision": 0.34782608695652173,
+              "recall": 0.004481792717086834,
+              "gt_positive_rate": 0.4663009404388715
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3828,
+              "n_fired_true": 21,
+              "n_fired_false": 2,
+              "n_missed_true": 3574,
+              "precision": 0.9130434782608695,
+              "recall": 0.0058414464534075105,
+              "gt_positive_rate": 0.9391327063740856
+            }
+          },
+          "n_valid_eval_points": 3828,
+          "n_trifold_gt_true": 492
+        },
+        {
+          "subject_id": "wesad_S10_baseline_1",
+          "session_id": "S10",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 126.36,
+          "duration_sec": 1180.0,
+          "n_stim_events": 98,
+          "stim_rate_per_min": 4.983050847457627,
+          "trifold_precision": 0.10204081632653061,
+          "trifold_recall": 0.01615508885298869,
+          "gate_failure_counts": {
+            "diastole": 609,
+            "exhalation": 609,
+            "arousal": 609
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12248,
+              "n_fired_true": 66,
+              "n_fired_false": 32,
+              "n_missed_true": 4076,
+              "precision": 0.673469387755102,
+              "recall": 0.0159343312409464,
+              "gt_positive_rate": 0.3381776616590464
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12248,
+              "n_fired_true": 37,
+              "n_fired_false": 61,
+              "n_missed_true": 5598,
+              "precision": 0.37755102040816324,
+              "recall": 0.0065661047027506655,
+              "gt_positive_rate": 0.4600751143043762
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12248,
+              "n_fired_true": 39,
+              "n_fired_false": 59,
+              "n_missed_true": 3825,
+              "precision": 0.3979591836734694,
+              "recall": 0.010093167701863354,
+              "gt_positive_rate": 0.3154800783801437
+            }
+          },
+          "n_valid_eval_points": 12248,
+          "n_trifold_gt_true": 619
+        },
+        {
+          "subject_id": "wesad_S10_meditation_15",
+          "session_id": "S10",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.64,
+          "duration_sec": 398.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4069,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1460,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.3588105185549275
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4069,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1453,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.35709019415089704
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4069,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4069,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S10_meditation_9",
+          "session_id": "S10",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.36,
+          "duration_sec": 398.0,
+          "n_stim_events": 34,
+          "stim_rate_per_min": 5.125628140703517,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4063,
+              "n_fired_true": 23,
+              "n_fired_false": 11,
+              "n_missed_true": 1065,
+              "precision": 0.6764705882352942,
+              "recall": 0.021139705882352942,
+              "gt_positive_rate": 0.26778242677824265
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4063,
+              "n_fired_true": 22,
+              "n_fired_false": 12,
+              "n_missed_true": 1901,
+              "precision": 0.6470588235294118,
+              "recall": 0.011440457618304731,
+              "gt_positive_rate": 0.473295594388383
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4063,
+              "n_fired_true": 0,
+              "n_fired_false": 34,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4063,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S10_stress_11",
+          "session_id": "S10",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 77.21,
+          "duration_sec": 725.0,
+          "n_stim_events": 35,
+          "stim_rate_per_min": 2.896551724137931,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 7483,
+              "n_fired_true": 22,
+              "n_fired_false": 13,
+              "n_missed_true": 2799,
+              "precision": 0.6285714285714286,
+              "recall": 0.0077986529599432825,
+              "gt_positive_rate": 0.37698783910196443
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 7483,
+              "n_fired_true": 21,
+              "n_fired_false": 14,
+              "n_missed_true": 4002,
+              "precision": 0.6,
+              "recall": 0.005219985085756898,
+              "gt_positive_rate": 0.5376186021649071
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 7483,
+              "n_fired_true": 0,
+              "n_fired_false": 35,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 7483,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 328.02
+    },
+    "S11": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S11_amusement_11",
+          "session_id": "S11",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 38.68,
+          "duration_sec": 368.0,
+          "n_stim_events": 3728,
+          "stim_rate_per_min": 607.8260869565217,
+          "trifold_precision": 0.17147479104880023,
+          "trifold_recall": 0.9799691833590138,
+          "gate_failure_counts": {
+            "diastole": 13,
+            "exhalation": 13,
+            "arousal": 13
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3794,
+              "n_fired_true": 1445,
+              "n_fired_false": 2264,
+              "n_missed_true": 48,
+              "precision": 0.38959288217848476,
+              "recall": 0.9678499665103818,
+              "gt_positive_rate": 0.39351607801792304
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3794,
+              "n_fired_true": 1769,
+              "n_fired_false": 1940,
+              "n_missed_true": 29,
+              "precision": 0.47694796441089243,
+              "recall": 0.9838709677419355,
+              "gt_positive_rate": 0.4739061676331049
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3794,
+              "n_fired_true": 3486,
+              "n_fired_false": 223,
+              "n_missed_true": 79,
+              "precision": 0.939875977352386,
+              "recall": 0.9778401122019635,
+              "gt_positive_rate": 0.9396415392725356
+            }
+          },
+          "n_valid_eval_points": 3794,
+          "n_trifold_gt_true": 649
+        },
+        {
+          "subject_id": "wesad_S11_baseline_1",
+          "session_id": "S11",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 125.5,
+          "duration_sec": 1180.0,
+          "n_stim_events": 11284,
+          "stim_rate_per_min": 573.7627118644067,
+          "trifold_precision": 0.045167600248955275,
+          "trifold_recall": 0.9548872180451128,
+          "gate_failure_counts": {
+            "diastole": 24,
+            "exhalation": 24,
+            "arousal": 24
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12233,
+              "n_fired_true": 3640,
+              "n_fired_false": 7607,
+              "n_missed_true": 354,
+              "precision": 0.3236418600515693,
+              "recall": 0.9113670505758638,
+              "gt_positive_rate": 0.3264939099158015
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12233,
+              "n_fired_true": 5744,
+              "n_fired_false": 5503,
+              "n_missed_true": 476,
+              "precision": 0.5107139681692896,
+              "recall": 0.9234726688102894,
+              "gt_positive_rate": 0.5084607210005723
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12233,
+              "n_fired_true": 3029,
+              "n_fired_false": 8218,
+              "n_missed_true": 209,
+              "precision": 0.2693162621143416,
+              "recall": 0.9354539839407041,
+              "gt_positive_rate": 0.26469386086814356
+            }
+          },
+          "n_valid_eval_points": 12233,
+          "n_trifold_gt_true": 532
+        },
+        {
+          "subject_id": "wesad_S11_meditation_15",
+          "session_id": "S11",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.89,
+          "duration_sec": 396.0,
+          "n_stim_events": 3606,
+          "stim_rate_per_min": 546.3636363636364,
+          "trifold_precision": 0.05427446569178852,
+          "trifold_recall": 0.9234449760765551,
+          "gate_failure_counts": {
+            "diastole": 16,
+            "exhalation": 16,
+            "arousal": 16
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4048,
+              "n_fired_true": 1131,
+              "n_fired_false": 2425,
+              "n_missed_true": 263,
+              "precision": 0.31805399325084366,
+              "recall": 0.8113342898134863,
+              "gt_positive_rate": 0.34436758893280633
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4048,
+              "n_fired_true": 1570,
+              "n_fired_false": 1986,
+              "n_missed_true": 138,
+              "precision": 0.4415073115860517,
+              "recall": 0.9192037470725996,
+              "gt_positive_rate": 0.42193675889328064
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4048,
+              "n_fired_true": 1362,
+              "n_fired_false": 2194,
+              "n_missed_true": 118,
+              "precision": 0.3830146231721035,
+              "recall": 0.9202702702702703,
+              "gt_positive_rate": 0.36561264822134387
+            }
+          },
+          "n_valid_eval_points": 4048,
+          "n_trifold_gt_true": 209
+        },
+        {
+          "subject_id": "wesad_S11_meditation_9",
+          "session_id": "S11",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.48,
+          "duration_sec": 395.0,
+          "n_stim_events": 3475,
+          "stim_rate_per_min": 527.8481012658228,
+          "trifold_precision": 0.03266840127204394,
+          "trifold_recall": 0.8968253968253969,
+          "gate_failure_counts": {
+            "diastole": 13,
+            "exhalation": 13,
+            "arousal": 13
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4075,
+              "n_fired_true": 987,
+              "n_fired_false": 2472,
+              "n_missed_true": 245,
+              "precision": 0.28534258456201217,
+              "recall": 0.8011363636363636,
+              "gt_positive_rate": 0.30233128834355827
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4075,
+              "n_fired_true": 1566,
+              "n_fired_false": 1893,
+              "n_missed_true": 194,
+              "precision": 0.4527320034692108,
+              "recall": 0.8897727272727273,
+              "gt_positive_rate": 0.43190184049079755
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4075,
+              "n_fired_true": 967,
+              "n_fired_false": 2492,
+              "n_missed_true": 118,
+              "precision": 0.2795605666377566,
+              "recall": 0.8912442396313364,
+              "gt_positive_rate": 0.26625766871165646
+            }
+          },
+          "n_valid_eval_points": 4075,
+          "n_trifold_gt_true": 126
+        },
+        {
+          "subject_id": "wesad_S11_stress_5",
+          "session_id": "S11",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 73.03,
+          "duration_sec": 680.0,
+          "n_stim_events": 627,
+          "stim_rate_per_min": 55.3235294117647,
+          "trifold_precision": 0.026101141924959218,
+          "trifold_recall": 0.033264033264033266,
+          "gate_failure_counts": {
+            "diastole": 465,
+            "exhalation": 465,
+            "arousal": 465
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 7042,
+              "n_fired_true": 248,
+              "n_fired_false": 365,
+              "n_missed_true": 3234,
+              "precision": 0.40456769983686786,
+              "recall": 0.07122343480758185,
+              "gt_positive_rate": 0.4944618006248225
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 7042,
+              "n_fired_true": 324,
+              "n_fired_false": 289,
+              "n_missed_true": 3465,
+              "precision": 0.5285481239804242,
+              "recall": 0.0855106888361045,
+              "gt_positive_rate": 0.5380573700653224
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 7042,
+              "n_fired_true": 65,
+              "n_fired_false": 548,
+              "n_missed_true": 1590,
+              "precision": 0.10603588907014681,
+              "recall": 0.03927492447129909,
+              "gt_positive_rate": 0.23501846066458393
+            }
+          },
+          "n_valid_eval_points": 7042,
+          "n_trifold_gt_true": 481
+        }
+      ],
+      "wall_sec": 321.91
+    },
+    "S13": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S13_amusement_5",
+          "session_id": "S13",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.08,
+          "duration_sec": 382.0,
+          "n_stim_events": 702,
+          "stim_rate_per_min": 110.26178010471205,
+          "trifold_precision": 0.11815561959654179,
+          "trifold_recall": 0.13598673300165837,
+          "gate_failure_counts": {
+            "diastole": 521,
+            "exhalation": 521,
+            "arousal": 521
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3914,
+              "n_fired_true": 176,
+              "n_fired_false": 518,
+              "n_missed_true": 1247,
+              "precision": 0.25360230547550433,
+              "recall": 0.12368236120871398,
+              "gt_positive_rate": 0.3635666836995401
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3914,
+              "n_fired_true": 355,
+              "n_fired_false": 339,
+              "n_missed_true": 1564,
+              "precision": 0.5115273775216138,
+              "recall": 0.1849921834288692,
+              "gt_positive_rate": 0.49029126213592233
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3914,
+              "n_fired_true": 568,
+              "n_fired_false": 126,
+              "n_missed_true": 2724,
+              "precision": 0.8184438040345822,
+              "recall": 0.17253948967193194,
+              "gt_positive_rate": 0.8410832907511497
+            }
+          },
+          "n_valid_eval_points": 3914,
+          "n_trifold_gt_true": 603
+        },
+        {
+          "subject_id": "wesad_S13_baseline_1",
+          "session_id": "S13",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 125.6,
+          "duration_sec": 1180.016,
+          "n_stim_events": 1886,
+          "stim_rate_per_min": 95.89700478637576,
+          "trifold_precision": 0.08656399362719065,
+          "trifold_recall": 0.13113435237329044,
+          "gate_failure_counts": {
+            "diastole": 1080,
+            "exhalation": 1080,
+            "arousal": 1080
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12255,
+              "n_fired_true": 458,
+              "n_fired_false": 1425,
+              "n_missed_true": 3917,
+              "precision": 0.24322889006903878,
+              "recall": 0.10468571428571428,
+              "gt_positive_rate": 0.3569971440228478
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12255,
+              "n_fired_true": 941,
+              "n_fired_false": 942,
+              "n_missed_true": 4936,
+              "precision": 0.4997344662772172,
+              "recall": 0.16011570529181554,
+              "gt_positive_rate": 0.4795593635250918
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12255,
+              "n_fired_true": 1040,
+              "n_fired_false": 843,
+              "n_missed_true": 5835,
+              "precision": 0.5523101433882103,
+              "recall": 0.15127272727272728,
+              "gt_positive_rate": 0.5609955120359037
+            }
+          },
+          "n_valid_eval_points": 12255,
+          "n_trifold_gt_true": 1243
+        },
+        {
+          "subject_id": "wesad_S13_meditation_15",
+          "session_id": "S13",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.19,
+          "duration_sec": 397.0,
+          "n_stim_events": 460,
+          "stim_rate_per_min": 69.52141057934509,
+          "trifold_precision": 0.04434589800443459,
+          "trifold_recall": 0.04739336492890995,
+          "gate_failure_counts": {
+            "diastole": 402,
+            "exhalation": 402,
+            "arousal": 402
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4050,
+              "n_fired_true": 39,
+              "n_fired_false": 412,
+              "n_missed_true": 993,
+              "precision": 0.08647450110864745,
+              "recall": 0.0377906976744186,
+              "gt_positive_rate": 0.2548148148148148
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4050,
+              "n_fired_true": 211,
+              "n_fired_false": 240,
+              "n_missed_true": 1410,
+              "precision": 0.4678492239467849,
+              "recall": 0.13016656384947564,
+              "gt_positive_rate": 0.4002469135802469
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4050,
+              "n_fired_true": 451,
+              "n_fired_false": 0,
+              "n_missed_true": 3599,
+              "precision": 1.0,
+              "recall": 0.11135802469135803,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 4050,
+          "n_trifold_gt_true": 422
+        },
+        {
+          "subject_id": "wesad_S13_meditation_9",
+          "session_id": "S13",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.74,
+          "duration_sec": 397.984,
+          "n_stim_events": 527,
+          "stim_rate_per_min": 79.45043016804696,
+          "trifold_precision": 0.011560693641618497,
+          "trifold_recall": 0.01643835616438356,
+          "gate_failure_counts": {
+            "diastole": 359,
+            "exhalation": 359,
+            "arousal": 359
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4078,
+              "n_fired_true": 32,
+              "n_fired_false": 487,
+              "n_missed_true": 977,
+              "precision": 0.06165703275529865,
+              "recall": 0.031714568880079286,
+              "gt_positive_rate": 0.2474252084355076
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4078,
+              "n_fired_true": 210,
+              "n_fired_false": 309,
+              "n_missed_true": 1479,
+              "precision": 0.4046242774566474,
+              "recall": 0.12433392539964476,
+              "gt_positive_rate": 0.4141736145169201
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4078,
+              "n_fired_true": 460,
+              "n_fired_false": 59,
+              "n_missed_true": 3176,
+              "precision": 0.8863198458574181,
+              "recall": 0.1265126512651265,
+              "gt_positive_rate": 0.8916135360470819
+            }
+          },
+          "n_valid_eval_points": 4078,
+          "n_trifold_gt_true": 365
+        },
+        {
+          "subject_id": "wesad_S13_stress_11",
+          "session_id": "S13",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 71.72,
+          "duration_sec": 664.0,
+          "n_stim_events": 19,
+          "stim_rate_per_min": 1.716867469879518,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 15,
+            "exhalation": 15,
+            "arousal": 15
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6865,
+              "n_fired_true": 7,
+              "n_fired_false": 12,
+              "n_missed_true": 3038,
+              "precision": 0.3684210526315789,
+              "recall": 0.0022988505747126436,
+              "gt_positive_rate": 0.4435542607428988
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6865,
+              "n_fired_true": 16,
+              "n_fired_false": 3,
+              "n_missed_true": 3462,
+              "precision": 0.8421052631578947,
+              "recall": 0.004600345025876941,
+              "gt_positive_rate": 0.5066278222869629
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6865,
+              "n_fired_true": 0,
+              "n_fired_false": 19,
+              "n_missed_true": 73,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.010633648943918427
+            }
+          },
+          "n_valid_eval_points": 6865,
+          "n_trifold_gt_true": 15
+        }
+      ],
+      "wall_sec": 322.69
+    },
+    "S14": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S14_amusement_11",
+          "session_id": "S14",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 38.4,
+          "duration_sec": 372.0,
+          "n_stim_events": 1,
+          "stim_rate_per_min": 0.16129032258064516,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 498,
+            "exhalation": 498,
+            "arousal": 498
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3825,
+              "n_fired_true": 0,
+              "n_fired_false": 1,
+              "n_missed_true": 1468,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.3837908496732026
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3825,
+              "n_fired_true": 0,
+              "n_fired_false": 1,
+              "n_missed_true": 1680,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4392156862745098
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3825,
+              "n_fired_true": 1,
+              "n_fired_false": 0,
+              "n_missed_true": 3384,
+              "precision": 1.0,
+              "recall": 0.0002954209748892171,
+              "gt_positive_rate": 0.8849673202614379
+            }
+          },
+          "n_valid_eval_points": 3825,
+          "n_trifold_gt_true": 498
+        },
+        {
+          "subject_id": "wesad_S14_baseline_1",
+          "session_id": "S14",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 127.49,
+          "duration_sec": 1180.0,
+          "n_stim_events": 5,
+          "stim_rate_per_min": 0.2542372881355932,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12238,
+              "n_fired_true": 2,
+              "n_fired_false": 3,
+              "n_missed_true": 4477,
+              "precision": 0.4,
+              "recall": 0.00044652824291136416,
+              "gt_positive_rate": 0.36599117502859946
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12238,
+              "n_fired_true": 3,
+              "n_fired_false": 2,
+              "n_missed_true": 5341,
+              "precision": 0.6,
+              "recall": 0.000561377245508982,
+              "gt_positive_rate": 0.4366726589311979
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12238,
+              "n_fired_true": 0,
+              "n_fired_false": 5,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 12238,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S14_meditation_15",
+          "session_id": "S14",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 43.02,
+          "duration_sec": 397.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 244,
+            "exhalation": 244,
+            "arousal": 244
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4079,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1452,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.355969600392253
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4079,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1771,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4341750429026722
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4079,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1739,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4263299828389311
+            }
+          },
+          "n_valid_eval_points": 4079,
+          "n_trifold_gt_true": 244
+        },
+        {
+          "subject_id": "wesad_S14_meditation_9",
+          "session_id": "S14",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.94,
+          "duration_sec": 397.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 377,
+            "exhalation": 377,
+            "arousal": 377
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4081,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1489,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.3648615535407988
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4081,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1721,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.42171036510659154
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4081,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 2479,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.607449154618966
+            }
+          },
+          "n_valid_eval_points": 4081,
+          "n_trifold_gt_true": 377
+        },
+        {
+          "subject_id": "wesad_S14_stress_5",
+          "session_id": "S14",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 73.05,
+          "duration_sec": 675.0,
+          "n_stim_events": 8,
+          "stim_rate_per_min": 0.7111111111111111,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 47,
+            "exhalation": 47,
+            "arousal": 47
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6955,
+              "n_fired_true": 1,
+              "n_fired_false": 7,
+              "n_missed_true": 2277,
+              "precision": 0.125,
+              "recall": 0.0004389815627743635,
+              "gt_positive_rate": 0.3275341480948958
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6955,
+              "n_fired_true": 5,
+              "n_fired_false": 3,
+              "n_missed_true": 3520,
+              "precision": 0.625,
+              "recall": 0.0014184397163120568,
+              "gt_positive_rate": 0.5068296189791517
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6955,
+              "n_fired_true": 0,
+              "n_fired_false": 8,
+              "n_missed_true": 314,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.04514737598849748
+            }
+          },
+          "n_valid_eval_points": 6955,
+          "n_trifold_gt_true": 47
+        }
+      ],
+      "wall_sec": 326.2
+    },
+    "S15": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S15_amusement_5",
+          "session_id": "S15",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 39.41,
+          "duration_sec": 372.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 459,
+            "exhalation": 459,
+            "arousal": 459
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3813,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1043,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.2735378966692893
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3813,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1807,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.47390506163126145
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3813,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3625,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.9506949908208759
+            }
+          },
+          "n_valid_eval_points": 3813,
+          "n_trifold_gt_true": 459
+        },
+        {
+          "subject_id": "wesad_S15_baseline_1",
+          "session_id": "S15",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 123.91,
+          "duration_sec": 1175.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12065,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 5134,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4255283878988811
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12065,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 5364,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4445917944467468
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12065,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 12065,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S15_meditation_15",
+          "session_id": "S15",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.83,
+          "duration_sec": 397.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 312,
+            "exhalation": 312,
+            "arousal": 312
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4073,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1170,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.2872575497176528
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4073,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1616,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.396759145592929
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4073,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3079,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.7559538423766266
+            }
+          },
+          "n_valid_eval_points": 4073,
+          "n_trifold_gt_true": 312
+        },
+        {
+          "subject_id": "wesad_S15_meditation_9",
+          "session_id": "S15",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.55,
+          "duration_sec": 397.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4061,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1079,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.2656981039152918
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4061,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1702,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4191085939423787
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4061,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4061,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S15_stress_11",
+          "session_id": "S15",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 76.62,
+          "duration_sec": 686.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 7083,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3327,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.469716221939856
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 7083,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3503,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.494564450091769
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 7083,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 7083,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 326.67
+    },
+    "S16": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S16_amusement_11",
+          "session_id": "S16",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.0,
+          "duration_sec": 368.0,
+          "n_stim_events": 5,
+          "stim_rate_per_min": 0.8152173913043478,
+          "trifold_precision": 0.2,
+          "trifold_recall": 0.0015455950540958269,
+          "gate_failure_counts": {
+            "diastole": 646,
+            "exhalation": 646,
+            "arousal": 646
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3778,
+              "n_fired_true": 3,
+              "n_fired_false": 2,
+              "n_missed_true": 1627,
+              "precision": 0.6,
+              "recall": 0.0018404907975460123,
+              "gt_positive_rate": 0.4314452091053467
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3778,
+              "n_fired_true": 1,
+              "n_fired_false": 4,
+              "n_missed_true": 1606,
+              "precision": 0.2,
+              "recall": 0.0006222775357809583,
+              "gt_positive_rate": 0.42535733192165165
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3778,
+              "n_fired_true": 2,
+              "n_fired_false": 3,
+              "n_missed_true": 3494,
+              "precision": 0.4,
+              "recall": 0.0005720823798627002,
+              "gt_positive_rate": 0.9253573319216517
+            }
+          },
+          "n_valid_eval_points": 3778,
+          "n_trifold_gt_true": 647
+        },
+        {
+          "subject_id": "wesad_S16_baseline_1",
+          "session_id": "S16",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 124.76,
+          "duration_sec": 1180.0,
+          "n_stim_events": 14,
+          "stim_rate_per_min": 0.711864406779661,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12257,
+              "n_fired_true": 11,
+              "n_fired_false": 3,
+              "n_missed_true": 4508,
+              "precision": 0.7857142857142857,
+              "recall": 0.0024341668510732464,
+              "gt_positive_rate": 0.36868728073753776
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12257,
+              "n_fired_true": 6,
+              "n_fired_false": 8,
+              "n_missed_true": 5334,
+              "precision": 0.42857142857142855,
+              "recall": 0.0011235955056179776,
+              "gt_positive_rate": 0.4356694133964265
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12257,
+              "n_fired_true": 0,
+              "n_fired_false": 14,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 12257,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S16_meditation_15",
+          "session_id": "S16",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.54,
+          "duration_sec": 397.0,
+          "n_stim_events": 1,
+          "stim_rate_per_min": 0.15113350125944586,
+          "trifold_precision": 1.0,
+          "trifold_recall": 0.023255813953488372,
+          "gate_failure_counts": {
+            "diastole": 42,
+            "exhalation": 42,
+            "arousal": 42
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4055,
+              "n_fired_true": 1,
+              "n_fired_false": 0,
+              "n_missed_true": 1353,
+              "precision": 1.0,
+              "recall": 0.0007385524372230429,
+              "gt_positive_rate": 0.3339087546239211
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4055,
+              "n_fired_true": 1,
+              "n_fired_false": 0,
+              "n_missed_true": 1296,
+              "precision": 1.0,
+              "recall": 0.0007710100231303007,
+              "gt_positive_rate": 0.31985203452527744
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4055,
+              "n_fired_true": 1,
+              "n_fired_false": 0,
+              "n_missed_true": 436,
+              "precision": 1.0,
+              "recall": 0.002288329519450801,
+              "gt_positive_rate": 0.10776818742293465
+            }
+          },
+          "n_valid_eval_points": 4055,
+          "n_trifold_gt_true": 43
+        },
+        {
+          "subject_id": "wesad_S16_meditation_9",
+          "session_id": "S16",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.16,
+          "duration_sec": 395.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4075,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1346,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.3303067484662577
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4075,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1353,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.33202453987730063
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4075,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4075,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S16_stress_5",
+          "session_id": "S16",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 72.9,
+          "duration_sec": 673.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6972,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 2510,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.3600114744693058
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6972,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3725,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.5342799770510613
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6972,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6972,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 320.72
+    },
+    "S17": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S17_amusement_5",
+          "session_id": "S17",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 38.8,
+          "duration_sec": 372.0,
+          "n_stim_events": 3693,
+          "stim_rate_per_min": 595.6451612903226,
+          "trifold_precision": 0.2367986798679868,
+          "trifold_recall": 0.9652466367713004,
+          "gate_failure_counts": {
+            "diastole": 31,
+            "exhalation": 31,
+            "arousal": 31
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3796,
+              "n_fired_true": 1668,
+              "n_fired_false": 1968,
+              "n_missed_true": 65,
+              "precision": 0.45874587458745875,
+              "recall": 0.9624927870744374,
+              "gt_positive_rate": 0.4565331928345627
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3796,
+              "n_fired_true": 1741,
+              "n_fired_false": 1895,
+              "n_missed_true": 75,
+              "precision": 0.47882288228822883,
+              "recall": 0.9587004405286343,
+              "gt_positive_rate": 0.47839831401475236
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3796,
+              "n_fired_true": 3458,
+              "n_fired_false": 178,
+              "n_missed_true": 146,
+              "precision": 0.9510451045104511,
+              "recall": 0.9594894561598224,
+              "gt_positive_rate": 0.9494204425711275
+            }
+          },
+          "n_valid_eval_points": 3796,
+          "n_trifold_gt_true": 892
+        },
+        {
+          "subject_id": "wesad_S17_baseline_1",
+          "session_id": "S17",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 125.51,
+          "duration_sec": 1181.0,
+          "n_stim_events": 10612,
+          "stim_rate_per_min": 539.1363251481795,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12253,
+              "n_fired_true": 4009,
+              "n_fired_false": 6577,
+              "n_missed_true": 567,
+              "precision": 0.3787077271868506,
+              "recall": 0.8760926573426573,
+              "gt_positive_rate": 0.3734595609238554
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12253,
+              "n_fired_true": 5117,
+              "n_fired_false": 5469,
+              "n_missed_true": 827,
+              "precision": 0.4833742679010013,
+              "recall": 0.8608681022880216,
+              "gt_positive_rate": 0.48510568840284013
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12253,
+              "n_fired_true": 0,
+              "n_fired_false": 10586,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 12253,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S17_meditation_15",
+          "session_id": "S17",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.14,
+          "duration_sec": 394.0,
+          "n_stim_events": 3678,
+          "stim_rate_per_min": 560.1015228426396,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4031,
+              "n_fired_true": 1431,
+              "n_fired_false": 2208,
+              "n_missed_true": 153,
+              "precision": 0.393239901071723,
+              "recall": 0.9034090909090909,
+              "gt_positive_rate": 0.39295460183577274
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4031,
+              "n_fired_true": 1001,
+              "n_fired_false": 2638,
+              "n_missed_true": 139,
+              "precision": 0.27507557021159657,
+              "recall": 0.8780701754385964,
+              "gt_positive_rate": 0.2828082361696849
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4031,
+              "n_fired_true": 0,
+              "n_fired_false": 3639,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4031,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S17_meditation_9",
+          "session_id": "S17",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 36.15,
+          "duration_sec": 337.0,
+          "n_stim_events": 3320,
+          "stim_rate_per_min": 591.0979228486648,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3383,
+              "n_fired_true": 1213,
+              "n_fired_false": 2005,
+              "n_missed_true": 53,
+              "precision": 0.3769422001243008,
+              "recall": 0.9581358609794629,
+              "gt_positive_rate": 0.37422406148389004
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3383,
+              "n_fired_true": 1067,
+              "n_fired_false": 2151,
+              "n_missed_true": 47,
+              "precision": 0.3315724052206339,
+              "recall": 0.9578096947935368,
+              "gt_positive_rate": 0.32929352645580845
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3383,
+              "n_fired_true": 0,
+              "n_fired_false": 3218,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 3383,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S17_stress_11",
+          "session_id": "S17",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 78.31,
+          "duration_sec": 723.0,
+          "n_stim_events": 1809,
+          "stim_rate_per_min": 150.12448132780082,
+          "trifold_precision": 0.07183257918552036,
+          "trifold_recall": 0.26403326403326405,
+          "gate_failure_counts": {
+            "diastole": 354,
+            "exhalation": 354,
+            "arousal": 354
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 7446,
+              "n_fired_true": 761,
+              "n_fired_false": 1007,
+              "n_missed_true": 2448,
+              "precision": 0.4304298642533937,
+              "recall": 0.23714552820193208,
+              "gt_positive_rate": 0.4309696481332259
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 7446,
+              "n_fired_true": 970,
+              "n_fired_false": 798,
+              "n_missed_true": 3208,
+              "precision": 0.5486425339366516,
+              "recall": 0.23216850167544278,
+              "gt_positive_rate": 0.5611066344345957
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 7446,
+              "n_fired_true": 488,
+              "n_fired_false": 1280,
+              "n_missed_true": 1343,
+              "precision": 0.27601809954751133,
+              "recall": 0.2665210267613326,
+              "gt_positive_rate": 0.24590384098845017
+            }
+          },
+          "n_valid_eval_points": 7446,
+          "n_trifold_gt_true": 481
+        }
+      ],
+      "wall_sec": 322.27
+    },
+    "S2": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S2_amusement_9",
+          "session_id": "S2",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 38.36,
+          "duration_sec": 362.0,
+          "n_stim_events": 3726,
+          "stim_rate_per_min": 617.5690607734807,
+          "trifold_precision": 0.18287099380554808,
+          "trifold_recall": 0.9854862119013063,
+          "gate_failure_counts": {
+            "diastole": 10,
+            "exhalation": 10,
+            "arousal": 10
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3738,
+              "n_fired_true": 1463,
+              "n_fired_false": 2250,
+              "n_missed_true": 17,
+              "precision": 0.39402100727174794,
+              "recall": 0.9885135135135135,
+              "gt_positive_rate": 0.39593365436062067
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3738,
+              "n_fired_true": 1762,
+              "n_fired_false": 1951,
+              "n_missed_true": 12,
+              "precision": 0.4745488823054134,
+              "recall": 0.9932356257046223,
+              "gt_positive_rate": 0.47458533975387907
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3738,
+              "n_fired_true": 3371,
+              "n_fired_false": 342,
+              "n_missed_true": 23,
+              "precision": 0.9078911931053056,
+              "recall": 0.993223335297584,
+              "gt_positive_rate": 0.907972177635099
+            }
+          },
+          "n_valid_eval_points": 3738,
+          "n_trifold_gt_true": 689
+        },
+        {
+          "subject_id": "wesad_S2_baseline_1",
+          "session_id": "S2",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 125.79,
+          "duration_sec": 1144.0,
+          "n_stim_events": 10860,
+          "stim_rate_per_min": 569.5804195804196,
+          "trifold_precision": 0.026133530335211007,
+          "trifold_recall": 0.9593220338983051,
+          "gate_failure_counts": {
+            "diastole": 12,
+            "exhalation": 12,
+            "arousal": 12
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 11865,
+              "n_fired_true": 3398,
+              "n_fired_false": 7431,
+              "n_missed_true": 403,
+              "precision": 0.3137870532828516,
+              "recall": 0.8939752696658774,
+              "gt_positive_rate": 0.32035398230088497
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 11865,
+              "n_fired_true": 5414,
+              "n_fired_false": 5415,
+              "n_missed_true": 454,
+              "precision": 0.49995382768492014,
+              "recall": 0.9226312201772324,
+              "gt_positive_rate": 0.4945638432364096
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 11865,
+              "n_fired_true": 1660,
+              "n_fired_false": 9169,
+              "n_missed_true": 69,
+              "precision": 0.15329208606519532,
+              "recall": 0.9600925390399074,
+              "gt_positive_rate": 0.1457227138643068
+            }
+          },
+          "n_valid_eval_points": 11865,
+          "n_trifold_gt_true": 295
+        },
+        {
+          "subject_id": "wesad_S2_meditation_13",
+          "session_id": "S2",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.12,
+          "duration_sec": 377.0,
+          "n_stim_events": 3885,
+          "stim_rate_per_min": 618.3023872679045,
+          "trifold_precision": 0.08355159769512834,
+          "trifold_recall": 1.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3840,
+              "n_fired_true": 1062,
+              "n_fired_false": 2756,
+              "n_missed_true": 13,
+              "precision": 0.27815610267155577,
+              "recall": 0.987906976744186,
+              "gt_positive_rate": 0.2799479166666667
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3840,
+              "n_fired_true": 1453,
+              "n_fired_false": 2365,
+              "n_missed_true": 7,
+              "precision": 0.38056574122577264,
+              "recall": 0.9952054794520548,
+              "gt_positive_rate": 0.3802083333333333
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3840,
+              "n_fired_true": 3267,
+              "n_fired_false": 551,
+              "n_missed_true": 0,
+              "precision": 0.855683603981142,
+              "recall": 1.0,
+              "gt_positive_rate": 0.85078125
+            }
+          },
+          "n_valid_eval_points": 3840,
+          "n_trifold_gt_true": 319
+        },
+        {
+          "subject_id": "wesad_S2_meditation_7",
+          "session_id": "S2",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 43.14,
+          "duration_sec": 391.0,
+          "n_stim_events": 4053,
+          "stim_rate_per_min": 621.9437340153453,
+          "trifold_precision": 0.07736461192912403,
+          "trifold_recall": 1.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4007,
+              "n_fired_true": 1020,
+              "n_fired_false": 2987,
+              "n_missed_true": 0,
+              "precision": 0.2545545295732468,
+              "recall": 1.0,
+              "gt_positive_rate": 0.2545545295732468
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4007,
+              "n_fired_true": 1845,
+              "n_fired_false": 2162,
+              "n_missed_true": 0,
+              "precision": 0.4604442226104317,
+              "recall": 1.0,
+              "gt_positive_rate": 0.4604442226104317
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4007,
+              "n_fired_true": 2896,
+              "n_fired_false": 1111,
+              "n_missed_true": 0,
+              "precision": 0.722735213376591,
+              "recall": 1.0,
+              "gt_positive_rate": 0.722735213376591
+            }
+          },
+          "n_valid_eval_points": 4007,
+          "n_trifold_gt_true": 310
+        },
+        {
+          "subject_id": "wesad_S2_stress_3",
+          "session_id": "S2",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 70.21,
+          "duration_sec": 615.0,
+          "n_stim_events": 1871,
+          "stim_rate_per_min": 182.53658536585365,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6325,
+              "n_fired_true": 861,
+              "n_fired_false": 1010,
+              "n_missed_true": 1970,
+              "precision": 0.46018172100481025,
+              "recall": 0.3041328152596256,
+              "gt_positive_rate": 0.4475889328063241
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6325,
+              "n_fired_true": 872,
+              "n_fired_false": 999,
+              "n_missed_true": 2221,
+              "precision": 0.4660609299839658,
+              "recall": 0.28192693178144196,
+              "gt_positive_rate": 0.4890118577075099
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6325,
+              "n_fired_true": 0,
+              "n_fired_false": 1871,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6325,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 320.97
+    },
+    "S3": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S3_amusement_11",
+          "session_id": "S3",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.19,
+          "duration_sec": 375.0,
+          "n_stim_events": 3704,
+          "stim_rate_per_min": 592.64,
+          "trifold_precision": 0.18388599616333243,
+          "trifold_recall": 0.9896755162241888,
+          "gate_failure_counts": {
+            "diastole": 7,
+            "exhalation": 7,
+            "arousal": 7
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3829,
+              "n_fired_true": 1477,
+              "n_fired_false": 2172,
+              "n_missed_true": 77,
+              "precision": 0.40476842970676896,
+              "recall": 0.9504504504504504,
+              "gt_positive_rate": 0.40585009140767825
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3829,
+              "n_fired_true": 1609,
+              "n_fired_false": 2040,
+              "n_missed_true": 104,
+              "precision": 0.44094272403398194,
+              "recall": 0.9392877991827204,
+              "gt_positive_rate": 0.44737529381039437
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3829,
+              "n_fired_true": 3626,
+              "n_fired_false": 23,
+              "n_missed_true": 34,
+              "precision": 0.9936969032611674,
+              "recall": 0.9907103825136612,
+              "gt_positive_rate": 0.9558631496474276
+            }
+          },
+          "n_valid_eval_points": 3829,
+          "n_trifold_gt_true": 678
+        },
+        {
+          "subject_id": "wesad_S3_baseline_1",
+          "session_id": "S3",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 126.98,
+          "duration_sec": 1140.0,
+          "n_stim_events": 9800,
+          "stim_rate_per_min": 515.7894736842105,
+          "trifold_precision": 0.0717727878601456,
+          "trifold_recall": 0.8578431372549019,
+          "gate_failure_counts": {
+            "diastole": 116,
+            "exhalation": 116,
+            "arousal": 116
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 11807,
+              "n_fired_true": 3504,
+              "n_fired_false": 6249,
+              "n_missed_true": 812,
+              "precision": 0.3592740695170717,
+              "recall": 0.8118628359592215,
+              "gt_positive_rate": 0.3655458626238672
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 11807,
+              "n_fired_true": 3553,
+              "n_fired_false": 6200,
+              "n_missed_true": 753,
+              "precision": 0.3642981646672819,
+              "recall": 0.8251277287505806,
+              "gt_positive_rate": 0.3646989074277971
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 11807,
+              "n_fired_true": 5054,
+              "n_fired_false": 4699,
+              "n_missed_true": 708,
+              "precision": 0.5181995283502512,
+              "recall": 0.8771259979173898,
+              "gt_positive_rate": 0.4880155839756077
+            }
+          },
+          "n_valid_eval_points": 11807,
+          "n_trifold_gt_true": 816
+        },
+        {
+          "subject_id": "wesad_S3_meditation_15",
+          "session_id": "S3",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 42.49,
+          "duration_sec": 378.0,
+          "n_stim_events": 3233,
+          "stim_rate_per_min": 513.1746031746031,
+          "trifold_precision": 0.17080943275971958,
+          "trifold_recall": 0.7802037845705968,
+          "gate_failure_counts": {
+            "diastole": 151,
+            "exhalation": 151,
+            "arousal": 151
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3794,
+              "n_fired_true": 1055,
+              "n_fired_false": 2083,
+              "n_missed_true": 290,
+              "precision": 0.33620140216698535,
+              "recall": 0.7843866171003717,
+              "gt_positive_rate": 0.35450711649973643
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3794,
+              "n_fired_true": 1389,
+              "n_fired_false": 1749,
+              "n_missed_true": 303,
+              "precision": 0.44263862332695986,
+              "recall": 0.8209219858156028,
+              "gt_positive_rate": 0.4459673168160253
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3794,
+              "n_fired_true": 3138,
+              "n_fired_false": 0,
+              "n_missed_true": 656,
+              "precision": 1.0,
+              "recall": 0.8270954138112809,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 3794,
+          "n_trifold_gt_true": 687
+        },
+        {
+          "subject_id": "wesad_S3_meditation_9",
+          "session_id": "S3",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 44.01,
+          "duration_sec": 402.0,
+          "n_stim_events": 3852,
+          "stim_rate_per_min": 574.9253731343283,
+          "trifold_precision": 0.16201998947922147,
+          "trifold_recall": 0.9655172413793104,
+          "gate_failure_counts": {
+            "diastole": 22,
+            "exhalation": 22,
+            "arousal": 22
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4114,
+              "n_fired_true": 1286,
+              "n_fired_false": 2516,
+              "n_missed_true": 92,
+              "precision": 0.33824302998421885,
+              "recall": 0.9332365747460087,
+              "gt_positive_rate": 0.3349538162372387
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4114,
+              "n_fired_true": 1698,
+              "n_fired_false": 2104,
+              "n_missed_true": 87,
+              "precision": 0.4466070489216202,
+              "recall": 0.9512605042016806,
+              "gt_positive_rate": 0.43388429752066116
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4114,
+              "n_fired_true": 3802,
+              "n_fired_false": 0,
+              "n_missed_true": 312,
+              "precision": 1.0,
+              "recall": 0.924161400097229,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 4114,
+          "n_trifold_gt_true": 638
+        },
+        {
+          "subject_id": "wesad_S3_stress_5",
+          "session_id": "S3",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 72.33,
+          "duration_sec": 640.0,
+          "n_stim_events": 2732,
+          "stim_rate_per_min": 256.125,
+          "trifold_precision": 0.051756007393715345,
+          "trifold_recall": 0.6796116504854369,
+          "gate_failure_counts": {
+            "diastole": 66,
+            "exhalation": 66,
+            "arousal": 66
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6618,
+              "n_fired_true": 1197,
+              "n_fired_false": 1508,
+              "n_missed_true": 1533,
+              "precision": 0.4425138632162662,
+              "recall": 0.43846153846153846,
+              "gt_positive_rate": 0.4125113327289211
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6618,
+              "n_fired_true": 1483,
+              "n_fired_false": 1222,
+              "n_missed_true": 1969,
+              "precision": 0.5482439926062846,
+              "recall": 0.4296060254924681,
+              "gt_positive_rate": 0.5216077364762768
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6618,
+              "n_fired_true": 681,
+              "n_fired_false": 2024,
+              "n_missed_true": 346,
+              "precision": 0.25175600739371534,
+              "recall": 0.6630963972736125,
+              "gt_positive_rate": 0.1551828346932608
+            }
+          },
+          "n_valid_eval_points": 6618,
+          "n_trifold_gt_true": 206
+        }
+      ],
+      "wall_sec": 329.41
+    },
+    "S4": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S4_amusement_5",
+          "session_id": "S4",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.39,
+          "duration_sec": 372.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 514,
+            "exhalation": 514,
+            "arousal": 514
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3816,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1034,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.2709643605870021
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3816,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1939,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.5081236897274634
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3816,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3649,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.9562368972746331
+            }
+          },
+          "n_valid_eval_points": 3816,
+          "n_trifold_gt_true": 514
+        },
+        {
+          "subject_id": "wesad_S4_baseline_1",
+          "session_id": "S4",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 135.85,
+          "duration_sec": 1158.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 134,
+            "exhalation": 134,
+            "arousal": 134
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 11985,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3470,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.28952857738840215
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 11985,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 5699,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4755110554860242
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 11985,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 813,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.06783479349186483
+            }
+          },
+          "n_valid_eval_points": 11985,
+          "n_trifold_gt_true": 134
+        },
+        {
+          "subject_id": "wesad_S4_meditation_15",
+          "session_id": "S4",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 46.06,
+          "duration_sec": 397.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 218,
+            "exhalation": 218,
+            "arousal": 218
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4098,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1348,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.3289409468033187
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4098,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1685,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.41117618350414836
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4098,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1744,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4255734504636408
+            }
+          },
+          "n_valid_eval_points": 4098,
+          "n_trifold_gt_true": 218
+        },
+        {
+          "subject_id": "wesad_S4_meditation_9",
+          "session_id": "S4",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 46.56,
+          "duration_sec": 408.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4203,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1219,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.2900309302878896
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4203,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 1791,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.4261241970021413
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4203,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4203,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S4_stress_11",
+          "session_id": "S4",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 75.68,
+          "duration_sec": 635.0,
+          "n_stim_events": 0,
+          "stim_rate_per_min": 0.0,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6573,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 2699,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.41061919975657996
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6573,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 3454,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.5254830366651453
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6573,
+              "n_fired_true": 0,
+              "n_fired_false": 0,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6573,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 346.96
+    },
+    "S5": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S5_amusement_5",
+          "session_id": "S5",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.96,
+          "duration_sec": 374.0,
+          "n_stim_events": 2063,
+          "stim_rate_per_min": 330.96256684491976,
+          "trifold_precision": 0.08165322580645161,
+          "trifold_recall": 0.2961608775137112,
+          "gate_failure_counts": {
+            "diastole": 385,
+            "exhalation": 385,
+            "arousal": 385
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3750,
+              "n_fired_true": 362,
+              "n_fired_false": 1622,
+              "n_missed_true": 844,
+              "precision": 0.18245967741935484,
+              "recall": 0.30016583747927034,
+              "gt_positive_rate": 0.3216
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3750,
+              "n_fired_true": 905,
+              "n_fired_false": 1079,
+              "n_missed_true": 792,
+              "precision": 0.4561491935483871,
+              "recall": 0.5332940483205657,
+              "gt_positive_rate": 0.45253333333333334
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3750,
+              "n_fired_true": 1984,
+              "n_fired_false": 0,
+              "n_missed_true": 1766,
+              "precision": 1.0,
+              "recall": 0.5290666666666667,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 3750,
+          "n_trifold_gt_true": 547
+        },
+        {
+          "subject_id": "wesad_S5_baseline_1",
+          "session_id": "S5",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 132.06,
+          "duration_sec": 1198.0,
+          "n_stim_events": 6646,
+          "stim_rate_per_min": 332.8547579298832,
+          "trifold_precision": 0.002579274768623881,
+          "trifold_recall": 0.4473684210526316,
+          "gate_failure_counts": {
+            "diastole": 21,
+            "exhalation": 21,
+            "arousal": 21
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12314,
+              "n_fired_true": 1281,
+              "n_fired_false": 5310,
+              "n_missed_true": 3111,
+              "precision": 0.1943559399180701,
+              "recall": 0.2916666666666667,
+              "gt_positive_rate": 0.3566672080558714
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12314,
+              "n_fired_true": 3304,
+              "n_fired_false": 3287,
+              "n_missed_true": 2884,
+              "precision": 0.501289637384312,
+              "recall": 0.5339366515837104,
+              "gt_positive_rate": 0.5025174598018516
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12314,
+              "n_fired_true": 102,
+              "n_fired_false": 6489,
+              "n_missed_true": 116,
+              "precision": 0.015475648611743286,
+              "recall": 0.46788990825688076,
+              "gt_positive_rate": 0.017703426993665745
+            }
+          },
+          "n_valid_eval_points": 12314,
+          "n_trifold_gt_true": 38
+        },
+        {
+          "subject_id": "wesad_S5_meditation_15",
+          "session_id": "S5",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 45.6,
+          "duration_sec": 397.0,
+          "n_stim_events": 2306,
+          "stim_rate_per_min": 348.51385390428214,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4044,
+              "n_fired_true": 666,
+              "n_fired_false": 1605,
+              "n_missed_true": 826,
+              "precision": 0.29326287978863935,
+              "recall": 0.44638069705093836,
+              "gt_positive_rate": 0.36894164193867457
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4044,
+              "n_fired_true": 943,
+              "n_fired_false": 1328,
+              "n_missed_true": 748,
+              "precision": 0.41523557904007047,
+              "recall": 0.5576581904198699,
+              "gt_positive_rate": 0.41815034619188923
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4044,
+              "n_fired_true": 0,
+              "n_fired_false": 2271,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 4044,
+          "n_trifold_gt_true": 0
+        },
+        {
+          "subject_id": "wesad_S5_meditation_9",
+          "session_id": "S5",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 44.22,
+          "duration_sec": 397.0,
+          "n_stim_events": 2243,
+          "stim_rate_per_min": 338.992443324937,
+          "trifold_precision": 0.05490926012098651,
+          "trifold_recall": 0.38562091503267976,
+          "gate_failure_counts": {
+            "diastole": 188,
+            "exhalation": 188,
+            "arousal": 188
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3954,
+              "n_fired_true": 459,
+              "n_fired_false": 1690,
+              "n_missed_true": 798,
+              "precision": 0.2135877152163797,
+              "recall": 0.36515513126491644,
+              "gt_positive_rate": 0.3179059180576631
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3954,
+              "n_fired_true": 687,
+              "n_fired_false": 1462,
+              "n_missed_true": 536,
+              "precision": 0.319683573755235,
+              "recall": 0.5617334423548651,
+              "gt_positive_rate": 0.3093070308548306
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3954,
+              "n_fired_true": 1361,
+              "n_fired_false": 788,
+              "n_missed_true": 1280,
+              "precision": 0.6333178222429037,
+              "recall": 0.51533510034078,
+              "gt_positive_rate": 0.6679312089023773
+            }
+          },
+          "n_valid_eval_points": 3954,
+          "n_trifold_gt_true": 306
+        },
+        {
+          "subject_id": "wesad_S5_stress_11",
+          "session_id": "S5",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 73.03,
+          "duration_sec": 645.0,
+          "n_stim_events": 763,
+          "stim_rate_per_min": 70.97674418604652,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6675,
+              "n_fired_true": 250,
+              "n_fired_false": 505,
+              "n_missed_true": 2695,
+              "precision": 0.33112582781456956,
+              "recall": 0.08488964346349745,
+              "gt_positive_rate": 0.4411985018726592
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6675,
+              "n_fired_true": 426,
+              "n_fired_false": 329,
+              "n_missed_true": 2978,
+              "precision": 0.5642384105960265,
+              "recall": 0.12514688601645124,
+              "gt_positive_rate": 0.5099625468164795
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6675,
+              "n_fired_true": 0,
+              "n_fired_false": 755,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6675,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 338.35
+    },
+    "S6": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S6_amusement_11",
+          "session_id": "S6",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.66,
+          "duration_sec": 372.0,
+          "n_stim_events": 870,
+          "stim_rate_per_min": 140.32258064516128,
+          "trifold_precision": 0.16222479721900349,
+          "trifold_recall": 0.17879948914431673,
+          "gate_failure_counts": {
+            "diastole": 643,
+            "exhalation": 643,
+            "arousal": 643
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3834,
+              "n_fired_true": 342,
+              "n_fired_false": 521,
+              "n_missed_true": 1373,
+              "precision": 0.3962920046349942,
+              "recall": 0.19941690962099126,
+              "gt_positive_rate": 0.4473135106937924
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3834,
+              "n_fired_true": 408,
+              "n_fired_false": 455,
+              "n_missed_true": 1430,
+              "precision": 0.4727694090382387,
+              "recall": 0.2219804134929271,
+              "gt_positive_rate": 0.4793948878455921
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3834,
+              "n_fired_true": 796,
+              "n_fired_false": 67,
+              "n_missed_true": 2829,
+              "precision": 0.9223638470451911,
+              "recall": 0.21958620689655173,
+              "gt_positive_rate": 0.9454877412623891
+            }
+          },
+          "n_valid_eval_points": 3834,
+          "n_trifold_gt_true": 783
+        },
+        {
+          "subject_id": "wesad_S6_baseline_1",
+          "session_id": "S6",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 133.68,
+          "duration_sec": 1180.0,
+          "n_stim_events": 5125,
+          "stim_rate_per_min": 260.59322033898303,
+          "trifold_precision": 0.01646090534979424,
+          "trifold_recall": 0.3853211009174312,
+          "gate_failure_counts": {
+            "diastole": 134,
+            "exhalation": 134,
+            "arousal": 134
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12232,
+              "n_fired_true": 1934,
+              "n_fired_false": 3169,
+              "n_missed_true": 2117,
+              "precision": 0.3789927493631197,
+              "recall": 0.4774129844482844,
+              "gt_positive_rate": 0.3311805101373447
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12232,
+              "n_fired_true": 2372,
+              "n_fired_false": 2731,
+              "n_missed_true": 3252,
+              "precision": 0.4648246129727611,
+              "recall": 0.4217638691322902,
+              "gt_positive_rate": 0.4597776324395029
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12232,
+              "n_fired_true": 566,
+              "n_fired_false": 4537,
+              "n_missed_true": 882,
+              "precision": 0.11091514795218499,
+              "recall": 0.39088397790055246,
+              "gt_positive_rate": 0.118378024852845
+            }
+          },
+          "n_valid_eval_points": 12232,
+          "n_trifold_gt_true": 218
+        },
+        {
+          "subject_id": "wesad_S6_meditation_15",
+          "session_id": "S6",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 43.49,
+          "duration_sec": 390.0,
+          "n_stim_events": 885,
+          "stim_rate_per_min": 136.15384615384616,
+          "trifold_precision": 0.006872852233676976,
+          "trifold_recall": 0.375,
+          "gate_failure_counts": {
+            "diastole": 10,
+            "exhalation": 10,
+            "arousal": 10
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4016,
+              "n_fired_true": 394,
+              "n_fired_false": 479,
+              "n_missed_true": 1209,
+              "precision": 0.4513172966781214,
+              "recall": 0.24578914535246413,
+              "gt_positive_rate": 0.39915338645418325
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4016,
+              "n_fired_true": 283,
+              "n_fired_false": 590,
+              "n_missed_true": 1367,
+              "precision": 0.3241695303550974,
+              "recall": 0.1715151515151515,
+              "gt_positive_rate": 0.4108565737051793
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4016,
+              "n_fired_true": 37,
+              "n_fired_false": 836,
+              "n_missed_true": 57,
+              "precision": 0.042382588774341354,
+              "recall": 0.39361702127659576,
+              "gt_positive_rate": 0.023406374501992032
+            }
+          },
+          "n_valid_eval_points": 4016,
+          "n_trifold_gt_true": 16
+        },
+        {
+          "subject_id": "wesad_S6_meditation_9",
+          "session_id": "S6",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 44.65,
+          "duration_sec": 397.0,
+          "n_stim_events": 1426,
+          "stim_rate_per_min": 215.5163727959698,
+          "trifold_precision": 0.04778636683063949,
+          "trifold_recall": 0.43870967741935485,
+          "gate_failure_counts": {
+            "diastole": 87,
+            "exhalation": 87,
+            "arousal": 87
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4065,
+              "n_fired_true": 537,
+              "n_fired_false": 886,
+              "n_missed_true": 796,
+              "precision": 0.3773717498243148,
+              "recall": 0.4028507126781695,
+              "gt_positive_rate": 0.3279212792127921
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4065,
+              "n_fired_true": 501,
+              "n_fired_false": 922,
+              "n_missed_true": 1070,
+              "precision": 0.3520730850316233,
+              "recall": 0.31890515595162316,
+              "gt_positive_rate": 0.38646986469864697
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4065,
+              "n_fired_true": 456,
+              "n_fired_false": 967,
+              "n_missed_true": 1063,
+              "precision": 0.320449754040759,
+              "recall": 0.30019749835418036,
+              "gt_positive_rate": 0.37367773677736776
+            }
+          },
+          "n_valid_eval_points": 4065,
+          "n_trifold_gt_true": 155
+        },
+        {
+          "subject_id": "wesad_S6_stress_5",
+          "session_id": "S6",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 73.57,
+          "duration_sec": 650.0,
+          "n_stim_events": 581,
+          "stim_rate_per_min": 53.630769230769225,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6681,
+              "n_fired_true": 253,
+              "n_fired_false": 315,
+              "n_missed_true": 2688,
+              "precision": 0.4454225352112676,
+              "recall": 0.08602516150969058,
+              "gt_positive_rate": 0.4402035623409669
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6681,
+              "n_fired_true": 280,
+              "n_fired_false": 288,
+              "n_missed_true": 3213,
+              "precision": 0.49295774647887325,
+              "recall": 0.08016032064128256,
+              "gt_positive_rate": 0.5228259242628349
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6681,
+              "n_fired_true": 0,
+              "n_fired_false": 568,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6681,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 338.42
+    },
+    "S7": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S7_amusement_5",
+          "session_id": "S7",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.84,
+          "duration_sec": 372.0,
+          "n_stim_events": 3559,
+          "stim_rate_per_min": 574.0322580645161,
+          "trifold_precision": 0.13340870548332392,
+          "trifold_recall": 0.8660550458715597,
+          "gate_failure_counts": {
+            "diastole": 73,
+            "exhalation": 73,
+            "arousal": 73
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3832,
+              "n_fired_true": 970,
+              "n_fired_false": 2568,
+              "n_missed_true": 128,
+              "precision": 0.27416619559072924,
+              "recall": 0.8834244080145719,
+              "gt_positive_rate": 0.28653444676409184
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3832,
+              "n_fired_true": 1636,
+              "n_fired_false": 1902,
+              "n_missed_true": 153,
+              "precision": 0.462408140192199,
+              "recall": 0.9144773616545556,
+              "gt_positive_rate": 0.4668580375782881
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3832,
+              "n_fired_true": 3538,
+              "n_fired_false": 0,
+              "n_missed_true": 294,
+              "precision": 1.0,
+              "recall": 0.923277661795407,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 3832,
+          "n_trifold_gt_true": 545
+        },
+        {
+          "subject_id": "wesad_S7_baseline_1",
+          "session_id": "S7",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 129.9,
+          "duration_sec": 1186.0,
+          "n_stim_events": 12135,
+          "stim_rate_per_min": 613.9123102866779,
+          "trifold_precision": 0.07682785938273642,
+          "trifold_recall": 0.9810326659641728,
+          "gate_failure_counts": {
+            "diastole": 18,
+            "exhalation": 18,
+            "arousal": 18
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12317,
+              "n_fired_true": 3625,
+              "n_fired_false": 8493,
+              "n_missed_true": 111,
+              "precision": 0.29914177256973096,
+              "recall": 0.9702890792291221,
+              "gt_positive_rate": 0.3033206137858245
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12317,
+              "n_fired_true": 5447,
+              "n_fired_false": 6671,
+              "n_missed_true": 98,
+              "precision": 0.4494966166033999,
+              "recall": 0.9823264201983769,
+              "gt_positive_rate": 0.45019079321263294
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12317,
+              "n_fired_true": 6378,
+              "n_fired_false": 5740,
+              "n_missed_true": 71,
+              "precision": 0.5263244759861363,
+              "recall": 0.9889905411691735,
+              "gt_positive_rate": 0.5235852886254769
+            }
+          },
+          "n_valid_eval_points": 12317,
+          "n_trifold_gt_true": 949
+        },
+        {
+          "subject_id": "wesad_S7_meditation_15",
+          "session_id": "S7",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.76,
+          "duration_sec": 393.0,
+          "n_stim_events": 3628,
+          "stim_rate_per_min": 553.8931297709923,
+          "trifold_precision": 0.11257350882105853,
+          "trifold_recall": 0.8427672955974843,
+          "gate_failure_counts": {
+            "diastole": 75,
+            "exhalation": 75,
+            "arousal": 75
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4013,
+              "n_fired_true": 969,
+              "n_fired_false": 2602,
+              "n_missed_true": 140,
+              "precision": 0.2713525623074769,
+              "recall": 0.8737601442741209,
+              "gt_positive_rate": 0.2763518564664839
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4013,
+              "n_fired_true": 1483,
+              "n_fired_false": 2088,
+              "n_missed_true": 177,
+              "precision": 0.4152898347801736,
+              "recall": 0.8933734939759036,
+              "gt_positive_rate": 0.4136556192374782
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4013,
+              "n_fired_true": 3571,
+              "n_fired_false": 0,
+              "n_missed_true": 442,
+              "precision": 1.0,
+              "recall": 0.8898579616247196,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 4013,
+          "n_trifold_gt_true": 477
+        },
+        {
+          "subject_id": "wesad_S7_meditation_9",
+          "session_id": "S7",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 41.81,
+          "duration_sec": 397.0,
+          "n_stim_events": 4036,
+          "stim_rate_per_min": 609.9748110831234,
+          "trifold_precision": 0.10464535464535464,
+          "trifold_recall": 0.9610091743119266,
+          "gate_failure_counts": {
+            "diastole": 17,
+            "exhalation": 17,
+            "arousal": 17
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4081,
+              "n_fired_true": 1005,
+              "n_fired_false": 2999,
+              "n_missed_true": 48,
+              "precision": 0.250999000999001,
+              "recall": 0.9544159544159544,
+              "gt_positive_rate": 0.2580249938740505
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4081,
+              "n_fired_true": 1645,
+              "n_fired_false": 2359,
+              "n_missed_true": 37,
+              "precision": 0.41083916083916083,
+              "recall": 0.9780023781212842,
+              "gt_positive_rate": 0.4121538838519971
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4081,
+              "n_fired_true": 4004,
+              "n_fired_false": 0,
+              "n_missed_true": 77,
+              "precision": 1.0,
+              "recall": 0.9811320754716981,
+              "gt_positive_rate": 1.0
+            }
+          },
+          "n_valid_eval_points": 4081,
+          "n_trifold_gt_true": 436
+        },
+        {
+          "subject_id": "wesad_S7_stress_11",
+          "session_id": "S7",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 69.17,
+          "duration_sec": 640.0,
+          "n_stim_events": 473,
+          "stim_rate_per_min": 44.34375,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 166,
+            "exhalation": 166,
+            "arousal": 166
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6605,
+              "n_fired_true": 218,
+              "n_fired_false": 255,
+              "n_missed_true": 2711,
+              "precision": 0.4608879492600423,
+              "recall": 0.07442813246841926,
+              "gt_positive_rate": 0.44345193035579106
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6605,
+              "n_fired_true": 268,
+              "n_fired_false": 205,
+              "n_missed_true": 3270,
+              "precision": 0.5665961945031712,
+              "recall": 0.07574901074053138,
+              "gt_positive_rate": 0.5356548069644209
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6605,
+              "n_fired_true": 0,
+              "n_fired_false": 473,
+              "n_missed_true": 624,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.09447388342165026
+            }
+          },
+          "n_valid_eval_points": 6605,
+          "n_trifold_gt_true": 166
+        }
+      ],
+      "wall_sec": 325.84
+    },
+    "S8": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S8_amusement_5",
+          "session_id": "S8",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 38.69,
+          "duration_sec": 370.0,
+          "n_stim_events": 904,
+          "stim_rate_per_min": 146.59459459459458,
+          "trifold_precision": 0.09417040358744394,
+          "trifold_recall": 0.15700934579439252,
+          "gate_failure_counts": {
+            "diastole": 451,
+            "exhalation": 451,
+            "arousal": 451
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3790,
+              "n_fired_true": 228,
+              "n_fired_false": 664,
+              "n_missed_true": 1174,
+              "precision": 0.2556053811659193,
+              "recall": 0.16262482168330955,
+              "gt_positive_rate": 0.36992084432717676
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3790,
+              "n_fired_true": 411,
+              "n_fired_false": 481,
+              "n_missed_true": 1315,
+              "precision": 0.460762331838565,
+              "recall": 0.2381228273464658,
+              "gt_positive_rate": 0.4554089709762533
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3790,
+              "n_fired_true": 777,
+              "n_fired_false": 115,
+              "n_missed_true": 2556,
+              "precision": 0.8710762331838565,
+              "recall": 0.23312331233123312,
+              "gt_positive_rate": 0.8794195250659631
+            }
+          },
+          "n_valid_eval_points": 3790,
+          "n_trifold_gt_true": 535
+        },
+        {
+          "subject_id": "wesad_S8_baseline_1",
+          "session_id": "S8",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 120.58,
+          "duration_sec": 1169.0,
+          "n_stim_events": 2929,
+          "stim_rate_per_min": 150.33361847733104,
+          "trifold_precision": 0.018244406196213425,
+          "trifold_recall": 0.12771084337349398,
+          "gate_failure_counts": {
+            "diastole": 362,
+            "exhalation": 362,
+            "arousal": 362
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12052,
+              "n_fired_true": 437,
+              "n_fired_false": 2468,
+              "n_missed_true": 3359,
+              "precision": 0.15043029259896729,
+              "recall": 0.11512118018967334,
+              "gt_positive_rate": 0.31496846996349154
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12052,
+              "n_fired_true": 1475,
+              "n_fired_false": 1430,
+              "n_missed_true": 4846,
+              "precision": 0.5077452667814114,
+              "recall": 0.23334915361493436,
+              "gt_positive_rate": 0.5244772651842018
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12052,
+              "n_fired_true": 780,
+              "n_fired_false": 2125,
+              "n_missed_true": 2000,
+              "precision": 0.2685025817555938,
+              "recall": 0.2805755395683453,
+              "gt_positive_rate": 0.23066710919349487
+            }
+          },
+          "n_valid_eval_points": 12052,
+          "n_trifold_gt_true": 415
+        },
+        {
+          "subject_id": "wesad_S8_meditation_15",
+          "session_id": "S8",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.55,
+          "duration_sec": 396.0,
+          "n_stim_events": 1089,
+          "stim_rate_per_min": 165.0,
+          "trifold_precision": 0.01020408163265306,
+          "trifold_recall": 0.18032786885245902,
+          "gate_failure_counts": {
+            "diastole": 50,
+            "exhalation": 50,
+            "arousal": 50
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4071,
+              "n_fired_true": 203,
+              "n_fired_false": 875,
+              "n_missed_true": 1153,
+              "precision": 0.18831168831168832,
+              "recall": 0.14970501474926254,
+              "gt_positive_rate": 0.33308769344141487
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4071,
+              "n_fired_true": 515,
+              "n_fired_false": 563,
+              "n_missed_true": 1292,
+              "precision": 0.4777365491651206,
+              "recall": 0.2850027670171555,
+              "gt_positive_rate": 0.4438712846966347
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4071,
+              "n_fired_true": 110,
+              "n_fired_false": 968,
+              "n_missed_true": 265,
+              "precision": 0.10204081632653061,
+              "recall": 0.29333333333333333,
+              "gt_positive_rate": 0.09211495946941783
+            }
+          },
+          "n_valid_eval_points": 4071,
+          "n_trifold_gt_true": 61
+        },
+        {
+          "subject_id": "wesad_S8_meditation_9",
+          "session_id": "S8",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.6,
+          "duration_sec": 400.0,
+          "n_stim_events": 898,
+          "stim_rate_per_min": 134.7,
+          "trifold_precision": 0.030201342281879196,
+          "trifold_recall": 0.07605633802816901,
+          "gate_failure_counts": {
+            "diastole": 328,
+            "exhalation": 328,
+            "arousal": 328
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4121,
+              "n_fired_true": 131,
+              "n_fired_false": 763,
+              "n_missed_true": 1028,
+              "precision": 0.1465324384787472,
+              "recall": 0.11302847282139776,
+              "gt_positive_rate": 0.28124241688910456
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4121,
+              "n_fired_true": 412,
+              "n_fired_false": 482,
+              "n_missed_true": 1337,
+              "precision": 0.4608501118568233,
+              "recall": 0.23556317895940537,
+              "gt_positive_rate": 0.4244115505945159
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4121,
+              "n_fired_true": 743,
+              "n_fired_false": 151,
+              "n_missed_true": 2716,
+              "precision": 0.831096196868009,
+              "recall": 0.21480196588609424,
+              "gt_positive_rate": 0.8393593787915554
+            }
+          },
+          "n_valid_eval_points": 4121,
+          "n_trifold_gt_true": 355
+        },
+        {
+          "subject_id": "wesad_S8_stress_11",
+          "session_id": "S8",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 70.9,
+          "duration_sec": 670.0,
+          "n_stim_events": 732,
+          "stim_rate_per_min": 65.55223880597015,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6890,
+              "n_fired_true": 323,
+              "n_fired_false": 395,
+              "n_missed_true": 2839,
+              "precision": 0.44986072423398327,
+              "recall": 0.10215053763440861,
+              "gt_positive_rate": 0.45892597968069665
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6890,
+              "n_fired_true": 452,
+              "n_fired_false": 266,
+              "n_missed_true": 3569,
+              "precision": 0.6295264623955432,
+              "recall": 0.11240984829644367,
+              "gt_positive_rate": 0.583599419448476
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6890,
+              "n_fired_true": 0,
+              "n_fired_false": 718,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6890,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 312.62
+    },
+    "S9": {
+      "epochs": [
+        {
+          "subject_id": "wesad_S9_amusement_11",
+          "session_id": "S9",
+          "condition": "amusement",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 38.29,
+          "duration_sec": 372.0,
+          "n_stim_events": 7,
+          "stim_rate_per_min": 1.129032258064516,
+          "trifold_precision": 0.42857142857142855,
+          "trifold_recall": 0.008620689655172414,
+          "gate_failure_counts": {
+            "diastole": 345,
+            "exhalation": 345,
+            "arousal": 345
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 3830,
+              "n_fired_true": 4,
+              "n_fired_false": 3,
+              "n_missed_true": 980,
+              "precision": 0.5714285714285714,
+              "recall": 0.0040650406504065045,
+              "gt_positive_rate": 0.2569190600522193
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 3830,
+              "n_fired_true": 5,
+              "n_fired_false": 2,
+              "n_missed_true": 1472,
+              "precision": 0.7142857142857143,
+              "recall": 0.003385240352064997,
+              "gt_positive_rate": 0.3856396866840731
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 3830,
+              "n_fired_true": 5,
+              "n_fired_false": 2,
+              "n_missed_true": 3428,
+              "precision": 0.7142857142857143,
+              "recall": 0.0014564520827264782,
+              "gt_positive_rate": 0.8963446475195822
+            }
+          },
+          "n_valid_eval_points": 3830,
+          "n_trifold_gt_true": 348
+        },
+        {
+          "subject_id": "wesad_S9_baseline_1",
+          "session_id": "S9",
+          "condition": "baseline",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 122.82,
+          "duration_sec": 1180.0,
+          "n_stim_events": 80,
+          "stim_rate_per_min": 4.067796610169491,
+          "trifold_precision": 0.0125,
+          "trifold_recall": 0.012987012987012988,
+          "gate_failure_counts": {
+            "diastole": 76,
+            "exhalation": 76,
+            "arousal": 76
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 12234,
+              "n_fired_true": 51,
+              "n_fired_false": 29,
+              "n_missed_true": 4047,
+              "precision": 0.6375,
+              "recall": 0.012445095168374817,
+              "gt_positive_rate": 0.3349681216282491
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 12234,
+              "n_fired_true": 28,
+              "n_fired_false": 52,
+              "n_missed_true": 4968,
+              "precision": 0.35,
+              "recall": 0.005604483586869495,
+              "gt_positive_rate": 0.4083701160699689
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 12234,
+              "n_fired_true": 7,
+              "n_fired_false": 73,
+              "n_missed_true": 587,
+              "precision": 0.0875,
+              "recall": 0.011784511784511785,
+              "gt_positive_rate": 0.04855321235899951
+            }
+          },
+          "n_valid_eval_points": 12234,
+          "n_trifold_gt_true": 77
+        },
+        {
+          "subject_id": "wesad_S9_meditation_15",
+          "session_id": "S9",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.05,
+          "duration_sec": 395.0,
+          "n_stim_events": 3,
+          "stim_rate_per_min": 0.4556962025316456,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 78,
+            "exhalation": 78,
+            "arousal": 78
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4053,
+              "n_fired_true": 2,
+              "n_fired_false": 1,
+              "n_missed_true": 1009,
+              "precision": 0.6666666666666666,
+              "recall": 0.0019782393669634025,
+              "gt_positive_rate": 0.24944485566247224
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4053,
+              "n_fired_true": 3,
+              "n_fired_false": 0,
+              "n_missed_true": 1463,
+              "precision": 1.0,
+              "recall": 0.0020463847203274215,
+              "gt_positive_rate": 0.3617073772514187
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4053,
+              "n_fired_true": 0,
+              "n_fired_false": 3,
+              "n_missed_true": 990,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.24426350851221318
+            }
+          },
+          "n_valid_eval_points": 4053,
+          "n_trifold_gt_true": 78
+        },
+        {
+          "subject_id": "wesad_S9_meditation_9",
+          "session_id": "S9",
+          "condition": "meditation",
+          "label": 0,
+          "exh_source": "reference",
+          "replay_sec": 40.52,
+          "duration_sec": 398.0,
+          "n_stim_events": 4,
+          "stim_rate_per_min": 0.6030150753768844,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 111,
+            "exhalation": 111,
+            "arousal": 111
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 4105,
+              "n_fired_true": 3,
+              "n_fired_false": 1,
+              "n_missed_true": 1002,
+              "precision": 0.75,
+              "recall": 0.0029850746268656717,
+              "gt_positive_rate": 0.24482338611449453
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 4105,
+              "n_fired_true": 1,
+              "n_fired_false": 3,
+              "n_missed_true": 1592,
+              "precision": 0.25,
+              "recall": 0.0006277463904582549,
+              "gt_positive_rate": 0.38806333739342264
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 4105,
+              "n_fired_true": 0,
+              "n_fired_false": 4,
+              "n_missed_true": 1032,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.25140073081607794
+            }
+          },
+          "n_valid_eval_points": 4105,
+          "n_trifold_gt_true": 111
+        },
+        {
+          "subject_id": "wesad_S9_stress_5",
+          "session_id": "S9",
+          "condition": "stress",
+          "label": 1,
+          "exh_source": "reference",
+          "replay_sec": 67.74,
+          "duration_sec": 645.0,
+          "n_stim_events": 5,
+          "stim_rate_per_min": 0.46511627906976744,
+          "trifold_precision": 0.0,
+          "trifold_recall": 0.0,
+          "gate_failure_counts": {
+            "diastole": 0,
+            "exhalation": 0,
+            "arousal": 0
+          },
+          "per_gate": {
+            "diastole": {
+              "name": "diastole",
+              "n_eval_points": 6650,
+              "n_fired_true": 4,
+              "n_fired_false": 1,
+              "n_missed_true": 2440,
+              "precision": 0.8,
+              "recall": 0.0016366612111292963,
+              "gt_positive_rate": 0.3675187969924812
+            },
+            "exhalation": {
+              "name": "exhalation",
+              "n_eval_points": 6650,
+              "n_fired_true": 3,
+              "n_fired_false": 2,
+              "n_missed_true": 3670,
+              "precision": 0.6,
+              "recall": 0.0008167710318540703,
+              "gt_positive_rate": 0.5523308270676692
+            },
+            "arousal": {
+              "name": "arousal",
+              "n_eval_points": 6650,
+              "n_fired_true": 0,
+              "n_fired_false": 5,
+              "n_missed_true": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "gt_positive_rate": 0.0
+            }
+          },
+          "n_valid_eval_points": 6650,
+          "n_trifold_gt_true": 0
+        }
+      ],
+      "wall_sec": 310.71
+    }
+  },
+  "aggregate": {
+    "duration_sec": 599.44,
+    "n_stim_events": 2010.08,
+    "stim_rate_per_min": 206.3968,
+    "trifold_precision": 0.0649,
+    "trifold_recall": 0.2712,
+    "n_valid_eval_points": 6175.8,
+    "n_trifold_gt_true": 291.68,
+    "per_gate_mean": {
+      "diastole": {
+        "precision": 0.3128,
+        "recall": 0.3104,
+        "gt_positive_rate": 0.3497
+      },
+      "exhalation": {
+        "precision": 0.383,
+        "recall": 0.333,
+        "gt_positive_rate": 0.4497
+      },
+      "arousal": {
+        "precision": 0.347,
+        "recall": 0.2859,
+        "gt_positive_rate": 0.406
+      }
+    },
+    "n_epochs": 75
+  }
+}

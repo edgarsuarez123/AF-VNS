@@ -1929,3 +1929,31 @@ Created src/training/tinnitus_replay_validation.py:
 Created tests/test_tinnitus_replay_validation.py: 22/22 passing.
 Added replay_validation section to config_tinnitus.yaml.
 WESAD validation launched as background process → replay_wesad_err.log.
+
+F16 COMPLETE — WESAD replay validation results (2026-04-06):
+  15 subjects, 75 epochs, ~10min/subject on CUDA.
+
+  AGGREGATE:
+    trifold_precision:  0.065  (1 in 15 stims is a true tri-fold hit)
+    trifold_recall:     0.271  (catches 27% of true trigger windows)
+    stim_rate/min:      206    (too high — phase gates not selective enough)
+    diastole   P/R:     0.31 / 0.31
+    exhalation P/R:     0.38 / 0.33
+    arousal    P/R:     0.35 / 0.29
+
+  PER-SUBJECT (baseline vs stress stim rate):
+    S7:  588 → 44/min  S13: 89 → 1.7/min  S11: 564 → 55/min  (EDA gate working ✓)
+    S2:  607 → 183/min S3:  549 → 256/min  S5:  338 → 71/min
+    S4/S15: 0 events (likely EDA calibration failure or extreme signal)
+
+  KEY FINDINGS:
+    1. EDA arousal gate discriminates baseline vs stress correctly — stim rate
+       consistently higher at baseline than stress across most subjects.
+    2. Stim rate is too high (206/min vs ~60 physiological) because the phase
+       detector fires on nearly every heartbeat — diastole gate precision 0.31
+       means 69% of stims fire during systole (wrong phase).
+    3. Root cause: phase detector avg_acc=0.617 (exh ~51%) from F10 label noise.
+       The tri-fold architecture is correct; the bottleneck is the CNN.
+
+  Results: models/artifacts/replay_validation/wesad_replay_results.json
+  Plot:    models/artifacts/replay_validation/wesad_replay_summary.png

@@ -249,7 +249,7 @@ F1 ─┬─> F2 ─────────────────────
   - 2 new tests: `test_factory_loads_arousal_classifier`, `test_factory_rule_based_when_classifier_disabled`
   - 12/12 tests passing
 
-- [ ] 16. **F16: Ultimate goal — tri-fold validation and (optional) joint modeling** — in progress 2026-04-06
+- [x] 16. **F16: Ultimate goal — tri-fold validation and (optional) joint modeling** — done 2026-04-06
   - **SBIR end state:** stimulation only when **diastole ∧ exhalation ∧ EDA arousal-in-band** are simultaneously satisfied. Modular training (F10/F13/F14) + runtime AND (F12) is the shipping path; **F16 is where we prove and improve the full behavior on data.**
   - **Phase A — required:** **End-to-end offline replay** on **WESAD** (and optionally BIDMC where EDA absent: phase-only or simulated EDA). Feed synchronized PPG + EDA through `TinnitusClosedLoopPipeline` (or equivalent batch harness). **Metrics:** fraction of time all three gates true, false stim rate, latency, per-modality failure modes; compare to window-level phase labels and arousal ground truth where defined.
   - **Phase B — optional:** If labels for **simultaneous alignment** can be defined (e.g. frame-level AND of dia/exh/in-band on WESAD epochs), evaluate whether a **single fusion head** or **joint loss** beats the modular AND — research stretch, not required for first SBIR demo.
@@ -261,20 +261,32 @@ F1 ─┬─> F2 ─────────────────────
 
 **F1–F15 complete. F14 COMPLETE (no improvement; baseline checkpoint kept).**
 
-**F16 Phase A IN PROGRESS.**
+**F16 COMPLETE. All 16 features done.**
 
-`src/training/tinnitus_replay_validation.py` built and tested (22/22 tests passing). WESAD validation running as background process.
+### F16 Results — WESAD Tri-Fold Replay (15 subjects, 75 epochs)
 
-**Monitor:**
-- `Get-Content replay_wesad_err.log -Tail 10`
+| Metric | Value | Notes |
+|---|---|---|
+| Tri-fold precision | 0.065 | 1 in 15 stims hits a true trigger window |
+| Tri-fold recall | 0.271 | Catches 27% of true windows |
+| Stim rate | 206/min | Too high — phase gates not selective enough |
+| Diastole gate P/R | 0.31 / 0.31 | CNN fires during systole 69% of the time |
+| Exhalation gate P/R | 0.38 / 0.33 | Same root cause as F10 (exh acc ~51%) |
+| Arousal gate P/R | 0.35 / 0.29 | EDA classifier discriminates baseline vs stress ✓ |
 
-**After validation completes:** Results at `models/artifacts/replay_validation/wesad_replay_results.json`. Update F16 status with metrics table. Commit.
+**Key finding:** EDA arousal gate works as a suppressor — baseline stim rate consistently higher than stress (S7: 588→44/min, S13: 89→1.7/min, S11: 564→55/min). Root cause of low precision is the phase detector (avg_acc=0.617 from F10) — diastole/exhalation gates are not selective, firing on ~every heartbeat.
 
-**Deliverables files:**
-- `src/training/tinnitus_replay_validation.py` — replay script
-- `tests/test_tinnitus_replay_validation.py` — 22 tests
-- `models/artifacts/replay_validation/wesad_replay_results.json` — results (pending)
-- `models/artifacts/replay_validation/wesad_replay_summary.png` — plots (pending)
+**Root cause:** Phase detector accuracy ceiling (~51% exhalation) from label noise (WESAD BVP-derived labels). Improving the phase detector requires either better training data or hardware respiratory signal.
+
+**Deliverables:**
+- `src/training/tinnitus_replay_validation.py`
+- `tests/test_tinnitus_replay_validation.py` (22 tests)
+- `models/artifacts/replay_validation/wesad_replay_results.json`
+- `models/artifacts/replay_validation/wesad_replay_summary.png`
+
+**Resume From Here:** All F1–F16 complete. Optional next steps:
+- LSL integration layer for real-time hardware deployment
+- Better phase detector training data (hardware resp signal)
 
 **Remaining optional work:**
 - LSL integration layer for real-time hardware deployment
