@@ -130,8 +130,9 @@ closed_loop:
   eda_fs: 4                         # Expected EDA sampling rate (Hz)
   inference_stride_ms: 100          # Fast path: run PhaseDetector every 100ms
   slow_window_sec: 60               # Slow path: AutonomicState window
-  diastole_threshold: 0.5           # Sigmoid threshold for diastole gate
+  diastole_threshold: 0.65          # Sigmoid threshold for diastole gate (raised from 0.5 — F17)
   exhalation_threshold: 0.5         # Sigmoid threshold for exhalation gate
+  consecutive_frames_required: 3    # F17: require N consecutive agreeing frames before firing (3 = 600ms)
   use_arousal_classifier: true       # Load trained ArousalClassifier if checkpoint exists; false = rule-based only
   # EDA arousal gate uses eda.low/high_threshold_sigma (per-subject calibrated)
 

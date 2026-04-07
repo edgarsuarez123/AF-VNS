@@ -292,6 +292,75 @@ def test_reset_clears_state():
 # Test 10: latency regression — fast path mean < 50ms
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# F17: Consecutive-frame gating tests
+# ---------------------------------------------------------------------------
+
+def _make_pipeline_n(n: int, dia_thresh: float = 0.5, exh_thresh: float = 0.5) -> TinnitusClosedLoopPipeline:
+    """Build pipeline with consecutive_frames_required=n."""
+    phase_detector = PhaseDetector(PhaseDetectorConfig(input_samples=250))
+    phase_detector.eval()
+    return TinnitusClosedLoopPipeline(
+        phase_detector=phase_detector,
+        autonomic_state=AutonomicState(AutonomicStateConfig()),
+        stim_recommender=StimRecommender(StimConfig()),
+        arousal_gate=ArousalGate(config_path=CONFIG_PATH),
+        ppg_fs=PPG_FS,
+        eda_fs=EDA_FS,
+        inference_stride_ms=100.0,
+        slow_window_sec=60.0,
+        diastole_threshold=dia_thresh,
+        exhalation_threshold=exh_thresh,
+        consecutive_frames_required=n,
+        config_path=CONFIG_PATH,
+    )
+
+
+def test_consecutive_frames_all_pass():
+    """All 10 frames high + N=3 → stim fires."""
+    pipe = _make_pipeline_n(n=3, dia_thresh=0.5, exh_thresh=0.5)
+
+    def _mock_forward(x):
+        B = x.shape[0]
+        return torch.full((B, 10, 2), 5.0)  # all high
+
+    pipe._phase_detector.forward = _mock_forward
+    _calibrate_gate_in_band(pipe)
+
+    events = pipe.feed(_synthetic_ppg(FAST_WINDOW))
+    assert len(events) >= 1, "Expected stim event when all N frames pass"
+
+
+def test_consecutive_frames_partial_fail():
+    """Last frame high but frame [-3] low → N=3 blocks stim."""
+    pipe = _make_pipeline_n(n=3, dia_thresh=0.5, exh_thresh=0.5)
+
+    def _mock_forward(x):
+        B = x.shape[0]
+        out = torch.full((B, 10, 2), 5.0)
+        out[:, -3, 0] = -5.0  # frame at index -3: diastole low
+        return out
+
+    pipe._phase_detector.forward = _mock_forward
+    _calibrate_gate_in_band(pipe)
+
+    events = pipe.feed(_synthetic_ppg(FAST_WINDOW))
+    assert events == [], "Expected no stim when one of N frames fails diastole threshold"
+
+
+def test_consecutive_frames_config_read():
+    """Factory reads consecutive_frames_required from config and stores it."""
+    pipe = build_tinnitus_closed_loop_pipeline(config_path=CONFIG_PATH, device="cpu")
+    # config_tinnitus.yaml has consecutive_frames_required: 3
+    assert pipe._consecutive_n == 3, (
+        f"Expected _consecutive_n=3 from config, got {pipe._consecutive_n}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 10: latency regression — fast path mean < 50ms
+# ---------------------------------------------------------------------------
+
 def test_latency_regression():
     """Fast path (denoise + inference) runs in < 50ms mean over 50 calls."""
     pipe = _make_pipeline()

@@ -1957,3 +1957,29 @@ F16 COMPLETE — WESAD replay validation results (2026-04-06):
 
   Results: models/artifacts/replay_validation/wesad_replay_results.json
   Plot:    models/artifacts/replay_validation/wesad_replay_summary.png
+
+--------------------------------------------------------------------------------
+T-17. CONSECUTIVE-FRAME GATING + DIASTOLE THRESHOLD TUNING (F17, 2026-04-07)
+--------------------------------------------------------------------------------
+Zero-retraining improvements to cut stim rate from 206/min.
+
+Changes:
+  config_tinnitus.yaml:
+    closed_loop.diastole_threshold: 0.5 → 0.65 (stricter diastole gate)
+    closed_loop.consecutive_frames_required: 3 (600ms of agreement required)
+
+  src/models/tinnitus_closed_loop.py:
+    TinnitusClosedLoopPipeline.__init__(): added consecutive_frames_required param
+    _run_fast_path(): replaced single last-frame check with np.all() over last N frames
+    build_tinnitus_closed_loop_pipeline(): reads consecutive_frames_required from config
+
+Logic: PhaseDetector outputs (B, 10, 2) at 5Hz. Fast path runs every 100ms.
+  With N=3, requires frames[-3:] all above threshold before firing — 600ms agreement.
+  With diastole_threshold=0.65, requires sigmoid > 0.65 (not just 0.5).
+  Expected stim rate: ~30-60/min (down from 206/min). No retraining needed.
+
+Tests: 3 new tests in test_tinnitus_closed_loop.py:
+  test_consecutive_frames_all_pass   — all 10 frames high + N=3 fires
+  test_consecutive_frames_partial_fail — frame[-3] low + N=3 blocks
+  test_consecutive_frames_config_read  — factory reads N=3 from config
+15/15 tests passing. Full suite: 488 passing, 3 pre-existing failures.

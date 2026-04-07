@@ -95,9 +95,10 @@ class TinnitusClosedLoopPipeline:
         eda_fs:               Expected EDA sampling rate in Hz (default 4)
         inference_stride_ms:  Fast-path stride in ms (default 100)
         slow_window_sec:      Slow-path window length in seconds (default 60)
-        diastole_threshold:   Sigmoid threshold for diastole binary decision
-        exhalation_threshold: Sigmoid threshold for exhalation binary decision
-        config_path:          Path to config YAML (used for artifact correction)
+        diastole_threshold:          Sigmoid threshold for diastole binary decision
+        exhalation_threshold:        Sigmoid threshold for exhalation binary decision
+        consecutive_frames_required: N consecutive agreeing frames before firing (F17, default 1)
+        config_path:                 Path to config YAML (used for artifact correction)
     """
 
     def __init__(
@@ -112,6 +113,7 @@ class TinnitusClosedLoopPipeline:
         slow_window_sec: float = 60.0,
         diastole_threshold: float = 0.5,
         exhalation_threshold: float = 0.5,
+        consecutive_frames_required: int = 1,
         config_path: str = "config_tinnitus.yaml",
     ) -> None:
         self._phase_detector = phase_detector
@@ -122,6 +124,7 @@ class TinnitusClosedLoopPipeline:
         self._eda_fs = float(eda_fs)
         self._dia_threshold = float(diastole_threshold)
         self._exh_threshold = float(exhalation_threshold)
+        self._consecutive_n = max(1, int(consecutive_frames_required))
         self._config_path = config_path
 
         # Window / stride sizes in samples (PPG domain)
@@ -273,12 +276,14 @@ class TinnitusClosedLoopPipeline:
         # Sigmoid probabilities — (10, 2)
         probs = torch.sigmoid(logits)[0].cpu().numpy()
 
-        # Tri-fold check on last frame
-        last_dia_prob = float(probs[-1, 0])
-        last_exh_prob = float(probs[-1, 1])
-
-        if last_dia_prob <= self._dia_threshold or last_exh_prob <= self._exh_threshold:
+        # Tri-fold check: last N frames must all exceed thresholds (F17 consecutive-frame gate)
+        N = min(self._consecutive_n, probs.shape[0])
+        dia_window = probs[-N:, 0]
+        exh_window = probs[-N:, 1]
+        if not (np.all(dia_window > self._dia_threshold) and np.all(exh_window > self._exh_threshold)):
             return None
+        last_dia_prob = float(dia_window[-1])
+        last_exh_prob = float(exh_window[-1])
 
         # EDA arousal gate check — uncalibrated gate blocks all stims
         try:
@@ -376,6 +381,7 @@ def build_tinnitus_closed_loop_pipeline(
     slow_window_sec = float(cl_cfg.get("slow_window_sec", 60.0))
     diastole_threshold = float(cl_cfg.get("diastole_threshold", 0.5))
     exhalation_threshold = float(cl_cfg.get("exhalation_threshold", 0.5))
+    consecutive_frames_required = int(cl_cfg.get("consecutive_frames_required", 1))
     use_arousal_classifier = cl_cfg.get("use_arousal_classifier", True)
 
     phase_detector = build_phase_detector(
@@ -410,5 +416,6 @@ def build_tinnitus_closed_loop_pipeline(
         slow_window_sec=slow_window_sec,
         diastole_threshold=diastole_threshold,
         exhalation_threshold=exhalation_threshold,
+        consecutive_frames_required=consecutive_frames_required,
         config_path=config_path,
     )

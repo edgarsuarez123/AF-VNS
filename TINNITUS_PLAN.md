@@ -250,6 +250,12 @@ F1 ─┬─> F2 ─────────────────────
   - 12/12 tests passing
 
 - [x] 16. **F16: Ultimate goal — tri-fold validation and (optional) joint modeling** — done 2026-04-06
+- [x] 17. **F17: Consecutive-frame gating + diastole threshold tuning** — done 2026-04-07
+  - `closed_loop.consecutive_frames_required: 3` — require 3 consecutive agreeing frames (600ms) before firing
+  - `closed_loop.diastole_threshold: 0.5 → 0.65` — stricter gate to cut false positives
+  - Modified `TinnitusClosedLoopPipeline._run_fast_path()` to check last N frames via `np.all(dia_window > thresh)`
+  - `build_tinnitus_closed_loop_pipeline()` reads `consecutive_frames_required` from config
+  - 3 new tests: all-pass N=3 fires, partial-fail N=3 blocks, config read; 15/15 tests passing
   - **SBIR end state:** stimulation only when **diastole ∧ exhalation ∧ EDA arousal-in-band** are simultaneously satisfied. Modular training (F10/F13/F14) + runtime AND (F12) is the shipping path; **F16 is where we prove and improve the full behavior on data.**
   - **Phase A — required:** **End-to-end offline replay** on **WESAD** (and optionally BIDMC where EDA absent: phase-only or simulated EDA). Feed synchronized PPG + EDA through `TinnitusClosedLoopPipeline` (or equivalent batch harness). **Metrics:** fraction of time all three gates true, false stim rate, latency, per-modality failure modes; compare to window-level phase labels and arousal ground truth where defined.
   - **Phase B — optional:** If labels for **simultaneous alignment** can be defined (e.g. frame-level AND of dia/exh/in-band on WESAD epochs), evaluate whether a **single fusion head** or **joint loss** beats the modular AND — research stretch, not required for first SBIR demo.
@@ -284,12 +290,9 @@ F1 ─┬─> F2 ─────────────────────
 - `models/artifacts/replay_validation/wesad_replay_results.json`
 - `models/artifacts/replay_validation/wesad_replay_summary.png`
 
-**Resume From Here:** All F1–F16 complete. Optional next steps:
-- LSL integration layer for real-time hardware deployment
-- Better phase detector training data (hardware resp signal)
+**Resume From Here:** F1–F16 complete. F17–F22 in progress (tri-fold gate improvements).
 
-**Remaining optional work:**
-- LSL integration layer for real-time hardware deployment
+**F17–F22 plan:** Improve all three gates via consecutive-frame gating, multi-channel PPG, skin-temp EDA feature, dual-model exhalation, sliding recalibration, and re-run replay validation.
 
 **WESAD status:** Extracted at `data/raw/tinnitus avns/wesad/WESAD/`. 75 records parsed.
 **Checkpoints:**
