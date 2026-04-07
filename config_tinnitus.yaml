@@ -192,6 +192,25 @@ arousal_classifier:
   cache_dir: models/artifacts/cache_tinnitus_arousal
   split_path: models/artifacts/tinnitus_arousal_split.json
 
+# F19 — V2 arousal classifier (6 features: +skin_temp_mean, finer hop)
+arousal_classifier_v2:
+  model_type: "gradient_boosting"
+  window_sec: 60
+  hop_sec: 15                       # F19: halved from 30 → doubles training data
+  n_estimators: 100
+  max_depth: 3
+  learning_rate: 0.1
+  features:
+    - tonic_scl_mean
+    - tonic_scl_std
+    - phasic_mean
+    - max_scr_amplitude
+    - scr_rate
+    - skin_temp_mean               # F19: wrist skin temperature from WESAD E4
+  checkpoint_path: models/checkpoints/arousal_classifier_v2.pkl
+  cache_dir: models/artifacts/cache_tinnitus_arousal_v2
+  split_path: models/artifacts/tinnitus_arousal_split.json  # reuse same subject split
+
 # F16 — Offline replay validation config
 replay_validation:
   chunk_sec: 1.0                    # Streaming chunk size (simulate real-time at 1s granularity)

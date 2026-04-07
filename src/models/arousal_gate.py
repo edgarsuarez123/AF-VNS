@@ -89,9 +89,13 @@ class ArousalGate:
         self._in_band: bool = False
         self._tonic_scl: float = float("nan")
 
-        # Current 5-feature EDA vector for classifier path — updated by update()
+        # Current EDA feature vector for classifier path — updated by update()
         self._current_features: Optional[np.ndarray] = None
         self._eda_fs: float = 0.0  # saved from last update() call
+
+        # Optional temperature ring buffer (F19)
+        self._temp_buffer: deque = deque()
+        self._temp_buffer_capacity: int = 0
 
         # Ring buffer — capacity set on first update() when fs is known
         self._buffer: deque = deque()
@@ -130,15 +134,21 @@ class ArousalGate:
     # Streaming update
     # ------------------------------------------------------------------
 
-    def update(self, new_samples: np.ndarray, fs: float) -> None:
+    def update(
+        self,
+        new_samples: np.ndarray,
+        fs: float,
+        temp_samples: Optional[np.ndarray] = None,
+    ) -> None:
         """Append new EDA samples to ring buffer, recompute tonic + gate state.
 
-        Also updates the 5-feature EDA vector used by the classifier path.
+        Also updates the feature EDA vector used by the classifier path.
 
         Parameters
         ----------
         new_samples : 1D EDA samples in µS
         fs : sampling rate of new_samples in Hz
+        temp_samples : optional 1D skin temperature samples (°C) at same fs (F19)
         """
         new_samples = np.asarray(new_samples, dtype=np.float64).ravel()
         self._eda_fs = float(fs)
@@ -147,11 +157,19 @@ class ArousalGate:
         capacity = max(1, int(self._buffer_sec * fs))
         if self._buffer_capacity != capacity:
             self._buffer_capacity = capacity
+            self._temp_buffer_capacity = capacity
 
-        # Append and trim to capacity
+        # Append and trim EDA to capacity
         self._buffer.extend(new_samples.tolist())
         while len(self._buffer) > self._buffer_capacity:
             self._buffer.popleft()
+
+        # Append and trim temperature to capacity (F19)
+        if temp_samples is not None:
+            temp_arr = np.asarray(temp_samples, dtype=np.float64).ravel()
+            self._temp_buffer.extend(temp_arr.tolist())
+            while len(self._temp_buffer) > self._temp_buffer_capacity:
+                self._temp_buffer.popleft()
 
         if len(self._buffer) == 0:
             return
@@ -164,8 +182,11 @@ class ArousalGate:
         # Store last tonic value for get_state()
         self._tonic_scl = float(tonic[-1]) if len(tonic) > 0 else float("nan")
 
-        # --- Update 5-feature vector for classifier path ---
-        self._current_features = self._compute_features(tonic, phasic, buf, fs)
+        # Build optional temp buffer array for feature extraction (F19)
+        temp_buf = np.array(self._temp_buffer, dtype=np.float64) if len(self._temp_buffer) > 0 else None
+
+        # --- Update feature vector for classifier path ---
+        self._current_features = self._compute_features(tonic, phasic, buf, fs, temp_buf)
 
         # --- Rule-based path ---
         if self._calibrated:
@@ -189,11 +210,14 @@ class ArousalGate:
         phasic: np.ndarray,
         buf: np.ndarray,
         fs: float,
+        temp_buf: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        """Compute 5 EDA features from current buffer decomposition.
+        """Compute 5 or 6 EDA features from current buffer decomposition.
 
-        Returns (5,) float32: [tonic_scl_mean, tonic_scl_std, phasic_mean,
-                                max_scr_amplitude, scr_rate]
+        Returns (5,) float32 when temp_buf is None:
+            [tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amplitude, scr_rate]
+        Returns (6,) float32 when temp_buf is provided (F19):
+            [...5 features..., skin_temp_mean]
         """
         tonic_scl_mean = float(np.nanmean(tonic))
         tonic_scl_std = float(np.nanstd(tonic))
@@ -208,10 +232,13 @@ class ArousalGate:
             max_scr_amp = 0.0
             scr_rate = 0.0
 
-        return np.array(
-            [tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amp, scr_rate],
-            dtype=np.float32,
-        )
+        feats = [tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amp, scr_rate]
+
+        # F19: optional skin temperature feature
+        if temp_buf is not None and len(temp_buf) > 0:
+            feats.append(float(np.nanmean(temp_buf)))
+
+        return np.array(feats, dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Gate query

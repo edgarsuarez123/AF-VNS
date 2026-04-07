@@ -36,7 +36,9 @@ FEATURE_NAMES = [
     "max_scr_amplitude",
     "scr_rate",
 ]
+FEATURE_NAMES_V2 = FEATURE_NAMES + ["skin_temp_mean"]  # F19: adds skin temperature
 N_FEATURES = len(FEATURE_NAMES)
+N_FEATURES_V2 = len(FEATURE_NAMES_V2)
 
 
 # ---------------------------------------------------------------------------
@@ -59,24 +61,30 @@ def extract_eda_features_window(
     eda_window: np.ndarray,
     fs: float,
     scr_min_amplitude: float = 0.02,
+    temp_window: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    """Extract 5 EDA features from a single window.
+    """Extract EDA features from a single window.
 
     Parameters
     ----------
     eda_window : 1D float64 EDA signal in µS
     fs : sampling rate in Hz
     scr_min_amplitude : minimum phasic amplitude to count as an SCR
+    temp_window : optional 1D float64 skin temperature signal (°C). When provided,
+                  appends skin_temp_mean as 6th feature (F19).
 
     Returns
     -------
-    (N_FEATURES,) float32 — all NaN if decomposition fails or signal too short
+    (5,) or (6,) float32 — all NaN if decomposition fails or signal too short.
+    Number of features equals N_FEATURES (5) when temp_window is None,
+    N_FEATURES_V2 (6) when temp_window is provided.
     """
     from src.features.eda import decompose_eda, detect_scr_peaks
 
+    n_out = N_FEATURES_V2 if temp_window is not None else N_FEATURES
     min_samples = int(fs * 10)  # require at least 10s
     if len(eda_window) < min_samples:
-        return np.full(N_FEATURES, np.nan, dtype=np.float32)
+        return np.full(n_out, np.nan, dtype=np.float32)
 
     try:
         decomposed = decompose_eda(eda_window, fs)
@@ -94,13 +102,14 @@ def extract_eda_features_window(
         duration_min = len(eda_window) / fs / 60.0
         scr_rate = float(peaks["count"] / duration_min) if duration_min > 0 else 0.0
 
-        return np.array(
-            [tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amplitude, scr_rate],
-            dtype=np.float32,
-        )
+        feats = [tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amplitude, scr_rate]
+        if temp_window is not None:
+            skin_temp_mean = float(np.nanmean(temp_window)) if len(temp_window) > 0 else float("nan")
+            feats.append(skin_temp_mean)
+        return np.array(feats, dtype=np.float32)
     except Exception as exc:
         logger.debug("EDA feature extraction failed: %s", exc)
-        return np.full(N_FEATURES, np.nan, dtype=np.float32)
+        return np.full(n_out, np.nan, dtype=np.float32)
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +132,10 @@ def _get_base_subject_id(record: dict) -> str:
 # Main precompute
 # ---------------------------------------------------------------------------
 
-def precompute_arousal_cache(config_path: str = "config_tinnitus.yaml") -> dict:
+def precompute_arousal_cache(
+    config_path: str = "config_tinnitus.yaml",
+    config_section: str = "arousal_classifier",
+) -> dict:
     """Extract EDA arousal features from WESAD and save to cache.
 
     Returns a dict with counts: {"train": N, "val": N, "test": N, "total": N}
@@ -132,8 +144,9 @@ def precompute_arousal_cache(config_path: str = "config_tinnitus.yaml") -> dict:
 
     cfg = _load_config(config_path)
     eda_cfg = cfg.get("eda", {})
-    ac_cfg = cfg.get("arousal_classifier", {})
+    ac_cfg = cfg.get(config_section, cfg.get("arousal_classifier", {}))
     data_cfg = cfg.get("data", {})
+    use_temp = "skin_temp_mean" in ac_cfg.get("features", [])
 
     wesad_dir = data_cfg.get("wesad_subdir", "data/raw/tinnitus avns/wesad/WESAD")
     window_sec = float(ac_cfg.get("window_sec", 60))
@@ -192,6 +205,8 @@ def precompute_arousal_cache(config_path: str = "config_tinnitus.yaml") -> dict:
 
         eda = rec.get("eda_signal")
         eda_fs = rec.get("eda_fs")
+        temp = rec.get("temp_signal")  # F19: optional skin temperature
+        temp_fs = rec.get("temp_fs")
         label = int(rec.get("label", 0))
 
         if eda is None or eda_fs is None or len(eda) == 0:
@@ -201,16 +216,28 @@ def precompute_arousal_cache(config_path: str = "config_tinnitus.yaml") -> dict:
         win_samples = int(window_sec * eda_fs)
         hop_samples = max(1, int(hop_sec * eda_fs))
 
+        def _get_temp_win(start_eda: int, end_eda: int) -> Optional[np.ndarray]:
+            """Slice temp aligned to EDA window (both at same FS)."""
+            if not use_temp or temp is None or temp_fs is None:
+                return None
+            ratio = float(temp_fs) / float(eda_fs)
+            t_start = int(start_eda * ratio)
+            t_end = int(end_eda * ratio)
+            t_end = min(t_end, len(temp))
+            return temp[t_start:t_end].astype(np.float64) if t_end > t_start else None
+
         if len(eda) < win_samples:
             # Short epoch: use whole signal if at least 10s
-            feats = extract_eda_features_window(eda, eda_fs, scr_min_amplitude)
+            feats = extract_eda_features_window(
+                eda, eda_fs, scr_min_amplitude, _get_temp_win(0, len(eda)))
             split_features[split_name].append(feats)
             split_labels[split_name].append(label)
         else:
             start = 0
             while start + win_samples <= len(eda):
                 win = eda[start:start + win_samples]
-                feats = extract_eda_features_window(win, eda_fs, scr_min_amplitude)
+                feats = extract_eda_features_window(
+                    win, eda_fs, scr_min_amplitude, _get_temp_win(start, start + win_samples))
                 split_features[split_name].append(feats)
                 split_labels[split_name].append(label)
                 start += hop_samples
@@ -226,11 +253,12 @@ def precompute_arousal_cache(config_path: str = "config_tinnitus.yaml") -> dict:
         feats_list = split_features[split_name]
         labels_list = split_labels[split_name]
 
+        n_feat = N_FEATURES_V2 if use_temp else N_FEATURES
         if feats_list:
             feats_arr = np.stack(feats_list, axis=0).astype(np.float32)
             labels_arr = np.array(labels_list, dtype=np.int32)
         else:
-            feats_arr = np.zeros((0, N_FEATURES), dtype=np.float32)
+            feats_arr = np.zeros((0, n_feat), dtype=np.float32)
             labels_arr = np.zeros(0, dtype=np.int32)
 
         np.save(str(Path(cache_dir) / f"{split_name}_features.npy"), feats_arr)
@@ -239,9 +267,10 @@ def precompute_arousal_cache(config_path: str = "config_tinnitus.yaml") -> dict:
 
     total = sum(counts.values())
 
+    active_feature_names = FEATURE_NAMES_V2 if use_temp else FEATURE_NAMES
     meta = {
-        "feature_names": FEATURE_NAMES,
-        "n_features": N_FEATURES,
+        "feature_names": active_feature_names,
+        "n_features": len(active_feature_names),
         "window_sec": window_sec,
         "hop_sec": hop_sec,
         "counts": counts,
@@ -267,10 +296,12 @@ def main() -> None:
     )
     parser.add_argument("--config", default="config_tinnitus.yaml",
                         help="Path to config YAML (default: config_tinnitus.yaml)")
+    parser.add_argument("--config-section", default="arousal_classifier",
+                        help="Config section to read (e.g. arousal_classifier_v2 for F19)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    precompute_arousal_cache(args.config)
+    precompute_arousal_cache(args.config, config_section=args.config_section)
 
 
 if __name__ == "__main__":

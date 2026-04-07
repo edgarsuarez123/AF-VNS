@@ -228,6 +228,12 @@ def parse_wesad_dir(
             logger.warning("WESAD S%d: unexpected data structure: %s", s, exc)
             continue
 
+        # Extract wrist temperature (F19 — optional, same 4 Hz as EDA)
+        try:
+            temp_wrist = np.array(data["signal"]["wrist"]["TEMP"], dtype=np.float64).ravel()
+        except (KeyError, TypeError):
+            temp_wrist = None
+
         # Labels are at chest FS (700 Hz) — downsample to BVP FS (64 Hz) for epoch segmentation
         # DECISION: segment using BVP-rate labels to avoid sub-sample epoch boundaries
         bvp_label_indices = np.round(
@@ -257,6 +263,7 @@ def parse_wesad_dir(
             eda_labels=eda_labels,
             resp=resp_resampled,
             label_map=label_map,
+            temp=temp_wrist,
         )
         records.extend(epoch_records)
 
@@ -272,6 +279,7 @@ def _segment_wesad_epochs(
     eda_labels: np.ndarray,
     resp: np.ndarray,
     label_map: dict,
+    temp: Optional[np.ndarray] = None,
 ) -> List[TinnitusRecordDict]:
     """Segment continuous WESAD signals into per-label-epoch records."""
     records: List[TinnitusRecordDict] = []
@@ -311,6 +319,14 @@ def _segment_wesad_epochs(
         if len(bvp_epoch) < min_bvp_samples:
             continue
 
+        # Temperature epoch (F19) — same index range as EDA (both at 4 Hz)
+        temp_epoch = None
+        if temp is not None and len(temp) > 0:
+            temp_start = int(start_bvp * _WESAD_TEMP_FS / _WESAD_BVP_FS)
+            temp_end = int(end_bvp * _WESAD_TEMP_FS / _WESAD_BVP_FS)
+            temp_end = min(temp_end, len(temp))
+            temp_epoch = temp[temp_start:temp_end].astype(np.float64) if temp_end > temp_start else None
+
         records.append({
             "subject_id": f"wesad_S{subject_id}_{label_name}_{i}",
             "ppg_signal": bvp_epoch,
@@ -320,6 +336,8 @@ def _segment_wesad_epochs(
             "resp_channel": "chest_belt",
             "eda_signal": eda_epoch if len(eda_epoch) > 0 else None,
             "eda_fs": _WESAD_EDA_FS if len(eda_epoch) > 0 else None,
+            "temp_signal": temp_epoch,
+            "temp_fs": _WESAD_TEMP_FS if temp_epoch is not None else None,
             "label": mapped_label,
             "session_id": f"S{subject_id}",
             "condition": label_name,

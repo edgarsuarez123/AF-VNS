@@ -172,13 +172,17 @@ class TinnitusClosedLoopPipeline:
         self,
         ppg_samples: np.ndarray,
         eda_samples: Optional[np.ndarray] = None,
+        temp_samples: Optional[np.ndarray] = None,
     ) -> list[TinnitusStimEvent]:
-        """Feed PPG (and optionally EDA) samples into the pipeline.
+        """Feed PPG (and optionally EDA / temperature) samples into the pipeline.
 
         Args:
             ppg_samples:  1-D float array of PPG values at ppg_fs Hz.
             eda_samples:  Optional 1-D float array of EDA values at eda_fs Hz.
                           If provided, updates the ArousalGate ring buffer.
+            temp_samples: Optional 1-D float array of skin temperature (°C) at
+                          eda_fs Hz (F19). Forwarded to ArousalGate for 6-feature
+                          classifier path when provided.
 
         Returns:
             List of TinnitusStimEvent objects triggered during this call
@@ -191,7 +195,11 @@ class TinnitusClosedLoopPipeline:
         if eda_samples is not None:
             eda_arr = np.asarray(eda_samples, dtype=np.float64).ravel()
             if len(eda_arr) > 0:
-                self._arousal_gate.update(eda_arr, self._eda_fs)
+                temp_arr = (
+                    np.asarray(temp_samples, dtype=np.float64).ravel()
+                    if temp_samples is not None else None
+                )
+                self._arousal_gate.update(eda_arr, self._eda_fs, temp_samples=temp_arr)
 
         for s in ppg_samples:
             self._ppg_buffer.append(float(s))

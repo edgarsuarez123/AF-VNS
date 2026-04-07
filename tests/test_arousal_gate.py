@@ -156,3 +156,57 @@ def test_config_loaded():
     assert gate._high_sigma == float(eda_cfg["high_threshold_sigma"])
     assert gate._frame_rate_hz == float(eda_cfg["frame_rate_hz"])
     assert gate._calibration_sec == float(eda_cfg["calibration_sec"])
+
+
+# ---------------------------------------------------------------------------
+# F19: skin temperature support
+# ---------------------------------------------------------------------------
+
+def test_update_with_temp_samples_produces_6_features():
+    """update() with temp_samples appends skin_temp_mean as 6th feature."""
+    gate = _make_gate()
+    gate.calibrate(_flat_signal(1.0, duration_sec=120.0), FS)
+
+    eda = _flat_signal(1.0, duration_sec=30.0)
+    temp = np.full(len(eda), 33.5, dtype=np.float64)
+    gate.update(eda, FS, temp_samples=temp)
+
+    assert gate._current_features is not None
+    assert len(gate._current_features) == 6
+    assert abs(float(gate._current_features[5]) - 33.5) < 0.1
+
+
+def test_update_without_temp_samples_produces_5_features():
+    """update() without temp_samples returns 5-feature vector (backward compat)."""
+    gate = _make_gate()
+    gate.calibrate(_flat_signal(1.0, duration_sec=120.0), FS)
+
+    gate.update(_flat_signal(1.0, duration_sec=30.0), FS)
+
+    assert gate._current_features is not None
+    assert len(gate._current_features) == 5
+
+
+def test_temp_buffer_accumulates_and_trims():
+    """Temperature ring buffer grows up to buffer capacity and does not exceed it."""
+    gate = ArousalGate(config_path=CONFIG_PATH, buffer_sec=10.0)
+
+    # Send more than buffer_sec worth of data
+    eda = _flat_signal(1.0, duration_sec=15.0)
+    temp = np.linspace(30.0, 35.0, len(eda))
+    gate.update(eda, FS, temp_samples=temp)
+
+    # Buffer should be capped at capacity
+    expected_cap = int(10.0 * FS)
+    assert len(gate._temp_buffer) <= expected_cap
+
+
+def test_update_with_temp_none_keeps_5_features():
+    """Passing temp_samples=None explicitly keeps 5-feature vector."""
+    gate = _make_gate()
+    gate.calibrate(_flat_signal(1.0, duration_sec=120.0), FS)
+
+    gate.update(_flat_signal(1.0, duration_sec=30.0), FS, temp_samples=None)
+
+    assert gate._current_features is not None
+    assert len(gate._current_features) == 5
