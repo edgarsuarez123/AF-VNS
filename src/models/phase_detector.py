@@ -35,6 +35,7 @@ class PhaseDetectorConfig:
     n_frames: int = 10       # output frames per window (2s × 5Hz)
     n_tasks: int = 2         # diastole + exhalation
     input_samples: int = 500  # 2s @ 250Hz
+    in_channels: int = 1     # input channels (F18: 3 = raw PPG + VPG + APG)
 
 
 class PhaseDetector(nn.Module):
@@ -46,7 +47,7 @@ class PhaseDetector(nn.Module):
 
         # Backbone: Conv1d + BN + ReLU blocks (bias=False — BN absorbs it)
         layers: list[nn.Module] = []
-        in_ch = 1
+        in_ch = cfg.in_channels
         for out_ch, k, s in zip(cfg.channels, cfg.kernels, cfg.strides):
             layers.extend([
                 nn.Conv1d(in_ch, out_ch, kernel_size=k, stride=s, bias=False),
@@ -73,9 +74,9 @@ class PhaseDetector(nn.Module):
             raise ValueError(
                 f"PhaseDetector expected (B, 1, {self.cfg.input_samples}); got {tuple(x.shape)}"
             )
-        if x.shape[1] != 1:
+        if x.shape[1] != self.cfg.in_channels:
             raise ValueError(
-                f"PhaseDetector expected 1 input channel; got {x.shape[1]}"
+                f"PhaseDetector expected {self.cfg.in_channels} input channel(s); got {x.shape[1]}"
             )
         if x.shape[2] != self.cfg.input_samples:
             raise ValueError(
@@ -122,6 +123,7 @@ def build_phase_detector(
         n_frames=int(m.get("n_frames", 10)),
         n_tasks=int(m.get("n_tasks", 2)),
         input_samples=int(m.get("input_samples", 500)),
+        in_channels=int(m.get("in_channels", 1)),
     )
     model = PhaseDetector(cfg)
 

@@ -261,13 +261,29 @@ class TinnitusClosedLoopPipeline:
         # Bandpass denoise (Butterworth 0.5–8 Hz)
         ppg_denoised = denoise_ppg(ppg_window, self._ppg_fs, config_path=self._config_path)
 
-        # Build tensor: (1, 1, 250)
-        tensor = (
-            torch.tensor(ppg_denoised, dtype=torch.float32)
-            .unsqueeze(0)
-            .unsqueeze(0)
-            .to(self._device)
-        )
+        # Build input tensor — single or multi-channel depending on model config
+        in_ch = getattr(self._phase_detector.cfg, "in_channels", 1)
+        if in_ch == 3:
+            # F18: compute VPG (1st deriv) + APG (2nd deriv), z-normalize each
+            ppg_f = ppg_denoised.astype(np.float32)
+            vpg = np.diff(ppg_f, prepend=ppg_f[:1])
+            apg = np.diff(vpg, prepend=vpg[:1])
+            channels = []
+            for ch in (ppg_f, vpg, apg):
+                std = float(ch.std())
+                channels.append((ch - ch.mean()) / std if std > 1e-8 else ch)
+            tensor = (
+                torch.tensor(np.stack(channels, axis=0), dtype=torch.float32)
+                .unsqueeze(0)   # (1, 3, 250)
+                .to(self._device)
+            )
+        else:
+            tensor = (
+                torch.tensor(ppg_denoised, dtype=torch.float32)
+                .unsqueeze(0)
+                .unsqueeze(0)   # (1, 1, 250)
+                .to(self._device)
+            )
 
         # Model forward — output (1, 10, 2) logits
         with torch.no_grad():

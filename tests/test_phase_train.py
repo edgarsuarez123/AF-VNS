@@ -408,3 +408,97 @@ class TestPhaseDetectorPPGConfig:
         assert out.shape == (2, 10, 2), (
             f"Expected (2, 10, 2), got {tuple(out.shape)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# F18: Multi-channel PPG (in_channels=3) tests
+# ---------------------------------------------------------------------------
+
+class TestPhaseDetectorMultiChannel:
+    """Verify PhaseDetector supports in_channels=3 (raw PPG + VPG + APG)."""
+
+    def test_forward_3channel(self):
+        """Forward pass (B, 3, 250) -> (B, 10, 2) with in_channels=3."""
+        from src.models.phase_detector import PhaseDetector, PhaseDetectorConfig
+
+        cfg = PhaseDetectorConfig(input_samples=250, in_channels=3)
+        model = PhaseDetector(cfg)
+        model.eval()
+
+        x = torch.randn(4, 3, 250)
+        with torch.no_grad():
+            out = model(x)
+        assert out.shape == (4, 10, 2), f"Expected (4, 10, 2), got {tuple(out.shape)}"
+
+    def test_backward_compat_1channel(self):
+        """Default in_channels=1 still produces correct output."""
+        from src.models.phase_detector import PhaseDetector, PhaseDetectorConfig
+
+        cfg = PhaseDetectorConfig(input_samples=250, in_channels=1)
+        model = PhaseDetector(cfg)
+        model.eval()
+
+        x = torch.randn(4, 1, 250)
+        with torch.no_grad():
+            out = model(x)
+        assert out.shape == (4, 10, 2)
+
+    def test_wrong_channel_count_raises(self):
+        """Passing 2-channel input to 3-channel model raises ValueError."""
+        from src.models.phase_detector import PhaseDetector, PhaseDetectorConfig
+        import pytest
+
+        cfg = PhaseDetectorConfig(input_samples=250, in_channels=3)
+        model = PhaseDetector(cfg)
+        model.eval()
+
+        x = torch.randn(2, 2, 250)
+        with pytest.raises(ValueError, match="input channel"):
+            model(x)
+
+    def test_build_phase_detector_v2_from_config(self):
+        """build_phase_detector reads phase_model_v2 and returns 3-channel model."""
+        from src.models.phase_detector import build_phase_detector
+
+        root = Path(__file__).resolve().parents[1]
+        cfg_path = str(root / "config_tinnitus.yaml")
+        model = build_phase_detector(cfg_path, model_section="phase_model_v2")
+        model.eval()
+
+        assert model.cfg.in_channels == 3
+        x = torch.randn(2, 3, 250)
+        with torch.no_grad():
+            out = model(x)
+        assert out.shape == (2, 10, 2)
+
+    def test_multichannel_dataset_shape(self, tmp_path):
+        """TinnitusPhaseDataset returns (3, 250) tensor when cache is 3-channel."""
+        import numpy as np
+        from src.training.tinnitus_phase_train import TinnitusPhaseDataset
+
+        # Create synthetic 3-channel cache
+        n = 20
+        np.save(tmp_path / "train_ppg.npy", np.random.randn(n, 3, 250).astype(np.float32))
+        np.save(tmp_path / "train_diastole.npy", np.zeros((n, 10), dtype=np.float32))
+        np.save(tmp_path / "train_exhalation.npy", np.zeros((n, 10), dtype=np.float32))
+        np.save(tmp_path / "train_quality.npy", np.ones((n, 10), dtype=np.float32))
+
+        ds = TinnitusPhaseDataset(tmp_path, "train")
+        ppg, dia, exh, qual = ds[0]
+        assert ppg.shape == (3, 250), f"Expected (3, 250), got {tuple(ppg.shape)}"
+        assert dia.shape == (10,)
+
+    def test_single_channel_dataset_shape(self, tmp_path):
+        """TinnitusPhaseDataset returns (1, 250) tensor when cache is single-channel."""
+        import numpy as np
+        from src.training.tinnitus_phase_train import TinnitusPhaseDataset
+
+        n = 20
+        np.save(tmp_path / "train_ppg.npy", np.random.randn(n, 250).astype(np.float32))
+        np.save(tmp_path / "train_diastole.npy", np.zeros((n, 10), dtype=np.float32))
+        np.save(tmp_path / "train_exhalation.npy", np.zeros((n, 10), dtype=np.float32))
+        np.save(tmp_path / "train_quality.npy", np.ones((n, 10), dtype=np.float32))
+
+        ds = TinnitusPhaseDataset(tmp_path, "train")
+        ppg, dia, exh, qual = ds[0]
+        assert ppg.shape == (1, 250), f"Expected (1, 250), got {tuple(ppg.shape)}"

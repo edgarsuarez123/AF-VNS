@@ -47,6 +47,23 @@ TARGET_FS = 125.0  # PhaseDetector input_samples=250 = 2s @ 125 Hz
 # Per-record processing
 # ---------------------------------------------------------------------------
 
+def _compute_vpg_apg(ppg_win: np.ndarray) -> np.ndarray:
+    """Compute VPG (1st deriv) + APG (2nd deriv) and return stacked (3, N) array.
+
+    Each channel is z-normalized independently.  Channels: [raw PPG, VPG, APG].
+    """
+    vpg = np.diff(ppg_win.astype(np.float32), prepend=ppg_win[:1])
+    apg = np.diff(vpg, prepend=vpg[:1])
+    channels = [ppg_win.astype(np.float32), vpg, apg]
+    out = []
+    for ch in channels:
+        std = float(ch.std())
+        if std > 1e-8:
+            ch = (ch - ch.mean()) / std
+        out.append(ch)
+    return np.stack(out, axis=0)  # (3, window_samples)
+
+
 def process_record(
     record: TinnitusRecordDict,
     config_path: str,
@@ -55,6 +72,7 @@ def process_record(
     min_valid_frames: int = 8,
     frame_rate_hz: float = 5.0,
     target_fs: float = TARGET_FS,
+    n_channels: int = 1,
 ) -> Optional[dict]:
     """Generate full-signal phase labels then slice into 2s PPG windows.
 
@@ -169,7 +187,11 @@ def process_record(
             n_skipped += 1
             continue
 
-        ppg_win = ppg[s: s + window_samples].astype(np.float32)
+        ppg_raw = ppg[s: s + window_samples]
+        if n_channels == 3:
+            ppg_win = _compute_vpg_apg(ppg_raw)  # (3, window_samples)
+        else:
+            ppg_win = ppg_raw.astype(np.float32)  # (window_samples,)
         q_win = np.fmin(
             dia_quality[frame_start:frame_end],
             exh_quality[frame_start:frame_end],
@@ -199,9 +221,9 @@ def process_record(
 
 def _process_record_wrapper(args):
     """Top-level picklable wrapper for ProcessPoolExecutor."""
-    record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, target_fs = args
+    record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, target_fs, n_channels = args
     return process_record(
-        record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, target_fs,
+        record, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, target_fs, n_channels,
     )
 
 
@@ -220,6 +242,7 @@ def build_tinnitus_cache(
     min_valid_frames: int = 8,
     frame_rate_hz: float = 5.0,
     target_fs: float = TARGET_FS,
+    n_channels: int = 1,
 ) -> dict:
     """Build tinnitus phase detection cache from pre-loaded records.
 
@@ -277,7 +300,7 @@ def build_tinnitus_cache(
     # --- Process records ---
     if workers > 1:
         args_list = [
-            (rec, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, target_fs)
+            (rec, config_path, window_sec, stride_sec, min_valid_frames, frame_rate_hz, target_fs, n_channels)
             for rec in records
         ]
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -327,7 +350,7 @@ def build_tinnitus_cache(
 
             result = process_record(
                 rec, config_path, window_sec, stride_sec,
-                min_valid_frames, frame_rate_hz, target_fs,
+                min_valid_frames, frame_rate_hz, target_fs, n_channels,
             )
             if result is None:
                 n_skipped_records += 1
@@ -359,8 +382,9 @@ def build_tinnitus_cache(
         split_lengths[name] = n
 
         if n == 0:
+            ppg_shape = (0, n_channels, window_samples) if n_channels > 1 else (0, window_samples)
             np.save(cache_dir / f"{name}_ppg.npy",
-                    np.zeros((0, window_samples), dtype=np.float32))
+                    np.zeros(ppg_shape, dtype=np.float32))
             np.save(cache_dir / f"{name}_diastole.npy",
                     np.zeros((0, frames_per_window), dtype=np.float32))
             np.save(cache_dir / f"{name}_exhalation.npy",
@@ -389,6 +413,7 @@ def build_tinnitus_cache(
         "stride_sec": stride_sec,
         "frame_rate_hz": frame_rate_hz,
         "target_fs": target_fs,
+        "n_channels": n_channels,
         "n_train": split_lengths.get("train", 0),
         "n_val": split_lengths.get("val", 0),
         "n_test": split_lengths.get("test", 0),
@@ -421,6 +446,8 @@ def main(
     config_path: str = CONFIG_PATH,
     workers: int = 1,
     dataset: str = "training",
+    n_channels: int = 1,
+    cache_dir_override: Optional[str] = None,
 ):
     """CLI entry: build tinnitus phase detection cache.
 
@@ -440,7 +467,8 @@ def main(
     min_valid = int(precompute_cfg.get("min_valid_frames", 8))
     frame_rate_hz = float(precompute_cfg.get("frame_rate_hz", 5.0))
 
-    cache_dir = Path(data_cfg.get("cache_dir", "models/artifacts/cache_tinnitus_phase"))
+    cache_dir = Path(cache_dir_override) if cache_dir_override else Path(
+        data_cfg.get("cache_dir", "models/artifacts/cache_tinnitus_phase"))
     split_path = data_cfg.get("split_path", "models/artifacts/tinnitus_phase_split.json")
 
     records: List[TinnitusRecordDict] = []
@@ -473,6 +501,7 @@ def main(
         stride_sec=stride_sec,
         min_valid_frames=min_valid,
         frame_rate_hz=frame_rate_hz,
+        n_channels=n_channels,
     )
 
 
@@ -487,5 +516,10 @@ if __name__ == "__main__":
                    help="Worker processes (0 = all cores). Default 1 = single-threaded.")
     p.add_argument("--dataset", choices=["training", "bidmc", "wesad"], default="training",
                    help="training=BIDMC+WESAD (default), bidmc=BIDMC only, wesad=WESAD only")
+    p.add_argument("--n-channels", type=int, default=1, choices=[1, 3],
+                   help="1=raw PPG only (default), 3=raw PPG + VPG + APG (F18 multi-channel)")
+    p.add_argument("--cache-dir", default=None,
+                   help="Override cache output directory (default: from config)")
     args = p.parse_args()
-    main(config_path=args.config, workers=args.workers, dataset=args.dataset)
+    main(config_path=args.config, workers=args.workers, dataset=args.dataset,
+         n_channels=args.n_channels, cache_dir_override=args.cache_dir)

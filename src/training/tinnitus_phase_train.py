@@ -38,7 +38,12 @@ CONFIG_PATH = "config_tinnitus.yaml"
 # ---------------------------------------------------------------------------
 
 class TinnitusPhaseDataset(PhaseDetectorDataset):
-    """Load 2s PPG windows + frame-level labels from tinnitus phase cache."""
+    """Load 2s PPG windows + frame-level labels from tinnitus phase cache.
+
+    Supports single-channel (N, 250) and multi-channel (N, C, 250) PPG arrays.
+    Multi-channel arrays (C>1) are returned as-is; single-channel arrays get
+    unsqueeze(0) to produce (1, 250) tensors for PhaseDetector.
+    """
 
     def __init__(self, cache_dir: Path, split: str = "train"):
         cache_dir = Path(cache_dir)
@@ -47,6 +52,19 @@ class TinnitusPhaseDataset(PhaseDetectorDataset):
         self._dia = np.load(cache_dir / f"{split}_diastole.npy", mmap_mode="r")
         self._exh = np.load(cache_dir / f"{split}_exhalation.npy", mmap_mode="r")
         self._qual = np.load(cache_dir / f"{split}_quality.npy", mmap_mode="r")
+        # Detect multi-channel: shape (N, C, W) vs single-channel (N, W)
+        self._multichannel = self._ecg.ndim == 3
+
+    def __getitem__(self, i: int):
+        raw = self._ecg[i].astype(np.float32)
+        if self._multichannel:
+            ppg = torch.from_numpy(raw)           # (C, W) — already channel-first
+        else:
+            ppg = torch.from_numpy(raw).unsqueeze(0)  # (1, W)
+        dia = torch.from_numpy(self._dia[i].astype(np.float32))
+        exh = torch.from_numpy(self._exh[i].astype(np.float32))
+        qual = torch.from_numpy(self._qual[i].astype(np.float32))
+        return ppg, dia, exh, qual
 
 
 # ---------------------------------------------------------------------------

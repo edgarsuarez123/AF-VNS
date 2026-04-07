@@ -74,6 +74,22 @@ phase_model:
   n_tasks: 2                        # diastole + exhalation
   input_samples: 250                # 2s × 125Hz (PPG native rate — not 500 like ECG @ 250Hz)
 
+# F18 — multi-channel PPG phase model (raw PPG + VPG + APG)
+phase_model_v2:
+  channels: [16, 32, 48]
+  kernels: [7, 5, 3]
+  strides: [5, 2, 2]
+  dropout: 0.1
+  n_frames: 10
+  n_tasks: 2
+  input_samples: 250
+  in_channels: 3              # raw PPG + VPG (1st deriv) + APG (2nd deriv)
+
+paths_v2:
+  phase_detect_checkpoint: models/checkpoints/tinnitus_phase_detector_v2.pth
+  cache_dir: models/artifacts/cache_tinnitus_phase_v2
+  split_path: models/artifacts/tinnitus_phase_split.json  # reuse same subject split
+
 # Phase detection precompute (2s windows)
 phase_precompute:
   window_sec: 2.0
