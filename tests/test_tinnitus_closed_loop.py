@@ -376,3 +376,108 @@ def test_latency_regression():
 
     mean_ms = float(np.mean(times_ms))
     assert mean_ms < 50.0, f"Fast path mean latency {mean_ms:.1f}ms exceeds 50ms threshold"
+
+
+# ---------------------------------------------------------------------------
+# F20: Dual-model exhalation detector
+# ---------------------------------------------------------------------------
+
+EXH_WINDOW = 750   # 6s @ 125 Hz
+
+
+def _make_pipeline_dual(dia_thresh: float = 0.5, exh_thresh: float = 0.5):
+    """Build pipeline with a dedicated exhalation PhaseDetector (F20)."""
+    # Shared diastole model: input_samples=250, n_tasks=2
+    phase_detector = PhaseDetector(PhaseDetectorConfig(input_samples=250, n_tasks=2))
+    phase_detector.eval()
+    # Exhalation model: input_samples=750, in_channels=2, n_tasks=1, n_frames=30
+    from src.models.phase_detector import PhaseDetectorConfig as PDC
+    exh_cfg = PDC(input_samples=750, in_channels=2, n_tasks=1, n_frames=30)
+    exh_detector = PhaseDetector(exh_cfg)
+    exh_detector.eval()
+    return TinnitusClosedLoopPipeline(
+        phase_detector=phase_detector,
+        autonomic_state=AutonomicState(AutonomicStateConfig()),
+        stim_recommender=StimRecommender(StimConfig()),
+        arousal_gate=ArousalGate(config_path=CONFIG_PATH),
+        ppg_fs=PPG_FS,
+        eda_fs=EDA_FS,
+        inference_stride_ms=100.0,
+        slow_window_sec=60.0,
+        diastole_threshold=dia_thresh,
+        exhalation_threshold=exh_thresh,
+        consecutive_frames_required=1,
+        config_path=CONFIG_PATH,
+        exh_detector=exh_detector,
+    )
+
+
+def test_dual_model_buffer_is_large_enough():
+    """With exh_detector set, PPG buffer maxlen >= 750 (6s window)."""
+    pipe = _make_pipeline_dual()
+    assert pipe._exh_window_samples == EXH_WINDOW
+    assert pipe._ppg_buffer.maxlen >= EXH_WINDOW
+
+
+def test_dual_model_fast_path_fires():
+    """Dual-model fast path fires when dia+exh both return high logits."""
+    pipe = _make_pipeline_dual(dia_thresh=0.5, exh_thresh=0.5)
+
+    def _mock_dia(x):
+        B = x.shape[0]
+        return torch.full((B, 10, 2), 5.0)
+
+    def _mock_exh(x):
+        B = x.shape[0]
+        return torch.full((B, 30, 1), 5.0)
+
+    pipe._phase_detector.forward = _mock_dia
+    pipe._exh_detector.forward = _mock_exh
+    _calibrate_gate_in_band(pipe)
+
+    # Feed 6s of PPG so exh buffer is full
+    events = pipe.feed(_synthetic_ppg(EXH_WINDOW))
+    assert len(events) >= 1, "Expected stim event with dual-model when both gates pass"
+
+
+def test_dual_model_exh_blocks_stim():
+    """Once exh buffer is full, dedicated exh returning low logits blocks stim."""
+    pipe = _make_pipeline_dual(dia_thresh=0.5, exh_thresh=0.5)
+
+    def _mock_dia(x):
+        B = x.shape[0]
+        return torch.full((B, 10, 2), 5.0)  # high dia AND high shared exh col
+
+    def _mock_exh(x):
+        B = x.shape[0]
+        return torch.full((B, 30, 1), -5.0)  # dedicated exh: all low
+
+    pipe._phase_detector.forward = _mock_dia
+    pipe._exh_detector.forward = _mock_exh
+    _calibrate_gate_in_band(pipe)
+
+    # Pre-fill PPG buffer to EXH_WINDOW samples so exh detector path is active
+    for s in _synthetic_ppg(EXH_WINDOW).tolist():
+        pipe._ppg_buffer.append(float(s))
+    # Reset stride counter so next feed immediately triggers fast path
+    pipe._samples_since_last_inference = pipe._stride_samples
+
+    # Feed one more stride — now buffer has >= 750 samples → exh detector path
+    events = pipe.feed(_synthetic_ppg(pipe._stride_samples))
+    assert events == [], "Dedicated exh detector returning low logits should block stim"
+
+
+def test_single_model_fallback_when_no_exh_detector():
+    """Without exh_detector, pipeline uses col 1 of shared model (backward compat)."""
+    pipe = _make_pipeline(diastole_threshold=0.5, exhalation_threshold=0.5)
+    assert pipe._exh_detector is None
+
+    def _mock_forward(x):
+        B = x.shape[0]
+        return torch.full((B, 10, 2), 5.0)
+
+    pipe._phase_detector.forward = _mock_forward
+    _calibrate_gate_in_band(pipe)
+
+    events = pipe.feed(_synthetic_ppg(FAST_WINDOW))
+    assert len(events) >= 1, "Single-model fallback should still fire stim"

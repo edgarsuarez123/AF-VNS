@@ -211,6 +211,34 @@ arousal_classifier_v2:
   cache_dir: models/artifacts/cache_tinnitus_arousal_v2
   split_path: models/artifacts/tinnitus_arousal_split.json  # reuse same subject split
 
+# F20 — Dedicated exhalation detector (6s window, 2-channel PPG + RIIV)
+exh_phase_model:
+  channels: [16, 32, 48]
+  kernels: [7, 5, 3]
+  strides: [5, 2, 2]
+  dropout: 0.1
+  n_frames: 30              # 6s × 5Hz output frames
+  n_tasks: 1                # exhalation only
+  input_samples: 750        # 6s × 125Hz
+
+exh_phase_precompute:
+  window_sec: 6.0
+  stride_sec: 0.2           # Dense overlap (same as diastole cache)
+  min_valid_frames: 20      # Skip windows with <20/30 non-NaN frames (2/3 coverage)
+  frame_rate_hz: 5.0
+
+exh_phase_training:
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  patience: 15
+  grad_clip: 1.0
+  label_smoothing: 0.1
+
+paths_exh:
+  phase_detect_checkpoint: models/checkpoints/tinnitus_exh_detector.pth
+  cache_dir: models/artifacts/cache_tinnitus_exh
+
 # F16 — Offline replay validation config
 replay_validation:
   chunk_sec: 1.0                    # Streaming chunk size (simulate real-time at 1s granularity)

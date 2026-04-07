@@ -115,8 +115,10 @@ class TinnitusClosedLoopPipeline:
         exhalation_threshold: float = 0.5,
         consecutive_frames_required: int = 1,
         config_path: str = "config_tinnitus.yaml",
+        exh_detector=None,
     ) -> None:
         self._phase_detector = phase_detector
+        self._exh_detector = exh_detector  # F20: optional dedicated exhalation CNN
         self._autonomic_state = autonomic_state
         self._stim_recommender = stim_recommender
         self._arousal_gate = arousal_gate
@@ -129,12 +131,15 @@ class TinnitusClosedLoopPipeline:
 
         # Window / stride sizes in samples (PPG domain)
         self._fast_window_samples = int(round(2.0 * self._ppg_fs))           # 250 @ 125 Hz
+        # F20: exh model uses 6s window — buffer must hold at least 750 samples
+        self._exh_window_samples = int(round(6.0 * self._ppg_fs))            # 750 @ 125 Hz
         self._slow_window_samples = int(round(slow_window_sec * self._ppg_fs))  # 7500 @ 125 Hz
         self._stride_samples = max(1, int(round(inference_stride_ms / 1000.0 * self._ppg_fs)))  # 13 @ 125 Hz
 
-        # PPG ring buffer — maxlen ensures automatic eviction of old data
+        # PPG ring buffer — maxlen large enough for slow path and exh model (6s)
+        _buf_size = max(self._slow_window_samples, self._exh_window_samples)
         self._ppg_buffer: collections.deque = collections.deque(
-            maxlen=self._slow_window_samples
+            maxlen=_buf_size
         )
 
         # Counters
@@ -300,14 +305,49 @@ class TinnitusClosedLoopPipeline:
         # Sigmoid probabilities — (10, 2)
         probs = torch.sigmoid(logits)[0].cpu().numpy()
 
-        # Tri-fold check: last N frames must all exceed thresholds (F17 consecutive-frame gate)
+        # Diastole check — from shared phase_detector (col 0)
         N = min(self._consecutive_n, probs.shape[0])
         dia_window = probs[-N:, 0]
-        exh_window = probs[-N:, 1]
-        if not (np.all(dia_window > self._dia_threshold) and np.all(exh_window > self._exh_threshold)):
+        if not np.all(dia_window > self._dia_threshold):
             return None
         last_dia_prob = float(dia_window[-1])
-        last_exh_prob = float(exh_window[-1])
+
+        # Exhalation check — F20: dedicated exh model if available, else shared model col 1
+        if self._exh_detector is not None and len(self._ppg_buffer) >= self._exh_window_samples:
+            # Build 6s two-channel (PPG + RIIV) tensor for exh model
+            from src.features.ppg_resp import extract_ppg_respiration
+            buf_6s = np.array(list(self._ppg_buffer)[-self._exh_window_samples:], dtype=np.float64)
+            ppg_6s_d = denoise_ppg(buf_6s, self._ppg_fs, config_path=self._config_path)
+            try:
+                riiv, _, _ = extract_ppg_respiration(ppg_6s_d, self._ppg_fs, method="riiv",
+                                                     config_path=self._config_path)
+            except Exception:
+                riiv = np.zeros(len(ppg_6s_d), dtype=np.float64)
+            ppg_f6 = ppg_6s_d.astype(np.float32)
+            riiv_f = riiv.astype(np.float32)
+            channels_6s = []
+            for ch in (ppg_f6, riiv_f):
+                std = float(ch.std())
+                channels_6s.append((ch - ch.mean()) / std if std > 1e-8 else ch - ch.mean())
+            exh_tensor = (
+                torch.tensor(np.stack(channels_6s, axis=0), dtype=torch.float32)
+                .unsqueeze(0)   # (1, 2, 750)
+                .to(self._device)
+            )
+            with torch.no_grad():
+                exh_logits = self._exh_detector(exh_tensor)   # (1, 30, 1)
+            exh_probs = torch.sigmoid(exh_logits)[0, :, 0].cpu().numpy()  # (30,)
+            N_exh = min(self._consecutive_n, len(exh_probs))
+            exh_window_arr = exh_probs[-N_exh:]
+            if not np.all(exh_window_arr > self._exh_threshold):
+                return None
+            last_exh_prob = float(exh_window_arr[-1])
+        else:
+            # Fallback: use shared model col 1 (2s window)
+            exh_window = probs[-N:, 1]
+            if not np.all(exh_window > self._exh_threshold):
+                return None
+            last_exh_prob = float(exh_window[-1])
 
         # EDA arousal gate check — uncalibrated gate blocks all stims
         try:
@@ -429,6 +469,29 @@ def build_tinnitus_closed_loop_pipeline(
 
     arousal_gate = ArousalGate(config_path=config_path, classifier=classifier)
 
+    # F20: load dedicated exhalation detector if checkpoint exists
+    exh_detector = None
+    try:
+        paths_exh_cfg = cfg.get("paths_exh", {})
+        exh_ckpt = paths_exh_cfg.get(
+            "phase_detect_checkpoint", "models/checkpoints/tinnitus_exh_detector.pth"
+        )
+        if not Path(exh_ckpt).is_absolute():
+            exh_ckpt = str(_root / exh_ckpt)
+        if Path(exh_ckpt).exists():
+            exh_detector = build_phase_detector(
+                config_path=config_path,
+                checkpoint_path=exh_ckpt,
+                device=device,
+                model_section="exh_phase_model",
+            )
+            exh_detector.eval()
+            logger.info("Loaded dedicated exhalation detector from %s (F20)", exh_ckpt)
+        else:
+            logger.info("No exh detector checkpoint at %s — using shared model for exhalation", exh_ckpt)
+    except Exception as exc:
+        logger.warning("Failed to load exh detector: %s", exc)
+
     return TinnitusClosedLoopPipeline(
         phase_detector=phase_detector,
         autonomic_state=autonomic_state,
@@ -442,4 +505,5 @@ def build_tinnitus_closed_loop_pipeline(
         exhalation_threshold=exhalation_threshold,
         consecutive_frames_required=consecutive_frames_required,
         config_path=config_path,
+        exh_detector=exh_detector,
     )
