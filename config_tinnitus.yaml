@@ -62,6 +62,11 @@ eda:
   high_threshold_sigma: 2.5         # SCL > baseline + N*sigma → hyperaroused → hold stimulation
   scr_min_amplitude: 0.02           # µS — minimum phasic SCR amplitude to count
   frame_rate_hz: 1.0                # Arousal gate update rate (EDA is slow — 4 Hz input, 1 Hz gate)
+  # F21 — sliding recalibration
+  sliding_recalibration: true       # Blend new baseline estimates into calibration over time
+  recalibration_window_sec: 300     # Rolling window size for new baseline estimate (5 min)
+  recalibration_interval_sec: 60    # Recalibrate every 60 seconds
+  recalibration_alpha: 0.3          # EMA blend factor (0=static, 1=full replacement)
 
 # Phase detector CNN — PPG input variant
 # Uses existing PhaseDetector class; only input_samples changes vs stroke config

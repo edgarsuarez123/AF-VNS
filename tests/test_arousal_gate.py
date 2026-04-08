@@ -210,3 +210,95 @@ def test_update_with_temp_none_keeps_5_features():
 
     assert gate._current_features is not None
     assert len(gate._current_features) == 5
+
+
+# ---------------------------------------------------------------------------
+# F21: sliding recalibration
+# ---------------------------------------------------------------------------
+
+def _make_gate_recal(alpha: float = 0.3) -> ArousalGate:
+    """Build ArousalGate with sliding recalibration config."""
+    import yaml
+    with open(CONFIG_PATH) as f:
+        cfg = yaml.safe_load(f)
+    cfg["eda"]["sliding_recalibration"] = True
+    cfg["eda"]["recalibration_window_sec"] = 30   # short window for testing
+    cfg["eda"]["recalibration_interval_sec"] = 10  # short interval for testing
+    cfg["eda"]["recalibration_alpha"] = alpha
+
+    import tempfile
+    import os
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(cfg, f)
+        tmp_path = f.name
+    try:
+        gate = ArousalGate(config_path=tmp_path)
+    finally:
+        os.unlink(tmp_path)
+    return gate
+
+
+def test_sliding_recal_shifts_baseline():
+    """After enough samples, sliding recalibration shifts cal_mean toward new baseline."""
+    gate = _make_gate_recal(alpha=0.3)
+
+    baseline = _flat_signal(1.0, duration_sec=120.0)
+    gate.calibrate(baseline, FS)
+    original_mean = gate._cal_mean
+
+    # Feed signal at a higher level for 2 minutes → recalibration should shift mean up
+    high_signal = _flat_signal(3.0, duration_sec=120.0)
+    gate.update(high_signal, FS)
+
+    # cal_mean should have drifted toward 3.0
+    assert gate._cal_mean > original_mean, (
+        f"Expected cal_mean to shift up after recal, got {gate._cal_mean:.4f} vs original {original_mean:.4f}"
+    )
+
+
+def test_sliding_recal_disabled_keeps_baseline_fixed():
+    """When sliding_recalibration=False, cal_mean stays fixed regardless of new data."""
+    gate = _make_gate()  # uses config as-is (sliding_recalibration may be true in config)
+    gate._sliding_recal = False  # force off
+
+    baseline = _flat_signal(1.0, duration_sec=120.0)
+    gate.calibrate(baseline, FS)
+    original_mean = gate._cal_mean
+
+    gate.update(_flat_signal(5.0, duration_sec=300.0), FS)
+
+    assert gate._cal_mean == original_mean, (
+        f"cal_mean should not change when recal disabled, got {gate._cal_mean:.4f}"
+    )
+
+
+def test_sliding_recal_ema_blend_math():
+    """Verify EMA blend: new_mean = (1-α)*old + α*new."""
+    gate = _make_gate_recal(alpha=0.5)
+
+    # Calibrate at 2.0 µS (flat → std≈0, but enough to set cal_mean)
+    gate.calibrate(_flat_signal(2.0, duration_sec=120.0), FS)
+    original_mean = gate._cal_mean
+
+    # Force a single recalibration step by directly calling the internals
+    gate._recal_buffer_capacity = 1000
+    gate._recal_buffer.extend(_flat_signal(4.0, duration_sec=250.0).tolist())
+    gate._samples_since_recal = int(gate._recal_interval_sec * FS) + 1
+    # Trigger recalibration via update() with a short chunk
+    gate.update(_flat_signal(4.0, duration_sec=1.0), FS)
+
+    # Mean should be between original (2.0) and 4.0
+    assert gate._cal_mean > original_mean
+    assert gate._cal_mean < 4.0, f"cal_mean {gate._cal_mean:.4f} should be blended, not fully replaced"
+
+
+def test_sliding_recal_get_state_includes_cal_fields():
+    """get_state() includes cal_mean, cal_std, and sliding_recalibration fields."""
+    gate = _make_gate()
+    gate.calibrate(_flat_signal(1.0, duration_sec=120.0), FS)
+
+    state = gate.get_state()
+    assert "sliding_recalibration" in state
+    assert "cal_mean" in state
+    assert "cal_std" in state
+    assert isinstance(state["sliding_recalibration"], bool)

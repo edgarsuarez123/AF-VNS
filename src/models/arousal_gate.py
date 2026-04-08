@@ -73,6 +73,12 @@ class ArousalGate:
         self._scr_min_amplitude: float = float(cfg.get("scr_min_amplitude", 0.02))
         self._buffer_sec: float = buffer_sec
 
+        # F21 — sliding recalibration config
+        self._sliding_recal: bool = bool(cfg.get("sliding_recalibration", False))
+        self._recal_window_sec: float = float(cfg.get("recalibration_window_sec", 300.0))
+        self._recal_interval_sec: float = float(cfg.get("recalibration_interval_sec", 60.0))
+        self._recal_alpha: float = float(cfg.get("recalibration_alpha", 0.3))
+
         # Optional trained classifier (F13)
         self._classifier = classifier
 
@@ -100,6 +106,11 @@ class ArousalGate:
         # Ring buffer — capacity set on first update() when fs is known
         self._buffer: deque = deque()
         self._buffer_capacity: int = 0
+
+        # F21 — sliding recalibration state
+        self._recal_buffer: deque = deque()   # accumulates recent EDA for new baseline
+        self._recal_buffer_capacity: int = 0  # set on first update() when fs is known
+        self._samples_since_recal: int = 0    # sample counter for recalibration interval
 
     # ------------------------------------------------------------------
     # Calibration (rule-based path only)
@@ -158,6 +169,7 @@ class ArousalGate:
         if self._buffer_capacity != capacity:
             self._buffer_capacity = capacity
             self._temp_buffer_capacity = capacity
+            self._recal_buffer_capacity = max(1, int(self._recal_window_sec * fs))
 
         # Append and trim EDA to capacity
         self._buffer.extend(new_samples.tolist())
@@ -203,6 +215,38 @@ class ArousalGate:
                 self._in_band = self._classifier.predict(self._current_features)
             except Exception as exc:
                 logger.debug("Classifier predict failed, keeping rule-based state: %s", exc)
+
+        # --- F21: sliding recalibration (rule-based path only) ---
+        if self._sliding_recal and self._calibrated:
+            # Accumulate samples into recalibration buffer
+            if self._recal_buffer_capacity > 0:
+                self._recal_buffer.extend(new_samples.tolist())
+                while len(self._recal_buffer) > self._recal_buffer_capacity:
+                    self._recal_buffer.popleft()
+
+            self._samples_since_recal += len(new_samples)
+            recal_interval_samples = max(1, int(self._recal_interval_sec * fs))
+
+            if (self._samples_since_recal >= recal_interval_samples
+                    and len(self._recal_buffer) >= int(10 * fs)):  # require ≥10s
+                self._samples_since_recal = 0
+                try:
+                    recal_buf = np.array(self._recal_buffer, dtype=np.float64)
+                    recal_decomp = decompose_eda(recal_buf, fs, method=self._decomp_method)
+                    recal_tonic = recal_decomp["tonic"]
+                    new_mean = float(np.nanmean(recal_tonic))
+                    new_std = float(np.nanstd(recal_tonic))
+                    if np.isfinite(new_mean) and np.isfinite(new_std) and new_std > 0:
+                        α = self._recal_alpha
+                        self._cal_mean = (1 - α) * self._cal_mean + α * new_mean
+                        self._cal_std = (1 - α) * self._cal_std + α * new_std
+                        self._low_thresh = self._cal_mean - self._low_sigma * self._cal_std
+                        self._high_thresh = self._cal_mean + self._high_sigma * self._cal_std
+                        logger.debug(
+                            "ArousalGate sliding recal: mean=%.4f  std=%.6f  band=[%.4f, %.4f]",
+                            self._cal_mean, self._cal_std, self._low_thresh, self._high_thresh)
+                except Exception as exc:
+                    logger.debug("Sliding recalibration failed, keeping prior baseline: %s", exc)
 
     def _compute_features(
         self,
@@ -283,6 +327,9 @@ class ArousalGate:
             "high_thresh": self._high_thresh,
             "calibrated": self._calibrated,
             "using_classifier": self._classifier is not None,
+            "sliding_recalibration": self._sliding_recal,
+            "cal_mean": self._cal_mean,
+            "cal_std": self._cal_std,
             "current_features": (
                 self._current_features.tolist()
                 if self._current_features is not None else None
