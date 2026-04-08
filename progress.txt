@@ -2051,3 +2051,35 @@ Changes:
 
 4 new F21 tests passing. Full suite (run via pytest tests/test_arousal_gate.py): 16/16.
 
+--------------------------------------------------------------------------------
+T-22. ALL CHECKPOINTS TRAINED — READY FOR F22 REPLAY (2026-04-07)
+--------------------------------------------------------------------------------
+All F18–F21 models trained and saved:
+
+  tinnitus_phase_detector_v2.pth  — F18 3-channel VPG/APG diastole CNN
+    Best avg_acc=0.6495 (dia=0.756, exh=0.539), early stop epoch 24
+    Marginal gain over v1 (0.617) — VPG/APG helps diastole slightly
+
+  arousal_classifier_v2.pkl  — F19 6-feature + 15s hop GBT
+    Trained on 2,737 windows (2× v1 thanks to 15s hop)
+    Features: tonic_scl_mean, tonic_scl_std, phasic_mean, max_scr_amplitude,
+              scr_rate, skin_temp_mean
+
+  tinnitus_exh_detector.pth  — F20 dedicated 6s RIIV exhalation CNN
+    Best exh_acc=0.5462, early stop epoch 17
+    Marginal over shared model (0.51) — label noise is the ceiling
+
+Fix applied:
+  exh_phase_model config section was missing in_channels: 2 → exh model built
+  with in_channels=1 and crashed on 2-channel input. Added to config.
+
+  tinnitus_train_arousal.py missing --config-section arg for v2. Added arg
+  and fixed feature importance logging to use FEATURE_NAMES_V2 when skin_temp
+  is in features list.
+
+Next: F22 — update tinnitus_replay_validation.py to load v2 components,
+  re-run WESAD replay, compare metrics vs F16 baseline (precision=0.065,
+  stim rate=206/min). F17 consecutive-frame gating alone expected to cut
+  stim rate ~5× without any retraining.
+
+

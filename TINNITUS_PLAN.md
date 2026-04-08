@@ -290,25 +290,33 @@ F1 ─┬─> F2 ─────────────────────
 - `models/artifacts/replay_validation/wesad_replay_results.json`
 - `models/artifacts/replay_validation/wesad_replay_summary.png`
 
-**Resume From Here:** F1–F21 complete. F22 (replay validation v2) is next.
+**Resume From Here:** F1–F21 complete + all checkpoints trained. **F22 is next.**
 
-**F17–F21 complete. Background training jobs running:**
-- v2 phase cache rebuild (3-channel VPG/APG): check `cache_v2_err.log`
-- v2 arousal cache rebuild (6-feature + 15s hop): check `arousal_v2_err.log`
-- After caches complete: train phase_model_v2 and arousal_classifier_v2
+**All checkpoints ready:**
+- `tinnitus_phase_detector.pth` — v1 baseline (avg=0.617, dia=0.72, exh=0.51)
+- `tinnitus_phase_detector_v2.pth` — F18 3-channel VPG/APG (avg=0.650, dia=0.756, exh=0.54) ✅
+- `tinnitus_exh_detector.pth` — F20 dedicated 6s RIIV exh (best exh_acc=0.546) ✅
+- `arousal_classifier.pkl` — v1 GBT (AUROC=0.930) ✅
+- `arousal_classifier_v2.pkl` — F19 6-feature + 15s hop GBT ✅
 
-**F22 — Re-run WESAD replay with all improvements:**
-- After checkpoints are ready: run `tinnitus_replay_validation.py` with v2 components
-- Compare vs F16 baseline: stim rate 206/min, tri-fold precision 0.065
-- Expected targets: stim rate <50/min, tri-fold precision >0.3
+**F22 — Re-run WESAD replay with all v2 components:**
 
-**WESAD status:** Extracted at `data/raw/tinnitus avns/wesad/WESAD/`. 75 records parsed.
-**Checkpoints:**
-- `tinnitus_phase_detector.pth` — baseline (avg=0.617, dia=0.72, exh=0.51)
-- `tinnitus_phase_detector_v2.pth` — 3-channel VPG/APG model (training pending)
-- `tinnitus_exh_detector.pth` — dedicated 6s exhalation model (training pending)
-- `arousal_classifier.pkl` — v1 GBT (test acc=0.859, AUROC=0.930)
-- `arousal_classifier_v2.pkl` — 6-feature + 15s hop GBT (training pending)
+Steps:
+1. Update `tinnitus_replay_validation.py`:
+   - Add `--use-v2` flag (or auto-detect checkpoints) that loads `phase_model_v2` + `exh_phase_model` + `arousal_classifier_v2`
+   - Add `replay_validation_v2` config section pointing to v2 checkpoint paths
+   - Save results to `models/artifacts/replay_validation_v2/`
+2. Run replay on WESAD, collect metrics
+3. Add comparison table (F16 vs F22) to this plan
+4. Update progress.txt, commit
+
+**Expected improvement vs F16 baseline:**
+| Metric | F16 | F22 target |
+|--------|-----|------------|
+| Stim rate | 206/min | <50/min (F17 consecutive frames alone should cut ~5×) |
+| Tri-fold precision | 0.065 | >0.15 |
+| Diastole acc | 0.72 | 0.76 (F18 VPG/APG) |
+| Exhalation acc | 0.51 | 0.55 (F20 6s RIIV) |
 
 ### F21 — Sliding EDA recalibration (2026-04-07)
 - `arousal_gate.py`: EMA blend of new baseline every `recalibration_interval_sec` seconds
