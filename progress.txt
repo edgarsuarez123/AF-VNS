@@ -107,7 +107,17 @@ T-22. F22 — RE-RUN WESAD REPLAY WITH V2 COMPONENTS (2026-04-08)
   All v2 checkpoints auto-loaded: tinnitus_phase_detector_v2.pth (3ch),
     tinnitus_exh_detector.pth (auto), arousal_classifier_v2.pkl (6-feat)
   41/42 tests passing (1 pre-existing integration failure needs WESAD data)
-  Status: REPLAY IN PROGRESS — check replay_v2_err.log for progress
+  Status: COMPLETE (13:40 UTC-4)
+  Results (F16 v1 → F22 v2):
+    Stim rate:          206.4 → 3.2 /min   (-203, F17 gating dominant effect)
+    Tri-fold precision: 0.065 → 0.052      (-0.013)
+    Tri-fold recall:    0.271 → 0.004      (-0.267, over-suppressed by N=3 consecutive frames)
+    Exh precision:      0.383 → 0.448      (+0.065, dedicated exh model helps)
+    Arousal precision:  0.347 → 0.370      (+0.023)
+  Key finding: F17 consecutive-frame gating (N=3, thresh=0.65) is the dominant driver.
+    F16 ran without it; F22 includes it. 98% stim reduction comes at cost of near-zero recall.
+    Clinically 3.2/min may be acceptable but recall collapse warrants threshold tuning.
+  Artifacts: models/artifacts/replay_validation_v2/
 
 T-14. PHASE ACCURACY EXPERIMENTS — LABEL SMOOTHING + WEIGHTED LOSS (2026-04-02)
   Added label_smoothing support to tinnitus_phase_train.py (reads from config, applies

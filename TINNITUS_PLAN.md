@@ -290,33 +290,29 @@ F1 ─┬─> F2 ─────────────────────
 - `models/artifacts/replay_validation/wesad_replay_results.json`
 - `models/artifacts/replay_validation/wesad_replay_summary.png`
 
-**Resume From Here:** F22 code complete. Replay running as background process (`replay_v2.log`/`replay_v2_err.log`). After it finishes, run `--compare` to generate table and update plan/progress.
+**F1–F22 COMPLETE.**
 
-**All checkpoints ready:**
-- `tinnitus_phase_detector.pth` — v1 baseline (avg=0.617, dia=0.72, exh=0.51)
-- `tinnitus_phase_detector_v2.pth` — F18 3-channel VPG/APG (avg=0.650, dia=0.756, exh=0.54) ✅
-- `tinnitus_exh_detector.pth` — F20 dedicated 6s RIIV exh (best exh_acc=0.546) ✅
-- `arousal_classifier.pkl` — v1 GBT (AUROC=0.930) ✅
-- `arousal_classifier_v2.pkl` — F19 6-feature + 15s hop GBT ✅
+### F22 Results — WESAD Tri-Fold Replay v2 (15 subjects, 75 epochs)
 
-**F22 — Re-run WESAD replay with all v2 components:**
+| Metric | F16 (v1) | F22 (v2) | Delta |
+|---|---|---|---|
+| Tri-fold precision | 0.065 | 0.052 | -0.013 |
+| Tri-fold recall | 0.271 | 0.004 | -0.267 |
+| Stim rate (/min) | 206.4 | 3.2 | **-203** |
+| Diastole precision | 0.313 | 0.295 | -0.018 |
+| Exhalation precision | 0.383 | 0.448 | **+0.065** |
+| Arousal precision | 0.347 | 0.370 | +0.023 |
 
-Steps:
-1. Update `tinnitus_replay_validation.py`:
-   - Add `--use-v2` flag (or auto-detect checkpoints) that loads `phase_model_v2` + `exh_phase_model` + `arousal_classifier_v2`
-   - Add `replay_validation_v2` config section pointing to v2 checkpoint paths
-   - Save results to `models/artifacts/replay_validation_v2/`
-2. Run replay on WESAD, collect metrics
-3. Add comparison table (F16 vs F22) to this plan
-4. Update progress.txt, commit
+**Key finding:** The dominant effect is **F17 consecutive-frame gating** (N=3, thresh=0.65), not the v2 model quality alone. F16 was run without F17; F22 includes it. The 98% stim rate reduction (206→3.2/min) comes primarily from requiring 3 consecutive diastole frames > 0.65 — a gate the phase detector (avg_acc=0.617) can rarely hold for 600ms, collapsing recall to 0.4%. Exhalation precision improved +6.5pp (dedicated exh model + skin temp arousal). Clinically, 3.2/min (~1 stim per 19s when all conditions align) may be the right regime, but the recall collapse means the pipeline is over-suppressing.
 
-**Expected improvement vs F16 baseline:**
-| Metric | F16 | F22 target |
-|--------|-----|------------|
-| Stim rate | 206/min | <50/min (F17 consecutive frames alone should cut ~5×) |
-| Tri-fold precision | 0.065 | >0.15 |
-| Diastole acc | 0.72 | 0.76 (F18 VPG/APG) |
-| Exhalation acc | 0.51 | 0.55 (F20 6s RIIV) |
+**Deliverables:**
+- `models/artifacts/replay_validation_v2/wesad_replay_results.json`
+- `models/artifacts/replay_validation_v2/wesad_replay_summary.png`
+
+**Next step:** The recall collapse (0.004) is the key open issue. Options:
+- Lower `consecutive_frames_required` to 2 (less strict debounce)
+- Lower `diastole_threshold` back toward 0.55 (balanced between F16's 0.5 and F17's 0.65)
+- Accept: 3.2/min is clinically appropriate; SBIR target is precision not recall
 
 ### F21 — Sliding EDA recalibration (2026-04-07)
 - `arousal_gate.py`: EMA blend of new baseline every `recalibration_interval_sec` seconds
