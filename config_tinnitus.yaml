@@ -225,6 +225,7 @@ exh_phase_model:
   n_frames: 30              # 6s × 5Hz output frames
   n_tasks: 1                # exhalation only
   input_samples: 750        # 6s × 125Hz
+  in_channels: 2            # raw PPG + RIIV respiratory proxy
 
 exh_phase_precompute:
   window_sec: 6.0
