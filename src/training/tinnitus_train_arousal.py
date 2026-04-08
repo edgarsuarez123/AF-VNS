@@ -39,6 +39,8 @@ def main() -> None:
         description="Train tinnitus arousal state classifier on WESAD EDA features"
     )
     parser.add_argument("--config", default="config_tinnitus.yaml")
+    parser.add_argument("--config-section", default="arousal_classifier",
+                        help="Config section to read (e.g. arousal_classifier_v2 for F19)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -47,7 +49,7 @@ def main() -> None:
     sys.path.insert(0, str(root))
 
     cfg = _load_config(args.config)
-    ac_cfg = cfg.get("arousal_classifier", {})
+    ac_cfg = cfg.get(args.config_section, cfg.get("arousal_classifier", {}))
 
     cache_dir = _resolve(
         ac_cfg.get("cache_dir", "models/artifacts/cache_tinnitus_arousal"), root
@@ -110,10 +112,12 @@ def main() -> None:
 
     # Feature importance (GBT only)
     if model_type == "gradient_boosting" and clf._model is not None:
-        from src.training.tinnitus_precompute_arousal import FEATURE_NAMES
+        from src.training.tinnitus_precompute_arousal import FEATURE_NAMES, FEATURE_NAMES_V2
+        use_v2 = "skin_temp_mean" in ac_cfg.get("features", [])
+        feat_names = FEATURE_NAMES_V2 if use_v2 else FEATURE_NAMES
         importances = clf._model.feature_importances_
         logger.info("Feature importances:")
-        for name, imp in sorted(zip(FEATURE_NAMES, importances), key=lambda x: -x[1]):
+        for name, imp in sorted(zip(feat_names, importances), key=lambda x: -x[1]):
             logger.info("  %-25s %.4f", name, imp)
 
     # ------------------------------------------------------------------
