@@ -2,7 +2,7 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-04-07
+Last updated: 2026-04-08
 
 --------------------------------------------------------------------------------
 TINNITUS PIPELINE — Branch: feature/tinnitus-avns (2026-04-02)
@@ -93,6 +93,21 @@ T-16. ULTIMATE GOAL — TRI-FOLD VALIDATION (F16, planned 2026-04-02)
   TINNITUS_PLAN.md: Phase A = end-to-end offline replay on WESAD (metrics: tri-fold
   coincidence, false stim, per-gate failure); Phase B optional = joint/fusion model if
   simultaneous-alignment labels exist. Modular AND (F12) remains shipping path.
+
+T-22. F22 — RE-RUN WESAD REPLAY WITH V2 COMPONENTS (2026-04-08)
+  Code complete. Replay running as background process (replay_v2.log/replay_v2_err.log).
+  Changes:
+    build_arousal_classifier(): added config_section param (default "arousal_classifier")
+    build_tinnitus_closed_loop_pipeline(): added phase_model_section/paths_section/arousal_config_section
+      params; resolves checkpoint from paths_section when not passed explicitly
+    tinnitus_replay_validation.py: temp_signal/temp_fs forwarding in replay_record();
+      _build_wesad_pipeline_v2() loads phase_model_v2+paths_v2+arousal_classifier_v2;
+      --use-v2 and --compare CLI flags; _print_comparison() for F16-vs-F22 table
+    config_tinnitus.yaml: replay_validation_v2 section (output_dir: models/artifacts/replay_validation_v2)
+  All v2 checkpoints auto-loaded: tinnitus_phase_detector_v2.pth (3ch),
+    tinnitus_exh_detector.pth (auto), arousal_classifier_v2.pkl (6-feat)
+  41/42 tests passing (1 pre-existing integration failure needs WESAD data)
+  Status: REPLAY IN PROGRESS — check replay_v2_err.log for progress
 
 T-14. PHASE ACCURACY EXPERIMENTS — LABEL SMOOTHING + WEIGHTED LOSS (2026-04-02)
   Added label_smoothing support to tinnitus_phase_train.py (reads from config, applies

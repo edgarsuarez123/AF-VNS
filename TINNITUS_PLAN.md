@@ -290,7 +290,7 @@ F1 ─┬─> F2 ─────────────────────
 - `models/artifacts/replay_validation/wesad_replay_results.json`
 - `models/artifacts/replay_validation/wesad_replay_summary.png`
 
-**Resume From Here:** F1–F21 complete + all checkpoints trained. **F22 is next.**
+**Resume From Here:** F22 code complete. Replay running as background process (`replay_v2.log`/`replay_v2_err.log`). After it finishes, run `--compare` to generate table and update plan/progress.
 
 **All checkpoints ready:**
 - `tinnitus_phase_detector.pth` — v1 baseline (avg=0.617, dia=0.72, exh=0.51)
