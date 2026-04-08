@@ -410,6 +410,9 @@ def build_tinnitus_closed_loop_pipeline(
     config_path: str = "config_tinnitus.yaml",
     checkpoint_path: Optional[str] = None,
     device: str = "cpu",
+    phase_model_section: str = "phase_model",
+    paths_section: str = "paths",
+    arousal_config_section: str = "arousal_classifier",
 ) -> TinnitusClosedLoopPipeline:
     """Build TinnitusClosedLoopPipeline from config.
 
@@ -417,9 +420,12 @@ def build_tinnitus_closed_loop_pipeline(
     eda_fs, inference_stride_ms, slow_window_sec, and thresholds.
 
     Args:
-        config_path:      Path to tinnitus config YAML.
-        checkpoint_path:  Optional PhaseDetector checkpoint path (default: from config).
-        device:           PyTorch device string ("cpu" or "cuda").
+        config_path:           Path to tinnitus config YAML.
+        checkpoint_path:       Optional PhaseDetector checkpoint path (default: from config).
+        device:                PyTorch device string ("cpu" or "cuda").
+        phase_model_section:   Config section for PhaseDetector architecture (default: "phase_model").
+        paths_section:         Config section for checkpoint paths (default: "paths").
+        arousal_config_section: Config section for ArousalClassifier (default: "arousal_classifier").
 
     Returns:
         Fully wired TinnitusClosedLoopPipeline ready to accept PPG + EDA samples.
@@ -448,10 +454,18 @@ def build_tinnitus_closed_loop_pipeline(
     consecutive_frames_required = int(cl_cfg.get("consecutive_frames_required", 1))
     use_arousal_classifier = cl_cfg.get("use_arousal_classifier", True)
 
+    # Resolve checkpoint from the specified paths_section if not explicitly passed
+    if checkpoint_path is None:
+        paths_cfg = cfg.get(paths_section, {})
+        ckpt_rel = paths_cfg.get("phase_detect_checkpoint")
+        if ckpt_rel:
+            checkpoint_path = str(_root / ckpt_rel) if not Path(ckpt_rel).is_absolute() else ckpt_rel
+
     phase_detector = build_phase_detector(
         config_path=config_path,
         checkpoint_path=checkpoint_path,
         device=device,
+        model_section=phase_model_section,
     )
     phase_detector.eval()
 
@@ -460,7 +474,7 @@ def build_tinnitus_closed_loop_pipeline(
 
     classifier = None
     if use_arousal_classifier:
-        clf = build_arousal_classifier(config_path=config_path)
+        clf = build_arousal_classifier(config_path=config_path, config_section=arousal_config_section)
         if clf._is_fitted:
             classifier = clf
             logger.info("ArousalGate using trained classifier")

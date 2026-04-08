@@ -253,6 +253,14 @@ replay_validation:
   output_dir: models/artifacts/replay_validation
   datasets: ["wesad"]               # ["wesad", "bidmc"] to include phase-only BIDMC
 
+# F22 — v2 replay validation (phase_model_v2 + arousal_classifier_v2)
+replay_validation_v2:
+  chunk_sec: 1.0
+  frame_rate_hz: 5.0
+  arousal_frame_rate_hz: 1.0
+  output_dir: models/artifacts/replay_validation_v2
+  datasets: ["wesad"]
+
 # WESAD label mapping
 wesad:
   label_map:

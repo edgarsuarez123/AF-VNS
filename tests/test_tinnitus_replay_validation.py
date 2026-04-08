@@ -182,7 +182,7 @@ class TestReplayRecord:
         from src.models.tinnitus_closed_loop import TinnitusStimEvent
 
         mock_pipeline = MagicMock()
-        mock_pipeline.feed.side_effect = lambda ppg, eda=None: [
+        mock_pipeline.feed.side_effect = lambda ppg, eda=None, temp_samples=None: [
             TinnitusStimEvent(
                 timestamp_samples=100,
                 amplitude=0.2,

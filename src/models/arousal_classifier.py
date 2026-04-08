@@ -278,6 +278,7 @@ class ArousalClassifier:
 def build_arousal_classifier(
     config_path: str = "config_tinnitus.yaml",
     checkpoint_path: Optional[str] = None,
+    config_section: str = "arousal_classifier",
 ) -> ArousalClassifier:
     """Build ArousalClassifier from config, loading checkpoint if it exists.
 
@@ -298,7 +299,7 @@ def build_arousal_classifier(
     with open(resolved) as f:
         cfg = yaml.safe_load(f)
 
-    ac_cfg = cfg.get("arousal_classifier", {})
+    ac_cfg = cfg.get(config_section, {})
     model_type = ac_cfg.get("model_type", "gradient_boosting")
 
     if checkpoint_path is None:

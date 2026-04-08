@@ -122,12 +122,77 @@ def _build_wesad_pipeline(
     checkpoint_path: Optional[str],
     device: str,
 ):
-    """Build TinnitusClosedLoopPipeline using the standard factory."""
+    """Build TinnitusClosedLoopPipeline using the standard v1 factory."""
     from src.models.tinnitus_closed_loop import build_tinnitus_closed_loop_pipeline
     return build_tinnitus_closed_loop_pipeline(
         config_path=config_path,
         checkpoint_path=checkpoint_path,
         device=device,
+    )
+
+
+def _build_wesad_pipeline_v2(
+    config_path: str,
+    device: str,
+):
+    """Build TinnitusClosedLoopPipeline with v2 components (F22).
+
+    Uses 3-channel phase detector (phase_model_v2/paths_v2), dedicated
+    exhalation detector (auto-loaded by factory), and v2 arousal classifier.
+    """
+    from src.models.tinnitus_closed_loop import build_tinnitus_closed_loop_pipeline
+    return build_tinnitus_closed_loop_pipeline(
+        config_path=config_path,
+        device=device,
+        phase_model_section="phase_model_v2",
+        paths_section="paths_v2",
+        arousal_config_section="arousal_classifier_v2",
+    )
+
+
+def _build_bidmc_pipeline_v2(
+    config_path: str,
+    checkpoint_path: Optional[str],
+    device: str,
+):
+    """Build BIDMC pipeline with v2 phase detector and AlwaysInBandGate."""
+    from src.data.dataset_parsers import load_config
+    from src.models.phase_detector import build_phase_detector
+    from src.models.autonomic_state import build_autonomic_state
+    from src.models.stim_recommender import build_stim_recommender
+    from src.models.tinnitus_closed_loop import TinnitusClosedLoopPipeline
+
+    cfg = load_config(config_path)
+    cl_cfg = cfg.get("closed_loop", {})
+    _root = Path(__file__).resolve().parents[2]
+
+    ckpt = checkpoint_path
+    if ckpt is None:
+        paths_v2 = cfg.get("paths_v2", {})
+        ckpt_rel = paths_v2.get("phase_detect_checkpoint")
+        if ckpt_rel:
+            ckpt = str(_root / ckpt_rel) if not Path(ckpt_rel).is_absolute() else ckpt_rel
+
+    phase_detector = build_phase_detector(
+        config_path=config_path,
+        checkpoint_path=ckpt,
+        device=device,
+        model_section="phase_model_v2",
+    )
+    phase_detector.eval()
+
+    return TinnitusClosedLoopPipeline(
+        phase_detector=phase_detector,
+        autonomic_state=build_autonomic_state(config_path=config_path),
+        stim_recommender=build_stim_recommender(config_path=config_path),
+        arousal_gate=AlwaysInBandGate(),
+        ppg_fs=float(cl_cfg.get("ppg_fs", 125.0)),
+        eda_fs=float(cl_cfg.get("eda_fs", 4.0)),
+        inference_stride_ms=float(cl_cfg.get("inference_stride_ms", 100.0)),
+        slow_window_sec=float(cl_cfg.get("slow_window_sec", 60.0)),
+        diastole_threshold=float(cl_cfg.get("diastole_threshold", 0.5)),
+        exhalation_threshold=float(cl_cfg.get("exhalation_threshold", 0.5)),
+        config_path=config_path,
     )
 
 
@@ -299,12 +364,14 @@ def replay_record(
     ppg_fs: float,
     eda_signal: Optional[np.ndarray] = None,
     eda_fs: Optional[float] = None,
+    temp_signal: Optional[np.ndarray] = None,
+    temp_fs: Optional[float] = None,
     chunk_sec: float = 1.0,
 ) -> list:
     """Feed one record through the pipeline in streaming 1-second chunks.
 
     Each chunk feeds chunk_sec * ppg_fs PPG samples and the time-aligned
-    EDA samples (chunk_sec * eda_fs). Simulates real-time data acquisition.
+    EDA and temperature samples. Simulates real-time data acquisition.
 
     Returns
     -------
@@ -313,6 +380,7 @@ def replay_record(
     ppg = np.asarray(ppg_signal, dtype=np.float64)
     chunk_ppg = max(1, int(round(chunk_sec * ppg_fs)))
     chunk_eda = max(1, int(round(chunk_sec * eda_fs))) if (eda_signal is not None and eda_fs) else 0
+    chunk_temp = max(1, int(round(chunk_sec * temp_fs))) if (temp_signal is not None and temp_fs) else 0
 
     events = []
     n_samples = len(ppg)
@@ -328,7 +396,14 @@ def replay_record(
                 dtype=np.float64,
             )
 
-        fired = pipeline.feed(ppg_chunk, eda_chunk)
+        temp_chunk = None
+        if temp_signal is not None and chunk_temp > 0:
+            temp_chunk = np.asarray(
+                temp_signal[i * chunk_temp: (i + 1) * chunk_temp],
+                dtype=np.float64,
+            )
+
+        fired = pipeline.feed(ppg_chunk, eda_chunk, temp_samples=temp_chunk)
         events.extend(fired)
 
     return events
@@ -518,6 +593,7 @@ def evaluate_wesad(
     checkpoint_path: Optional[str] = None,
     device: str = "cpu",
     output_dir: Optional[str] = None,
+    use_v2: bool = False,
 ) -> dict:
     """Run full WESAD tri-fold replay validation.
 
@@ -535,7 +611,8 @@ def evaluate_wesad(
 
     cfg = load_config(config_path)
     cl_cfg = cfg.get("closed_loop", {})
-    rv_cfg = cfg.get("replay_validation", {})
+    rv_section = "replay_validation_v2" if use_v2 else "replay_validation"
+    rv_cfg = cfg.get(rv_section, cfg.get("replay_validation", {}))
     ppg_fs = float(cl_cfg.get("ppg_fs", 125.0))
     stride_ms = float(cl_cfg.get("inference_stride_ms", 100.0))
     stride_samples = max(1, int(round(stride_ms / 1000.0 * ppg_fs)))
@@ -553,7 +630,10 @@ def evaluate_wesad(
         t_subject_start = time.time()
 
         # Build fresh pipeline per subject
-        pipeline = _build_wesad_pipeline(config_path, checkpoint_path, device)
+        if use_v2:
+            pipeline = _build_wesad_pipeline_v2(config_path, device)
+        else:
+            pipeline = _build_wesad_pipeline(config_path, checkpoint_path, device)
 
         # Find baseline epoch for EDA calibration
         baseline_eda: Optional[np.ndarray] = None
@@ -599,6 +679,8 @@ def evaluate_wesad(
                 ppg_fs=ppg_fs,
                 eda_signal=gt["eda_signal"],
                 eda_fs=gt["eda_fs"],
+                temp_signal=rec.get("temp_signal"),
+                temp_fs=rec.get("temp_fs"),
                 chunk_sec=chunk_sec,
             )
             elapsed = time.time() - t0
@@ -936,6 +1018,82 @@ def _plot_bidmc(results: dict, out: Path, prefix: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# F22 comparison utility
+# ---------------------------------------------------------------------------
+
+def _print_comparison(config_path: str = "config_tinnitus.yaml") -> None:
+    """Print side-by-side F16 (v1) vs F22 (v2) aggregate metrics."""
+    from src.data.dataset_parsers import load_config
+
+    cfg = load_config(config_path)
+    v1_dir = Path(cfg.get("replay_validation", {}).get(
+        "output_dir", "models/artifacts/replay_validation"
+    ))
+    v2_dir = Path(cfg.get("replay_validation_v2", {}).get(
+        "output_dir", "models/artifacts/replay_validation_v2"
+    ))
+
+    v1_path = v1_dir / "wesad_replay_results.json"
+    v2_path = v2_dir / "wesad_replay_results.json"
+
+    if not v1_path.exists():
+        logger.error("v1 results not found at %s — run without --use-v2 first", v1_path)
+        return
+    if not v2_path.exists():
+        logger.error("v2 results not found at %s — run with --use-v2 first", v2_path)
+        return
+
+    with open(v1_path) as f:
+        v1 = json.load(f)
+    with open(v2_path) as f:
+        v2 = json.load(f)
+
+    def agg(r, key, default=0.0):
+        return r.get("aggregate", {}).get(key, default)
+
+    def gate(r, name, metric):
+        return r.get("aggregate", {}).get("per_gate_mean", {}).get(name, {}).get(metric, 0.0)
+
+    rows = [
+        ("Metric", "F16 (v1)", "F22 (v2)", "Delta"),
+        ("-" * 30, "-" * 10, "-" * 10, "-" * 10),
+        ("Tri-fold precision",
+         f"{agg(v1,'trifold_precision'):.3f}",
+         f"{agg(v2,'trifold_precision'):.3f}",
+         f"{agg(v2,'trifold_precision') - agg(v1,'trifold_precision'):+.3f}"),
+        ("Tri-fold recall",
+         f"{agg(v1,'trifold_recall'):.3f}",
+         f"{agg(v2,'trifold_recall'):.3f}",
+         f"{agg(v2,'trifold_recall') - agg(v1,'trifold_recall'):+.3f}"),
+        ("Stim rate (/min)",
+         f"{agg(v1,'stim_rate_per_min'):.1f}",
+         f"{agg(v2,'stim_rate_per_min'):.1f}",
+         f"{agg(v2,'stim_rate_per_min') - agg(v1,'stim_rate_per_min'):+.1f}"),
+        ("Diastole precision",
+         f"{gate(v1,'diastole','precision'):.3f}",
+         f"{gate(v2,'diastole','precision'):.3f}",
+         f"{gate(v2,'diastole','precision') - gate(v1,'diastole','precision'):+.3f}"),
+        ("Exhalation precision",
+         f"{gate(v1,'exhalation','precision'):.3f}",
+         f"{gate(v2,'exhalation','precision'):.3f}",
+         f"{gate(v2,'exhalation','precision') - gate(v1,'exhalation','precision'):+.3f}"),
+        ("Arousal precision",
+         f"{gate(v1,'arousal','precision'):.3f}",
+         f"{gate(v2,'arousal','precision'):.3f}",
+         f"{gate(v2,'arousal','precision') - gate(v1,'arousal','precision'):+.3f}"),
+        ("N subjects",
+         str(v1.get("n_subjects", "?")),
+         str(v2.get("n_subjects", "?")),
+         ""),
+    ]
+
+    print("\n=== F16 vs F22 — WESAD Replay Comparison ===")
+    for row in rows:
+        print(f"  {row[0]:<30}  {row[1]:<12}  {row[2]:<12}  {row[3]}")
+    print()
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -947,7 +1105,7 @@ def main() -> None:
     )
 
     parser = argparse.ArgumentParser(
-        description="F16 — tinnitus tri-fold offline replay validation"
+        description="F16/F22 — tinnitus tri-fold offline replay validation"
     )
     parser.add_argument(
         "--dataset", choices=["wesad", "bidmc", "all"], default="wesad",
@@ -969,29 +1127,48 @@ def main() -> None:
         "--output-dir", default=None,
         help="Directory for JSON + plots (default: from config replay_validation.output_dir)",
     )
+    parser.add_argument(
+        "--use-v2", action="store_true", default=False,
+        help="F22: use v2 components (phase_model_v2 + arousal_classifier_v2)",
+    )
+    parser.add_argument(
+        "--compare", action="store_true", default=False,
+        help="F22: print comparison table between v1 (F16) and v2 (F22) results",
+    )
     args = parser.parse_args()
 
-    # Resolve output dir
+    # Resolve output dir from the appropriate config section
     if args.output_dir is None:
         try:
             from src.data.dataset_parsers import load_config
             cfg = load_config(args.config)
-            args.output_dir = cfg.get("replay_validation", {}).get(
-                "output_dir", "models/artifacts/replay_validation"
+            rv_section = "replay_validation_v2" if args.use_v2 else "replay_validation"
+            rv_cfg = cfg.get(rv_section, cfg.get("replay_validation", {}))
+            args.output_dir = rv_cfg.get(
+                "output_dir",
+                "models/artifacts/replay_validation_v2" if args.use_v2 else "models/artifacts/replay_validation",
             )
         except Exception:
-            args.output_dir = "models/artifacts/replay_validation"
+            args.output_dir = (
+                "models/artifacts/replay_validation_v2" if args.use_v2
+                else "models/artifacts/replay_validation"
+            )
+
+    if args.compare:
+        _print_comparison(args.config)
+        return
 
     datasets = ["wesad", "bidmc"] if args.dataset == "all" else [args.dataset]
 
     for ds in datasets:
-        logger.info("=== Starting %s replay validation ===", ds.upper())
+        logger.info("=== Starting %s replay validation (v2=%s) ===", ds.upper(), args.use_v2)
         if ds == "wesad":
             evaluate_wesad(
                 config_path=args.config,
                 checkpoint_path=args.checkpoint,
                 device=args.device,
                 output_dir=args.output_dir,
+                use_v2=args.use_v2,
             )
         else:
             evaluate_bidmc(
