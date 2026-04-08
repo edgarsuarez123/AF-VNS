@@ -290,14 +290,59 @@ F1 ─┬─> F2 ─────────────────────
 - `models/artifacts/replay_validation/wesad_replay_results.json`
 - `models/artifacts/replay_validation/wesad_replay_summary.png`
 
-**Resume From Here:** F1–F16 complete. F17–F22 in progress (tri-fold gate improvements).
+**Resume From Here:** F1–F21 complete. F22 (replay validation v2) is next.
 
-**F17–F22 plan:** Improve all three gates via consecutive-frame gating, multi-channel PPG, skin-temp EDA feature, dual-model exhalation, sliding recalibration, and re-run replay validation.
+**F17–F21 complete. Background training jobs running:**
+- v2 phase cache rebuild (3-channel VPG/APG): check `cache_v2_err.log`
+- v2 arousal cache rebuild (6-feature + 15s hop): check `arousal_v2_err.log`
+- After caches complete: train phase_model_v2 and arousal_classifier_v2
+
+**F22 — Re-run WESAD replay with all improvements:**
+- After checkpoints are ready: run `tinnitus_replay_validation.py` with v2 components
+- Compare vs F16 baseline: stim rate 206/min, tri-fold precision 0.065
+- Expected targets: stim rate <50/min, tri-fold precision >0.3
 
 **WESAD status:** Extracted at `data/raw/tinnitus avns/wesad/WESAD/`. 75 records parsed.
 **Checkpoints:**
 - `tinnitus_phase_detector.pth` — baseline (avg=0.617, dia=0.72, exh=0.51)
-- `tinnitus_phase_ls.pth` — label smoothing run (in progress)
-- `tinnitus_phase_dia_mod.pth` — dia-moderate run (queued)
-- `tinnitus_phase_exh_mod.pth` — exh-moderate run (queued)
-- `arousal_classifier.pkl` — fitted GBT (test acc=0.859, AUROC=0.930)
+- `tinnitus_phase_detector_v2.pth` — 3-channel VPG/APG model (training pending)
+- `tinnitus_exh_detector.pth` — dedicated 6s exhalation model (training pending)
+- `arousal_classifier.pkl` — v1 GBT (test acc=0.859, AUROC=0.930)
+- `arousal_classifier_v2.pkl` — 6-feature + 15s hop GBT (training pending)
+
+### F21 — Sliding EDA recalibration (2026-04-07)
+- `arousal_gate.py`: EMA blend of new baseline every `recalibration_interval_sec` seconds
+- Accumulates `_recal_buffer` (rolling 5-min window), blends with `alpha=0.3`
+- Config: `eda.sliding_recalibration=true`, `recalibration_window_sec=300`, `recalibration_interval_sec=60`, `recalibration_alpha=0.3`
+- `get_state()` now exposes `cal_mean`, `cal_std`, `sliding_recalibration` fields
+- 4 new tests: baseline shifts, disabled keeps fixed, EMA math, get_state fields
+
+### F20 — Dual-model exhalation with 6s window + RIIV (2026-04-07)
+- `tinnitus_precompute_exh_cache.py` (NEW): 6s two-channel (PPG+RIIV) windows at 0.2s stride, labels (N, 30) at 5Hz, reuses diastole subject split
+- `tinnitus_exh_train.py` (NEW): single-task BCE training loop, pos_weight balancing, label_smoothing=0.1
+- `config_tinnitus.yaml`: `exh_phase_model` (750 samples, 2-channel, n_tasks=1, n_frames=30), `exh_phase_precompute`, `exh_phase_training`, `paths_exh` sections
+- `tinnitus_closed_loop.py`: optional `exh_detector` param; fast path uses 6s RIIV tensor when buffer≥750 and dedicated model is loaded; falls back to shared model col 1; buffer maxlen extended to cover 6s
+- `build_tinnitus_closed_loop_pipeline()`: auto-loads exh detector checkpoint if exists
+- 4 new tests: buffer size, dual-model fires, exh blocks stim, single-model fallback; 503 tests pass
+
+### F19 — Skin temperature + finer EDA resolution (2026-04-07)
+- `tinnitus_parsers.py`: extracts WESAD E4 wrist TEMP at 4Hz, adds `temp_signal`/`temp_fs` fields to epoch records
+- `tinnitus_precompute_arousal.py`: 6-feature support (skin_temp_mean as 6th), `--config-section` CLI arg for v2 section
+- `arousal_gate.py`: `update()` accepts optional `temp_samples`, maintains `_temp_buffer`; `_compute_features()` returns 5 or 6 features depending on temp availability
+- `tinnitus_closed_loop.py`: `feed()` accepts optional `temp_samples`, passes to arousal gate
+- `config_tinnitus.yaml`: `arousal_classifier_v2` section (hop_sec=15, skin_temp_mean feature, v2 paths)
+- 4 new tests: 6-feat with temp, 5-feat backward compat, buffer trim, None passthrough; 499 tests pass
+
+### F18 — Multi-channel PPG (VPG + APG) for diastole (2026-04-07)
+- `phase_detector.py`: `in_channels: int = 1` to `PhaseDetectorConfig`; backbone uses `cfg.in_channels`; forward() checks correct channel count; `build_phase_detector()` reads `in_channels` from config
+- `config_tinnitus.yaml`: `phase_model_v2` section (`in_channels: 3`, `input_samples: 250`) + `paths_v2`
+- `tinnitus_precompute_cache.py`: `_compute_vpg_apg()` helper; `--n-channels 3` builds `(3, 250)` windows
+- `tinnitus_phase_train.py`: `TinnitusPhaseDataset` auto-detects 2D vs 3D cache; `--model-section` arg
+- `tinnitus_closed_loop.py`: `_run_fast_path()` computes VPG/APG on-the-fly when `in_ch==3`
+- 6 new tests: forward 3-channel, backward compat, wrong channel raises, config read, dataset 3D/1D; 499 tests pass
+- v2 cache rebuild launched as background process → `cache_v2.log` / `cache_v2_err.log`
+
+### F17 — Consecutive-frame gating + threshold tuning (2026-04-07)
+- `config_tinnitus.yaml`: `diastole_threshold: 0.5→0.65`, `consecutive_frames_required: 3`
+- `tinnitus_closed_loop.py`: `_run_fast_path()` checks last N frames via `np.all(dia_window > thresh)`; `build_tinnitus_closed_loop_pipeline()` reads `consecutive_frames_required`
+- 3 new tests: all-pass N=3 fires, partial-fail N=3 blocks, config read; 499 tests pass

@@ -2,7 +2,7 @@
 RS-Personalized AI-Driven Adaptive Stimulation (Aim 2) — Progress & Rationale
 ================================================================================
 Phase 1: Algorithmic & control software for auricular VNS (Sparrow Link).
-Last updated: 2026-04-02
+Last updated: 2026-04-07
 
 --------------------------------------------------------------------------------
 TINNITUS PIPELINE — Branch: feature/tinnitus-avns (2026-04-02)
@@ -1983,3 +1983,71 @@ Tests: 3 new tests in test_tinnitus_closed_loop.py:
   test_consecutive_frames_partial_fail — frame[-3] low + N=3 blocks
   test_consecutive_frames_config_read  — factory reads N=3 from config
 15/15 tests passing. Full suite: 488 passing, 3 pre-existing failures.
+
+--------------------------------------------------------------------------------
+T-18. MULTI-CHANNEL PPG VPG/APG — DIASTOLE CNN V2 (F18, 2026-04-07)
+--------------------------------------------------------------------------------
+Added VPG (1st derivative) + APG (2nd derivative) as explicit channels to make
+dicrotic notch structure visible to the diastole CNN.
+
+Changes:
+  phase_detector.py: in_channels param to PhaseDetectorConfig; backbone uses it
+  config_tinnitus.yaml: phase_model_v2 (in_channels=3), paths_v2 (new checkpoint/cache)
+  tinnitus_precompute_cache.py: _compute_vpg_apg() helper, --n-channels arg
+  tinnitus_phase_train.py: TinnitusPhaseDataset auto-detects 2D vs 3D cache
+  tinnitus_closed_loop.py: on-the-fly VPG/APG when in_ch==3
+
+v2 cache rebuild launched: python -m src.training.tinnitus_precompute_cache --n-channels 3
+  Log: cache_v2.log / cache_v2_err.log
+  Train after: python -m src.training.tinnitus_phase_train --model-section phase_model_v2
+
+6 new tests passing. Full suite: 499 passing, 2 pre-existing failures.
+
+--------------------------------------------------------------------------------
+T-19. SKIN TEMPERATURE + FINER EDA RESOLUTION (F19, 2026-04-07)
+--------------------------------------------------------------------------------
+Added WESAD E4 wrist temperature as 6th EDA feature; halved hop from 30→15s.
+
+Changes:
+  tinnitus_parsers.py: extracts TEMP at 4Hz, adds temp_signal/temp_fs fields
+  tinnitus_precompute_arousal.py: 6-feature support, --config-section for v2
+  arousal_gate.py: update() accepts temp_samples, _compute_features() returns 5 or 6 feats
+  tinnitus_closed_loop.py: feed() accepts temp_samples, passes to gate
+  config_tinnitus.yaml: arousal_classifier_v2 section (hop_sec=15, skin_temp_mean)
+
+v2 arousal cache rebuild launched → arousal_v2.log / arousal_v2_err.log
+After cache complete: python -m src.training.tinnitus_train_arousal --config-section arousal_classifier_v2
+
+4 new F19 tests passing. Full suite: 499 passing, 2 pre-existing failures.
+
+--------------------------------------------------------------------------------
+T-20. DUAL-MODEL EXHALATION WITH 6S WINDOW + RIIV (F20, 2026-04-07)
+--------------------------------------------------------------------------------
+Dedicated exhalation CNN on 6s PPG+RIIV windows — gets full breath cycle context.
+
+Changes:
+  tinnitus_precompute_exh_cache.py (NEW): 6s two-channel (PPG+RIIV), labels (N,30)
+  tinnitus_exh_train.py (NEW): single-task exh training, pos_weight, label_smoothing
+  config_tinnitus.yaml: exh_phase_model (750 samples, 2-ch, n_tasks=1, n_frames=30)
+  tinnitus_closed_loop.py: optional exh_detector, fast path uses 6s RIIV tensor when
+    buffer>=750 and model loaded; fallback to shared model col 1
+  build_tinnitus_closed_loop_pipeline(): auto-loads exh checkpoint if exists
+
+After v2 phase cache: build exh cache → python -m src.training.tinnitus_precompute_exh_cache
+After exh cache: python -m src.training.tinnitus_exh_train
+
+4 new F20 tests passing. Full suite: 503 passing, 2 pre-existing failures.
+
+--------------------------------------------------------------------------------
+T-21. SLIDING EDA RECALIBRATION (F21, 2026-04-07)
+--------------------------------------------------------------------------------
+EMA blend of new tonic baseline every 60s to track slow EDA drift.
+
+Changes:
+  arousal_gate.py: _recal_buffer accumulates recent 5min of EDA; every 60s decomposes,
+    blends new mean/std via EMA (alpha=0.3), updates thresholds; disabled flag keeps fixed
+  config_tinnitus.yaml: eda.sliding_recalibration=true, recalibration_window/interval/alpha
+  get_state() now exposes cal_mean, cal_std, sliding_recalibration fields
+
+4 new F21 tests passing. Full suite (run via pytest tests/test_arousal_gate.py): 16/16.
+
