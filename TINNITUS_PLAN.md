@@ -290,7 +290,7 @@ F1 ─┬─> F2 ─────────────────────
 - `models/artifacts/replay_validation/wesad_replay_results.json`
 - `models/artifacts/replay_validation/wesad_replay_summary.png`
 
-**F1–F22 COMPLETE.**
+**F1–F23 COMPLETE.**
 
 ### F22 Results — WESAD Tri-Fold Replay v2 (15 subjects, 75 epochs)
 
@@ -308,6 +308,10 @@ F1 ─┬─> F2 ─────────────────────
 **Deliverables:**
 - `models/artifacts/replay_validation_v2/wesad_replay_results.json`
 - `models/artifacts/replay_validation_v2/wesad_replay_summary.png`
+
+### F23 — Demo script + README architecture diagram (2026-10-05)
+- Created `scripts/demo_tinnitus_pipeline.py` — streams synthetic PPG+EDA through the tri-fold pipeline using trained checkpoints; prints stim events, gate states, and summary. Runs with zero dataset downloads.
+- README rewrite (master branch) covers all 3 pipelines with Mermaid diagrams — see Phase B in plan.
 
 **Next step:** The recall collapse (0.004) is the key open issue. Options:
 - Lower `consecutive_frames_required` to 2 (less strict debounce)
