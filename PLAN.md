@@ -1,5 +1,11 @@
 # AF VNS — Round 10: Threshold Tuning + Better Data + Better Features + Partial Unfreeze
 
+## Docs Update — 2026-10-05
+- [x] Rewrote README.md as unified 3-pipeline reference with Mermaid architecture diagrams
+- [x] Added `scripts/demo_af_pipeline.py` — synthetic ECG+HRV inference demo, no dataset required
+- Stroke demo: `scripts/demo_stroke_pipeline.py` lives on `feature/stroke-avns`
+- Tinnitus demo: `scripts/demo_tinnitus_pipeline.py` lives on `feature/tinnitus-avns`
+
 ## Context
 
 Round 9 achieved C2017 OOD AUROC=0.7432 (gap=0.0068 to NFR-2.1 target of 0.75).
