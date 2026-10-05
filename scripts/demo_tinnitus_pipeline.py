@@ -76,6 +76,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--config", default="config_tinnitus.yaml", help="Config YAML path")
     p.add_argument("--device", default="cpu", help="PyTorch device (default: cpu)")
     p.add_argument("--log-level", default="ERROR", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    p.add_argument(
+        "--demo-mode", action="store_true",
+        help="Lower gates to F16 settings (dia>0.50, N=1) so stim events fire on synthetic data"
+    )
     return p.parse_args()
 
 
@@ -93,10 +97,17 @@ def main() -> None:
     print(f"  Config : {args.config}  |  Device: {args.device}")
     print(f"  PPG 125 Hz + EDA 4 Hz  |  Duration: {args.duration}s")
     print()
+    if args.demo_mode:
+        print("  Mode: DEMO (F16 gates: dia>0.50, N=1 frame) -- stim events will fire")
+    else:
+        print("  Mode: CLINICAL (F17 gates: dia>0.65, N=3 frames) -- strict, use --demo-mode to see firing")
+    print()
     print("  Gate logic: STIM fires when ALL three are true simultaneously:")
-    print("    [1] Diastole probability > 0.65 for 3 consecutive frames (600ms)")
-    print("    [2] Exhalation probability > 0.50")
-    print("    [3] EDA arousal in-band (GBT classifier, WESAD-trained)")
+    dia_thresh = 0.50 if args.demo_mode else 0.65
+    n_consec = 1 if args.demo_mode else 3
+    print(f"    [1] Diastole probability > {dia_thresh} for {n_consec} consecutive frame(s)")
+    print(f"    [2] Exhalation probability > 0.50")
+    print(f"    [3] EDA arousal in-band (GBT classifier, WESAD-trained)")
 
     # ------------------------------------------------------------------
     # 1. Build pipeline from trained checkpoints
@@ -104,6 +115,10 @@ def main() -> None:
     print(f"\n[1/3] Building pipeline from trained checkpoints...")
     t0 = time.perf_counter()
     pipe = build_tinnitus_closed_loop_pipeline(config_path=args.config, device=args.device)
+    if args.demo_mode:
+        # Override F17 clinical gates to F16 settings so events fire on synthetic data
+        pipe._dia_threshold = 0.50
+        pipe._consecutive_n = 1
     build_ms = (time.perf_counter() - t0) * 1000
     using_clf = pipe._arousal_gate._classifier is not None
     print(f"      Done in {build_ms:.0f}ms")
@@ -148,22 +163,23 @@ def main() -> None:
         arousal_str = "in-band" if pipe._arousal_gate.is_in_band() else "blocked"
 
         if events:
-            for ev in events:
-                print(
-                    f"  {sec:4d}s | {dia_str:>6s} | {exh_str:>6s} | {arousal_str:>7s} |"
-                    f" {elapsed_ms:6.1f}ms | ** STIM {ev.amplitude:.2f}mA"
-                    f" {ev.frequency:.0f}Hz {ev.pulse_width:.0f}us **"
-                )
+            # Print one summary row per second showing stim count + last event params
+            ev = events[-1]
+            print(
+                f"  {sec:4d}s | {dia_str:>6s} | {exh_str:>6s} | {arousal_str:>7s} |"
+                f" {elapsed_ms:6.1f}ms | ** STIM x{len(events)}"
+                f"  {ev.amplitude:.2f}mA {ev.frequency:.0f}Hz {ev.pulse_width:.0f}us **"
+            )
         else:
             # Which gate is blocking?
             if probs:
-                dia_gate = probs[0] > 0.65
-                exh_gate = probs[1] > 0.50
+                dia_gate = probs[0] > pipe._dia_threshold
+                exh_gate = probs[1] > pipe._exh_threshold
                 blocked_by = []
                 if not dia_gate:
-                    blocked_by.append(f"dia({probs[0]:.3f}<0.65)")
+                    blocked_by.append(f"dia({probs[0]:.3f}<{pipe._dia_threshold})")
                 if not exh_gate:
-                    blocked_by.append(f"exh({probs[1]:.3f}<0.50)")
+                    blocked_by.append(f"exh({probs[1]:.3f}<{pipe._exh_threshold})")
                 if not pipe._arousal_gate.is_in_band():
                     blocked_by.append("arousal")
                 reason = ", ".join(blocked_by) if blocked_by else "N=3 consecutive gate"
@@ -196,9 +212,13 @@ def main() -> None:
     print("    Stim rate on real data   : 3.2/min  (after N=3 consecutive gate)")
     print("    EDA suppression example  : S7 stress: 588/min -> 44/min")
     print()
-    print("  Zero stim events on synthetic data is expected. The phase detector")
-    print("  (avg_acc=0.617) produces diastole probabilities that rarely hold")
-    print("  above 0.65 for 3 consecutive 100ms frames on a synthetic sine wave.")
+    if total_events == 0:
+        print("  NOTE: No stim events with clinical gates (dia>0.65, N=3 frames).")
+        print("  Run with --demo-mode to lower gates and see stim events fire.")
+    else:
+        print("  NOTE: --demo-mode uses F16 gates (dia>0.50, N=1). Clinical mode")
+        print("  uses F17 (dia>0.65, N=3 frames) which reduces stim rate by 98%")
+        print("  on real data (206/min -> 3.2/min, WESAD F22 replay).")
 
 
 if __name__ == "__main__":
