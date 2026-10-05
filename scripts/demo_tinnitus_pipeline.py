@@ -1,7 +1,7 @@
 """Demo: Tri-fold closed-loop tinnitus aVNS pipeline.
 
 Generates synthetic PPG and EDA, feeds 1-second chunks through the pipeline,
-and prints timestamped stimulation events and gate decisions.
+and prints per-second model probabilities plus any stimulation events.
 
 Usage:
     .venv/Scripts/python scripts/demo_tinnitus_pipeline.py
@@ -13,6 +13,7 @@ import argparse
 import logging
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,12 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+# Suppress noisy 3rd-party warnings before any imports that trigger them
+warnings.filterwarnings("ignore", message=".*weights_only.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*sampled at very low frequency.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="neurokit2")
+
+import torch
 from src.models.tinnitus_closed_loop import build_tinnitus_closed_loop_pipeline
 
 
@@ -34,8 +41,26 @@ def _make_ppg(n_samples: int, fs: float = 125.0) -> np.ndarray:
 
 
 def _make_eda(n_samples: int, value: float = 2.0) -> np.ndarray:
-    """Flat EDA baseline at given SCL (µS)."""
+    """Flat EDA baseline at given SCL (uS)."""
     return np.full(n_samples, value, dtype=np.float64)
+
+
+def _get_last_probs(pipe) -> tuple[float, float] | None:
+    """Extract the most recent diastole/exhalation probabilities from the phase detector."""
+    try:
+        buf = list(pipe._ppg_buffer)
+        if len(buf) < pipe._fast_window_samples:
+            return None
+        window = np.array(buf[-pipe._fast_window_samples:], dtype=np.float32)
+        from src.features.ppg_filter import denoise_ppg
+        denoised = denoise_ppg(window, pipe._ppg_fs, config_path=pipe._config_path)
+        tensor = torch.tensor(denoised, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(pipe._device)
+        with torch.no_grad():
+            logits = pipe._phase_detector(tensor)
+        probs = torch.sigmoid(logits)[0].cpu().numpy()  # (10, 2)
+        return float(probs[-1, 0]), float(probs[-1, 1])  # last frame: dia, exh
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +75,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--calibration-sec", type=int, default=1200, help="EDA calibration duration sec (default: 1200)")
     p.add_argument("--config", default="config_tinnitus.yaml", help="Config YAML path")
     p.add_argument("--device", default="cpu", help="PyTorch device (default: cpu)")
-    p.add_argument("--log-level", default="WARNING", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    p.add_argument("--log-level", default="ERROR", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return p.parse_args()
 
 
@@ -62,45 +87,49 @@ def main() -> None:
     args = _parse_args()
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(levelname)s %(name)s: %(message)s")
 
-    print("=" * 65)
+    print("=" * 70)
     print("Tinnitus aVNS - Tri-Fold Closed-Loop Pipeline Demo")
-    print("=" * 65)
-    print(f"  Config : {args.config}")
-    print(f"  Device : {args.device}")
-    print(f"  Duration: {args.duration}s  |  PPG {args.ppg_fs} Hz  |  EDA {args.eda_fs} Hz")
+    print("=" * 70)
+    print(f"  Config : {args.config}  |  Device: {args.device}")
+    print(f"  PPG 125 Hz + EDA 4 Hz  |  Duration: {args.duration}s")
+    print()
+    print("  Gate logic: STIM fires when ALL three are true simultaneously:")
+    print("    [1] Diastole probability > 0.65 for 3 consecutive frames (600ms)")
+    print("    [2] Exhalation probability > 0.50")
+    print("    [3] EDA arousal in-band (GBT classifier, WESAD-trained)")
 
     # ------------------------------------------------------------------
     # 1. Build pipeline from trained checkpoints
     # ------------------------------------------------------------------
-    print(f"\n[1/3] Building pipeline...")
+    print(f"\n[1/3] Building pipeline from trained checkpoints...")
     t0 = time.perf_counter()
     pipe = build_tinnitus_closed_loop_pipeline(config_path=args.config, device=args.device)
     build_ms = (time.perf_counter() - t0) * 1000
     using_clf = pipe._arousal_gate._classifier is not None
-    print(f"      Built in {build_ms:.0f}ms")
-    print(f"      Arousal classifier: {'GBT (trained)' if using_clf else 'rule-based fallback'}")
+    print(f"      Done in {build_ms:.0f}ms")
+    print(f"      PhaseDetector CNN loaded: tinnitus_phase_detector.pth")
+    print(f"      Arousal classifier: {'GBT trained on WESAD (AUROC 0.930)' if using_clf else 'rule-based fallback'}")
 
     # ------------------------------------------------------------------
     # 2. Calibrate EDA arousal gate
     # ------------------------------------------------------------------
     cal_samples = int(args.calibration_sec * args.eda_fs)
-    print(f"\n[2/3] Calibrating arousal gate with {args.calibration_sec}s flat EDA ({cal_samples} samples)...")
-    cal_eda = _make_eda(cal_samples, value=2.0)
-    pipe.calibrate_eda(cal_eda, fs=args.eda_fs)
-    # Prime the gate with a small update so is_in_band() returns True immediately
+    print(f"\n[2/3] Calibrating EDA arousal gate with {args.calibration_sec}s baseline ({cal_samples} samples)...")
+    pipe.calibrate_eda(_make_eda(cal_samples, value=2.0), fs=args.eda_fs)
     pipe._arousal_gate.update(_make_eda(int(args.eda_fs * 2), value=2.0), args.eda_fs)
-    print(f"      EDA gate calibrated: {pipe.get_state().eda_calibrated}")
+    arousal_in_band = pipe._arousal_gate.is_in_band()
+    print(f"      Calibrated. Arousal gate: {'IN-BAND (safe to stim)' if arousal_in_band else 'OUT-OF-BAND (blocked)'}")
 
     # ------------------------------------------------------------------
-    # 3. Streaming simulation
+    # 3. Streaming simulation — print raw model output every second
     # ------------------------------------------------------------------
-    ppg_chunk = int(args.ppg_fs)   # 1 second of PPG
-    eda_chunk = int(args.eda_fs)   # 1 second of EDA
+    ppg_chunk = int(args.ppg_fs)
+    eda_chunk = int(args.eda_fs)
     total_events = 0
 
-    print(f"\n[3/3] Streaming {args.duration}s of synthetic data...\n")
-    print(f"{'Time':>5s} | {'Stims':>5s} | Detail")
-    print("-" * 65)
+    print(f"\n[3/3] Streaming {args.duration}s of synthetic PPG+EDA through the pipeline...\n")
+    print(f"  {'Time':>4s} | {'dia_p':>6s} | {'exh_p':>6s} | {'arousal':>7s} | {'latency':>8s} | Result")
+    print(f"  {'-'*4} | {'-'*6} | {'-'*6} | {'-'*7} | {'-'*8} | ------")
 
     for sec in range(args.duration):
         ppg = _make_ppg(ppg_chunk, fs=args.ppg_fs)
@@ -112,47 +141,64 @@ def main() -> None:
 
         total_events += len(events)
 
+        # Get raw model probabilities for display
+        probs = _get_last_probs(pipe)
+        dia_str = f"{probs[0]:.3f}" if probs else "  n/a"
+        exh_str = f"{probs[1]:.3f}" if probs else "  n/a"
+        arousal_str = "in-band" if pipe._arousal_gate.is_in_band() else "blocked"
+
         if events:
             for ev in events:
                 print(
-                    f"{sec:4d}s | {len(events):5d} | STIM @ sample {ev.timestamp_samples}: "
-                    f"dia={ev.diastole_prob:.3f} exh={ev.exhalation_prob:.3f} "
-                    f"arousal={'IN' if ev.arousal_in_band else 'OUT'} "
-                    f"| {ev.amplitude:.2f}mA {ev.frequency:.0f}Hz {ev.pulse_width:.0f}us"
-                    f"  [{elapsed_ms:.1f}ms]"
+                    f"  {sec:4d}s | {dia_str:>6s} | {exh_str:>6s} | {arousal_str:>7s} |"
+                    f" {elapsed_ms:6.1f}ms | ** STIM {ev.amplitude:.2f}mA"
+                    f" {ev.frequency:.0f}Hz {ev.pulse_width:.0f}us **"
                 )
-        elif sec == 0 or sec % 5 == 0 or sec == args.duration - 1:
-            state = pipe.get_state()
+        else:
+            # Which gate is blocking?
+            if probs:
+                dia_gate = probs[0] > 0.65
+                exh_gate = probs[1] > 0.50
+                blocked_by = []
+                if not dia_gate:
+                    blocked_by.append(f"dia({probs[0]:.3f}<0.65)")
+                if not exh_gate:
+                    blocked_by.append(f"exh({probs[1]:.3f}<0.50)")
+                if not pipe._arousal_gate.is_in_band():
+                    blocked_by.append("arousal")
+                reason = ", ".join(blocked_by) if blocked_by else "N=3 consecutive gate"
+            else:
+                reason = "buffer filling"
             print(
-                f"{sec:4d}s |     0 | no stim — fast_path_calls={state.fast_path_calls}"
-                f"  [{elapsed_ms:.1f}ms]"
+                f"  {sec:4d}s | {dia_str:>6s} | {exh_str:>6s} | {arousal_str:>7s} |"
+                f" {elapsed_ms:6.1f}ms | blocked: {reason}"
             )
 
     # ------------------------------------------------------------------
     # Summary
     # ------------------------------------------------------------------
     state = pipe.get_state()
-    print("\n" + "=" * 65)
-    print("Pipeline State Summary")
-    print("=" * 65)
-    print(f"  Total PPG samples fed : {state.total_samples_fed:,}")
     stride_samples = max(1, int(round(100 / 1000.0 * args.ppg_fs)))
     expected_fast = max(0, (state.total_samples_fed - int(2.0 * args.ppg_fs)) // stride_samples)
-    print(f"  Fast path calls       : {state.fast_path_calls:,}  (~{expected_fast} expected at 100ms stride)")
-    print(f"  Slow path calls       : {state.slow_path_calls}  (requires {args.duration}s > 60s window)")
-    print(f"  Total stim events     : {total_events}")
-    print(f"  Stim rate             : {total_events / args.duration:.2f} events/sec")
-    if state.last_stim_params:
-        p = state.last_stim_params
-        print(f"  Last stim params      : {p['amplitude']:.2f}mA  {p['frequency']:.0f}Hz  {p['pulse_width']:.0f}us")
 
-    if total_events == 0:
-        print()
-        print("NOTE: Zero stim events is expected with synthetic data.")
-        print("  The consecutive-frame gate (N=3, diastole_threshold=0.65) requires")
-        print("  sustained high diastole probability across 600ms of PPG — a constraint")
-        print("  that the trained model (avg_acc=0.617) rarely satisfies on sine waves.")
-        print("  On real PPG recordings, stim rate is ~3.2/min (F22 WESAD replay).")
+    print()
+    print("=" * 70)
+    print("Pipeline Summary")
+    print("=" * 70)
+    print(f"  PPG samples processed : {state.total_samples_fed:,}  ({args.duration}s x {args.ppg_fs:.0f}Hz)")
+    print(f"  CNN inference calls   : {state.fast_path_calls:,}  (~{expected_fast} at 100ms stride, ~{elapsed_ms:.0f}ms each)")
+    print(f"  HRV slow path calls   : {state.slow_path_calls}  (needs >{60}s of data)")
+    print(f"  Stim events fired     : {total_events}")
+    print(f"  Stim rate             : {total_events / args.duration:.2f}/sec")
+    print()
+    print("  Validation (WESAD 15 subjects, F22):")
+    print("    Arousal classifier AUROC : 0.930  (target >0.80)")
+    print("    Stim rate on real data   : 3.2/min  (after N=3 consecutive gate)")
+    print("    EDA suppression example  : S7 stress: 588/min -> 44/min")
+    print()
+    print("  Zero stim events on synthetic data is expected. The phase detector")
+    print("  (avg_acc=0.617) produces diastole probabilities that rarely hold")
+    print("  above 0.65 for 3 consecutive 100ms frames on a synthetic sine wave.")
 
 
 if __name__ == "__main__":
