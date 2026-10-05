@@ -2,6 +2,9 @@
 
 Branch: `feature/stroke-avns`
 
+## Docs Update — 2026-10-05
+- [x] Added `scripts/demo_stroke_pipeline.py` — synthetic ECG demo, no dataset required. Fires real stim events from the trained phase_detector_ref.pth checkpoint.
+
 ## Grant Context (Aim 2)
 
 The grant describes Aim 2 as: a hybrid CNN/RNN system that processes 250Hz HRV
